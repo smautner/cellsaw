@@ -8,10 +8,22 @@ class mergeutils:
         f = lambda i,e: np.full_like(e.obs['true'],-1)  if i in masked else e.obs['true']
         return [ f(i,e) for i,e in enumerate(self.data)]
 
+    def confuse2(self, labels):
+        assert self.sorted
+        assert len(self.data) == 2, 'i could just assume that you mean the first 2 datasets, but i refuse :D'
+        assert len(labels[0])== self.data[0].shape[0]
+        assert len(labels[1])== self.data[1].shape[0]
+
+        draw.confuse2(labels)
+
+
+    def plot(self, labels):
+        draw.plot(self, labels)
+
 
 class merge(mergeutils):
     def __init__(self, adatas, selectgenes = 800, make_even = True, pca = 20, umaps = [2],
-            joint_space = False,
+            joint_space = True,
             sortfield = 0,
             titles = "ABCDEFGHIJKIJ"):
 
@@ -19,6 +31,8 @@ class merge(mergeutils):
         self.genescores = [a.varm['scores'] for a in adatas]
         self.geneab = [a.varm['genes'] for a in adatas]
         self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
+        self.sorted = False
+        self.jointSpace = joint_space
 
         # geneab = np.all(np.array(self.geneab), axis=0)
         # for i, d in enumerate(self.data):
@@ -66,6 +80,9 @@ class merge(mergeutils):
                 self.projections[x][i+1] = self.projections[x][i+1][hung[1]]
                 if x == 0:
                     self.data[i+1]= self.data[i+1][hung[1]]
+
+        self.sorted = True
+
     #
     def hungarian(self,data_fld,data_id, data_id2):
             hung, dist = mergehelpers.hungarian(self.projections[data_fld][data_id],self.projections[data_fld][data_id2])

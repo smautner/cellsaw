@@ -38,7 +38,9 @@ def plot(merge, labels, plotsperline =3, grad=False):
             plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
             plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
 
-            #plt.legend(markerscale=1.5, fontsize='small', ncol=int(len(X) * 2.5), bbox_to_anchor=(1, -.12))
+            #plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
+            #plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
+            plt.legend(markerscale=1.2, fontsize=3.5)
         else:
             plt.scatter(x[:,0], x[:,1], c=y, s=1)
 
