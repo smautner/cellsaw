@@ -30,23 +30,23 @@ def update_version_py():
 
 
     except EnvironmentError:
-        print("unable to run git, leaving cellsaw/_version.py alone")
+        print("unable to run git, leaving cellsaw/__version__.py alone")
         return
     stdout = p.communicate()[0]
     if p.returncode != 0:
-        print("unable to run git, leaving cellsaw/_version.py alone")
+        print("unable to run git, leaving cellsaw/__version__.py alone")
         return
     ver = "0.0."+stdout.decode('utf-8').strip()
     #ver = str(int(ver,16)) # pypi doesnt like base 16
-    f = open("cellsaw/_version.py", "w")
+    f = open("cellsaw/__version__.py", "w")
     f.write(VERSION_PY % ver)
     f.close()
-    print("set cellsaw/_version.py to '%s'" % ver)
+    print("set cellsaw/__version__.py to '%s'" % ver)
 
 
 def get_version():
     try:
-        f = open("cellsaw/_version.py")
+        f = open("cellsaw/__version__.py")
     except EnvironmentError:
         return None
     for line in f.readlines():
@@ -95,7 +95,7 @@ setup(
     version=get_version(),
     author='Stefan Mautner',
     author_email='myl4stn4m3@cs.uni-freiburg.de',
-        packages=['cellsaw','cellsaw.sim','cellsaw.merge','cellsaw.load'],
+        packages=['cellsaw','cellsaw.similarity','cellsaw.merge','cellsaw.load'],
     scripts=[ ],
     include_package_data=True,
     package_data={},
