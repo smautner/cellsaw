@@ -22,8 +22,8 @@ def diffuse(mergething, labelslist, pid = 1, neighbors = 30):
     y1len = Xlist[0].shape[0]
 
     lp_model = LabelSpreading(kernel=lambda x, y: mykernel(y1len, neighbors, x, y),
-                              alpha=.2,
-                              max_iter=30)
+                              alpha=.8,
+                              max_iter=1000)
 
     startlabels = np.hstack(labelslist)
     args = np.vstack(Map(tools.zehidense, Xlist)), startlabels
@@ -71,18 +71,20 @@ def mykernel(x1len=False, neighbors = 3, X=None, _=None, return_graph = False):
     q4 = nbrs.kneighbors_graph(x2,neighbors).todense()
     q1,q3 = hungmat(x1,x2)
 
+    q1 = q1*.01
+    q3 = q3*.01
     graph = np.hstack((np.vstack((q2,q3)),np.vstack((q1,q4))))
 
-
-    connect = dijkstra(graph,unweighted = True, directed = False)
-
+    '''
+    connect = dijkstra(graph, unweighted = True, directed = False)
     if return_graph:
         return graph, connect
     distances = -connect # invert
     distances -= distances.min() # longest = 4
     distances /= distances.max() # between 0 and 1 :)
     distances[distances < np.median(np.unique(distances))] = 0
+    '''
 
-    return np.power(distances,2)
+    return  graph #np.power(distances,2)
 
 
