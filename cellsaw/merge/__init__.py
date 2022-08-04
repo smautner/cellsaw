@@ -17,8 +17,8 @@ class mergeutils:
         draw.confuse2(labels)
 
 
-    def plot(self, labels):
-        draw.plot(self, labels)
+    def plot(self, labels, **kwargs):
+        draw.plot(self, labels,**kwargs)
 
 
 class merge(mergeutils):

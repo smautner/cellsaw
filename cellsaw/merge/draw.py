@@ -29,21 +29,25 @@ def plot(merge, labels, plotsperline =3, grad=False):
     xmax,ymax = concatX.max(axis = 0)
     xdiff = np.abs(xmax - xmin)
     ydiff = np.abs(ymax - ymin)
+    plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
+    plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
+
 
     for x,y in zip(X,labels):
 
         if not grad:
             d.draw(x,y, title=None)
 
-            plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
-            plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
-
             #plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
             #plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
             plt.legend(markerscale=1.2, fontsize=3.5)
         else:
+            d.next()
+            plt.gca().axes.yaxis.set_ticklabels([])
+            plt.gca().axes.xaxis.set_ticklabels([])
             plt.scatter(x[:,0], x[:,1], c=y, s=1)
-
+            #plt.colorbar(shrink=.5)
+            #plt.tick_params(labelsize=4)
     plt.show()
 
 
