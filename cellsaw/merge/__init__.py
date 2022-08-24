@@ -1,11 +1,11 @@
 import cellsaw.merge.mergehelpers  as mergehelpers
 import numpy as np
-from cellsaw.merge.diffusion import diffuse
+from cellsaw.merge.diffusion import diffuse, stringdiffuse
 from cellsaw.merge import draw
 
 class mergeutils:
-    def getlabels(self,masked = []):
-        f = lambda i,e: np.full_like(e.obs['true'],-1)  if i in masked else e.obs['true']
+    def getlabels(self,masked = [], label = 'true', fill = -1):
+        f = lambda i,e: np.full_like(e.obs[label],fill)  if i in masked else e.obs[label]
         return [ f(i,e) for i,e in enumerate(self.data)]
 
     def confuse2(self, labels):

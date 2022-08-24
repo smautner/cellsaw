@@ -7,3 +7,7 @@ def evaluate(pairs, labels, setid = 1):
 
 def scorepair(pair, labels, setid=1):
     return adjusted_rand_score( pair.data[setid].obs['true'],labels[setid])
+
+
+
+

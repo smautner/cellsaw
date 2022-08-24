@@ -47,3 +47,12 @@ def getnn(m,n):
     srt=  np.argsort(m, axis= 1)
     return [ [i]+srt[i,-n:].tolist() for i in range(srt.shape[0]) ]
 
+
+def neighbors(loader, sim = cosine , filenames=[], kNeighbors = 1):
+    simFunc = lambda a,b,c: sim(loader(a),loader(b))
+    distances = matrixmap_mp(simFunc,filenames,repeats = 2)
+    distances = np.mean(distances, axis =2)
+    return getNeighbors(distances,filenames,k=kNeighbors)
+
+
+

@@ -163,4 +163,20 @@ def load100addtruthAndWrite(adata,item, path='../data/100/data'):
     adata.write(fname, compression='gzip')
 
 
+import csv
+import re
+def loadpangalolabels(path):
+    with open(path+"/cell_type_annotations.txt",'r') as f:
+        data = csv.reader(f)
+        return { "_".join(line[:3]):line[3]  for line in data}
 
+def annotatetruecelltype(dic, adata, name):
+    match = re.search(r'SRA\d*-SRS\d*', name)
+    eh = match.group().replace('-',"_")
+    adata.obs['truecelltype'] = [  dic.get(f'{eh}_{c}',"pangalofail")  for c in adata.obs['true']  ]
+    return adata
+
+
+def annotatepangalo(pangaloLabelPath, adatas, names):
+    d = loadpangalolabels(pangaloLabelPath)
+    return [ annotatetruecelltype(d,a,n) for a,n in zip(adatas,names) ]
