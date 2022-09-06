@@ -1,7 +1,9 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 from cellsaw.similarity.measures import cosine, jaccard, precision
 import numpy as np
 from ubergauss import tools as ut
 from cellsaw.similarity import draw
+import pandas as pd
 
 def matrixmap(method, instances, repeats = 5):
     l = len(instances)
@@ -55,4 +57,96 @@ def neighbors(loader, sim = cosine , filenames=[], kNeighbors = 1):
     return getNeighbors(distances,filenames,k=kNeighbors)
 
 
+def matrixmap_odd(method, targets,sources, repeats = 5):
+    # instances not symmetrical
+    l = len(targets)
+    l2 = len(sources)
+    res = np.zeros((l,l2,repeats))
 
+    def func(stuff):
+        a,b,seeds,i,j = stuff
+        r = [ method(a,b,seed)  for seed in seeds ]
+        return r,i,j
+
+    tmptasks =([targets[i],sources[j],list(range(repeats)), i,j]
+               for i in range(l) for j in range(l2))
+
+    for r,i,j in ut.xmap(func,tmptasks):
+        for x,val in enumerate(r):
+            res[i,j,x] = val
+
+    return res
+
+
+
+'''
+ranked_datasets_list, similarity_df = rank_by_similarity(target = target_datasets,
+                                    source = source_datasets,
+                                    return_similarity = True)
+'''
+
+from cellsaw.load.preprocess import annotate_genescores # TODO should we move this to bla
+
+def rank_by_similarity(target = False,
+                        source = False,
+                        return_similarity = True):
+    '''
+    target: the ones we want to annotate
+    source: the database
+    return_similarity: returns (list, similarity_matrix) otherwise only the list
+    '''
+
+
+
+    # todo: minscore is set to 200 here,.,,  should be dont in the laoder
+    source = Map(annotate_genescores, source)
+    target = Map(annotate_genescores, target)
+
+
+
+    ff = lambda a,b,c: cosine(a,b, numgenes=500)
+    distances = matrixmap_odd(ff,target,source,repeats = 2)
+    distances = np.mean(distances, axis =2)
+    ranksim = np.argsort(-distances)
+    ranklist = [[source[col] for col in row]for row in ranksim]
+
+
+    def getname(ada):
+        s = ada.uns['fname']
+        return s[s.rindex('/'):]
+
+    ind = Map(getname,target)
+    col = Map(getname,source)
+    distances = pd.DataFrame( distances, index = ind, columns = col)
+
+
+    if return_similarity:
+        return ranklist, distances
+    else:
+        return ranklist
+
+
+def plot_dendrogram(similarity_df):
+    draw.dendro_degen(similarity_df.to_numpy(),
+        similarity_df.index)
+
+
+
+from cellsaw import merge
+
+def annotate_label(target,
+                   source,
+
+                   source_label = 'celltype',
+                    target_label='predicted_celltype',
+
+                    pca_dim = 20, umap_dim = None):
+
+
+    merged = merge.merge([target,source],pca=pca_dim,umaps=[umap_dim])
+
+    #labels = xmap(lambda x: x.getlabels(masked=[1]), mergedPairs)
+    #labels = xmap(lambda x:merge.diffuse(*x), zip(mergedPairs,labels))
+
+    # merge
+    #

@@ -170,10 +170,10 @@ def loadpangalolabels(path):
         data = csv.reader(f)
         return { "_".join(line[:3]):line[3]  for line in data}
 
-def annotatetruecelltype(dic, adata, name):
+def annotatetruecelltype(dic, adata, name, f_out = 'truecelltype', f_in = 'clusterid'):
     match = re.search(r'SRA\d*-SRS\d*', name)
     eh = match.group().replace('-',"_")
-    adata.obs['truecelltype'] = [  dic.get(f'{eh}_{c}',"pangalofail")  for c in adata.obs['true']  ]
+    adata.obs[f_out] = [  dic.get(f'{eh}_{c}', 'no pangalo')  for c in adata.obs[f_in]  ]
     return adata
 
 

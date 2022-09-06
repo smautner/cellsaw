@@ -1,4 +1,4 @@
-
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 from cellsaw.load.loadadata import get41names, get100names, load100
 from cellsaw.load.preprocess import annotate_genescores
 from scipy.sparse import csr_matrix
@@ -8,7 +8,8 @@ def easyLoad100(name, path = None, remove_unlabeled = False, mingenes= 200,subsa
                 preprocessingmethod = 'natto', donormalize= True,
                 plot=False,quiet=True, nattoargs=  {'mean': (0.015, 4), 'bins': (.25, 1)}):
     adata = load100(name, path=path, remove_unlabeled=remove_unlabeled, subsample = subsample)
-    gs = annotate_genescores(adata, mingenes=mingenes, selector=preprocessingmethod, donormalize= donormalize, nattoargs= nattoargs, plot=plot, quiet=quiet)
+    gs = annotate_genescores(adata, mingenes=mingenes, selector=preprocessingmethod,
+            donormalize= donormalize, nattoargs= nattoargs, plot=plot, quiet=quiet)
     return gs
 
 import anndata
@@ -16,86 +17,121 @@ import glob
 import cellsaw.load.loadadata as ldata
 from ubergauss import tools as t
 import os
+import scanpy as sc
 
 
-def read(dir, suffix = '.gz',datasets=[],delimiter= '\t'):
-    '''
-    # fun facts
-    1. scanpys load function should be able to handle everything,
-    but the delimiter is not passed on correctly.,..
 
-    2. it seems not so easy to get rid of unpacked gz files
-    '''
+def read(dir, suffix = '.gz',
+        datasets=[],
+        delimiter= '\t',
+        sample_size = 0,
+        remove_cells = {}):
 
-    # find the files...
+    # targets = list of files to load
     if dir[-1] != '/':
         dir+='/'
     if not datasets:
-        targets = glob.glob(f'{dir}*{suffix}')[:10]
+        targets = glob.glob(f'{dir}*{suffix}')
     else:
         targets  = [f'{dir}{e}{suffix}' for e in datasets]
 
 
-    # scanpy reading has a bug so we use anndatareadcsv in the meantime..
+    # if the files are csv: convert
     if not suffix.endswith('h5'):
-        t.xmap(lambda x: readcsv(x, delimiter),targets)
+        t.xmap(lambda x: readcsv(x, delimiter),targets,n_jobs = 10)
         return read(dir,'.h5')
 
-    return  [anndata.read_h5ad(x) for x in targets]
+
+    # read an h5 file
+    def openh5(fname):
+        adata = anndata.read_h5ad(fname, backed = None)
+
+        # reduce cell count
+        for k,v in remove_cells.items():
+            adata = adata[adata.obs[k]!=v]
+        if sample_size:
+            try:
+                sc.pp.subsample(adata, fraction=None, n_obs=sample_size,
+                        random_state=None, copy=False)
+            except:
+                print  (f"COULD NOT SUBSAMPLE {sample_size} items\
+                        from {adata.uns['fname']} cells(labeled)= {adata.X.shape}")
+                return adata
+
+        # done
+        print(".", end = '')
+        return adata
+
+    return Map(openh5, targets)
+
+
+
+
 
 
 def readcsv(x,delimiter = '\t'):
-    # things = pd.read_csv(x, sep='\t').T
-    # adata = anndata.AnnData(things)
-    # adata.X=csr_matrix(adata.X)
-    adata = anndata.read_csv(x,delimiter=delimiter)
-    filename = str(x[:x.find('.')])
-    print (filename)
-    adata.filename = filename
-    adata.write(str(filename)+'.h5', compression='gzip')
+    #adata = anndata.read_csv(x,delimiter=delimiter)
+    things = pd.read_csv(x, sep='\t').T
+    adata = anndata.AnnData(things)
+    adata.X=csr_matrix(adata.X)
+    path_nosuffix = str(x[:x.find('.')])
+    print (path_nosuffix)
+
+    try:
+        tis__cellcnt = path_nosuffix[path_nosuffix.rindex('/')+1:].split('_')
+        adata.uns['tissue'] = tis__cellcnt[0]
+        adata.uns['tissue5'] = tis__cellcnt[0][:5]
+        adata.uns['tissue5id'] = f'{tis__cellcnt[0][:5]}_{tis__cellcnt[-1]}'
+    except:
+        print("something went wrong finding tissue, tissue5 and/or tissue5id to write to 'uns'")
+
+
+    adata.uns['fname'] = path_nosuffix
+    adata.write(str(path_nosuffix)+'.h5', compression='gzip')
     adata.file.close()
-    os.remove(filename)
+    #os.remove(filename)
+    return 0
 
 
 
 
 
+def annotate(adatas,annotate_function, **kwargs):
+    f = annotate_function(**kwargs)
+    return Map(f, adatas)
 
 
+def annotate_from_barcode_csv(input_field = False, output_field = 'clusterid'):
 
-
-def annotate_truth(adatas, path):
-
-    plabels = ldata.loadpangalolabels(path)
     def annotate(adata):
         # add cluster id
-        fname = f"{path}/{adata.filename}.cluster.txt"
+        #fname = f"{path}/{adata.filename}.cluster.txt"
+        fname = f"{adata.uns['fname']}.cluster.txt"
         lol = open(fname,'r').readlines()
         barcode_cid={}
         for line in lol:
             bc,cl =  line.strip().split()
             barcode_cid[bc]= int(cl)
-        adata.obs['true'] = [barcode_cid.get(a,-1)  for a in adata.obs.index]
-
-        # add real label
-        # TODO is this ok with the filename?
-        #
-        ldata.annotatetruecelltype(plabels, adata, adata.filename)
-
+        if not input_field or input_field == 'barcode':
+            cells = adata.obs.index
+        else:
+            cells = adata.obs[input_field]
+        adata.obs[output_field] = [barcode_cid.get(a,-1)  for a in cells]
         return adata
 
-    return [annotate(x) for x in adatas]
+    return annotate
+
+def annotate_celltypes( path = '', input_field = '', output_field = ''):
+    plabels = ldata.loadpangalolabels(path)
+
+    return lambda x: ldata.annotatetruecelltype(plabels, x, x.uns['fname'],
+            f_out = output_field, f_in = input_field)
 
 
-
-
-
-def saveh5(data):
-    for adata in data:
-        adata.write(str(adata.filename)+'.h5', compression='gzip')
-
-
-
+def save(adatas, format = 'h5'):
+    assert format == 'h5', 'there is no generic writer in the libs currently'
+    for adata in adatas:
+        adata.write(adata.uns['fname']+'.h5', compression='gzip')
 
 
 

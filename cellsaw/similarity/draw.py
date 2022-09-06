@@ -28,6 +28,32 @@ def dendro(similarity, labels, distancecut = 1):
     plt.subplots_adjust(wspace = .4)
     return hira.fcluster(Z, t=7, criterion = 'maxclust')
 
+def dendro_degen(similarity, labels, distancecut = 1):
+    '''
+    so for the new mode the matrix is not symmetrical anymore..
+    '''
+
+    # HEATMAP
+    f=plt.figure(figsize=(16,8))
+    ax=plt.subplot(121)
+    ax.set_title('complete similarity matrix', fontsize=20)
+    sns.heatmap(similarity, xticklabels = False,
+            yticklabels = labels,  cmap="YlGnBu")
+    locs, labels = plt.yticks()
+    plt.setp(labels,size = 8)
+
+    # DENDROGRAM
+    ax=plt.subplot(122)
+    ax.set_title('induced dendrogram (ward)', fontsize=20)
+    #Z = squareform(similarity)
+    Z = similarity
+    Z = hira.linkage(1-Z,'ward')
+    hira.dendrogram(Z, labels = labels, color_threshold=distancecut, orientation='right')
+    locs, labels = plt.xticks()
+    plt.setp(labels, rotation=90,size = 8)
+    plt.subplots_adjust(wspace = .4)
+    return hira.fcluster(Z, t=7, criterion = 'maxclust')
+
 
 
 def plotPrecision(data, wg = True, method='cosine similarity'):

@@ -1,6 +1,6 @@
 import cellsaw.merge.mergehelpers  as mergehelpers
 import numpy as np
-from cellsaw.merge.diffusion import diffuse, stringdiffuse
+from cellsaw.merge.diffusion import Diffusion, stringdiffuse
 from cellsaw.merge import draw
 
 class mergeutils:

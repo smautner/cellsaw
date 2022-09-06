@@ -102,7 +102,7 @@ def HEM(merge, init = 0, pid =2):
 
 
 #############
-# KMEANS 
+# KMEANS
 ############
 def assign(x1,x2,c1,c2):
     r = ed(x1,c1)
@@ -111,8 +111,7 @@ def assign(x1,x2,c1,c2):
     z = np.argmin(r3, axis = 1) # cluster with minimal euclidean distance
     res = np.array( [zz if zz < c1.shape[0] else zz-c1.shape[0]  for zz in z] ) # y
 
-
-    return res,  np.argmin(r, axis = 1) !=  np.argmin(r2, axis = 1) 
+    return res,  np.argmin(r, axis = 1) !=  np.argmin(r2, axis = 1)
 
 
 def centers(y,X):
@@ -122,7 +121,7 @@ def centers(y,X):
     return np.array(cents)
 
 
-def optimize_kmeans(X1,X2,y): 
+def optimize_kmeans(X1,X2,y):
     c1, c2 = centers(y,X1), centers(y,X2)
     #c2 = h.hungsort(c1,c2)
     y,e = assign(X1,X2,c1,c2)
@@ -148,7 +147,7 @@ def multi_assign(X, c):
     res = np.array( [zz if zz < c[0].shape[0] else zz-(zz//c[0].shape[0])*c[0].shape[0]  for zz in z] )
 
     e = np.all(clustersByX == clustersByX[0,:], axis=0)
-#    e = np.argmin(ed(X[0],c[0]), axis = 1) !=  np.argmin(ed(X[1], c[1]), axis = 1) 
+#    e = np.argmin(ed(X[0],c[0]), axis = 1) !=  np.argmin(ed(X[1], c[1]), axis = 1)
 
     return res, e
 
