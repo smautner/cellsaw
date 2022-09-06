@@ -96,8 +96,6 @@ def rank_by_similarity(target = False,
     return_similarity: returns (list, similarity_matrix) otherwise only the list
     '''
 
-
-
     # todo: minscore is set to 200 here,.,,  should be dont in the laoder
     source = Map(annotate_genescores, source)
     target = Map(annotate_genescores, target)
@@ -112,11 +110,11 @@ def rank_by_similarity(target = False,
 
 
     def getname(ada):
-        s = ada.uns['fname']
-        return s[s.rindex('/'):]
+        return ada.uns['tissue5id']
 
     ind = Map(getname,target)
     col = Map(getname,source)
+
     distances = pd.DataFrame( distances, index = ind, columns = col)
 
 
@@ -127,26 +125,9 @@ def rank_by_similarity(target = False,
 
 
 def plot_dendrogram(similarity_df):
-    draw.dendro_degen(similarity_df.to_numpy(),
-        similarity_df.index)
+    draw.dendro_degen(similarity_df.to_numpy(),similarity_df.columns ,similarity_df.index)
 
 
 
-from cellsaw import merge
-
-def annotate_label(target,
-                   source,
-
-                   source_label = 'celltype',
-                    target_label='predicted_celltype',
-
-                    pca_dim = 20, umap_dim = None):
 
 
-    merged = merge.merge([target,source],pca=pca_dim,umaps=[umap_dim])
-
-    #labels = xmap(lambda x: x.getlabels(masked=[1]), mergedPairs)
-    #labels = xmap(lambda x:merge.diffuse(*x), zip(mergedPairs,labels))
-
-    # merge
-    #

@@ -89,3 +89,38 @@ class merge(mergeutils):
             return hung, dist[hung]
 
 
+
+
+
+
+
+
+
+from cellsaw.merge.diffusion import stringdiffuse
+
+def annotate_label(target,
+                   source,
+
+                   source_label = 'celltype',
+                   target_label='predicted_celltype',
+
+                   pca_dim = 20,
+                   umap_dim = 0,
+
+                   n_intra_neighbors = 7,
+                   n_inter_neighbors = 2,
+                   similarity_scale_factor = 1.0
+                   ):
+
+    # TODO: prepare to make sources a list so we can annotate more, maybe get some consensus
+    assert similarity_scale_factor == 1.0, 'not implemented'
+
+
+    merged = merge([target,source],pca=pca_dim,umaps=[umap_dim])
+
+    target.obs[target_label] = stringdiffuse(merged,source.obs[source_label],pid = umap_dim>0+umap_dim> 0,
+            neighbors_inter=n_inter_neighbors,
+            neighbors_intra=n_intra_neighbors)
+
+    return target
+
