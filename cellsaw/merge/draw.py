@@ -62,6 +62,7 @@ def tinyumap(X,Y,
         label=None,
         alpha = None,
         legend = False,
+        labeldict = {},
         size=None):
     plt.title(title, size=title_size)
     Y=np.array(Y)
@@ -69,6 +70,8 @@ def tinyumap(X,Y,
     embed = X
     plt.gca().axes.yaxis.set_ticklabels([])
     plt.gca().axes.xaxis.set_ticklabels([])
+    plt.tick_params(left = False)
+    plt.tick_params(bottom = False)
     for cla in np.unique(Y):
         plt.scatter(embed[Y==cla, 0],
                     embed[Y==cla, 1],
@@ -76,7 +79,7 @@ def tinyumap(X,Y,
                     s=size,
                     edgecolors = 'none',
                     alpha = alpha,
-                    label=str(cla), **getmarker(cla)) #str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
+                    label= labeldict.get(cla,str(cla)), **getmarker(cla)) #str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
     #plt.axis('off')
     #plt.xlabel('UMAP 2')
     #plt.ylabel('UMAP 1')

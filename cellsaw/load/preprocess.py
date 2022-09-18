@@ -24,19 +24,20 @@ def annotate_genescores(adata, selector='natto',
         sc.pp.log1p(adata)
 
     adata2 = adata.copy()
-    adata = adata[:,okgenes]
+
+    adata2 = adata2[:,okgenes]
     if selector == 'preselected':
         self.preselected_genes = self.data[0].preselected_genes
 
     if selector == 'natto':
-        genes, scores = getgenes_natto(adata, 1000, plot=plot, **nattoargs)
+        genes, scores = getgenes_natto(adata2, 1000, plot=plot, **nattoargs)
 
     elif selector == 'preselected':
-        genes = [True if gene in self.preselected_genes else False for gene in adata.var_names]
+        genes = [True if gene in self.preselected_genes else False for gene in adata2.var_names]
         scores = genes.as_type(int)
 
     else:
-        hvg_df = sc.pp.highly_variable_genes(adata, n_top_genes=1000, flavor=selector, inplace=False)
+        hvg_df = sc.pp.highly_variable_genes(adata2, n_top_genes=1000, flavor=selector, inplace=False)
         genes = np.array(hvg_df['highly_variable'])
         if selector == 'seurat_v3':
             ### Best used for raw_count data
@@ -44,16 +45,13 @@ def annotate_genescores(adata, selector='natto',
         else:
             scores = np.array(hvg_df['dispersions_norm'].fillna(0))
 
-
-    #fullscores = np.zeros(adata2.X.shape[1])
-    fullscores = np.full(adata2.X.shape[1],np.NINF,np.float)
+    fullscores = np.full(adata.X.shape[1],np.NINF,np.float)
     fullscores[okgenes==1] = scores
-    adata2.varm["scores"]=  fullscores
-    adata2.varm['genes'] = okgenes
-    #adata.varm["genes"] = genes ... lets decide later if we need this
-    if not quiet:
-        print(f"{incommingshape=}  => {adata.X.shape}")
-    return adata2
+    adata.varm["scores"]=  fullscores
+    adata.varm['genes'] = okgenes
+    if not quiet: # TODO logging
+        print(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")
+    return adata
 
 
 

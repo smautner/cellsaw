@@ -28,7 +28,10 @@ def make_even(data):
 def unioncut(scores, numGenes, data):
     indices = np.argpartition(scores, -numGenes)[:,-numGenes:]
     indices = np.unique(indices.flatten())
-    return [d[:,indices].copy() for d in data]
+
+    [d._inplace_subset_var(indices) for d in data]
+    return data
+    #return [d[:,indices].copy() for d in data]
 
 
 def dimension_reduction(adatas, scale, zero_center, PCA, umaps, joint_space=True):
@@ -53,7 +56,7 @@ def dimension_reduction(adatas, scale, zero_center, PCA, umaps, joint_space=True
         res.append(dx)
 
     for dim in umaps:
-        assert 0 < dim < PCA
+        assert 0 < dim < PCA, f'{dim=} {PCA=}'
         res.append(umapify(dx,dim))
 
     return res

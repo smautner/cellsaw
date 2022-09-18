@@ -34,7 +34,7 @@ def dendro_degen(similarity, xlabels,ylabels, distancecut = 1):
     '''
 
     f=plt.figure(figsize=(16,8))
-    ax=plt.subplot(121)
+    ax=plt.subplot(122)
 
 
 
@@ -47,7 +47,7 @@ def dendro_degen(similarity, xlabels,ylabels, distancecut = 1):
 
 
     # DENDROGRAM
-    ax=plt.subplot(122)
+    ax=plt.subplot(121)
 
     ax.set_title('induced dendrogram (ward)', fontsize=20)
     #Z = squareform(similarity)

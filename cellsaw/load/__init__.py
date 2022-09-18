@@ -48,7 +48,8 @@ def read(dir, suffix = '.gz',
 
         # reduce cell count
         for k,v in remove_cells.items():
-            adata = adata[adata.obs[k]!=v]
+            for delete_label in v:
+                adata = adata[adata.obs[k]!=delete_label]
         if sample_size:
             try:
                 sc.pp.subsample(adata, fraction=None, n_obs=sample_size,

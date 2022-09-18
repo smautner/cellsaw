@@ -21,8 +21,10 @@ class mergeutils:
         draw.plot(self, labels,**kwargs)
 
 
+
 class merge(mergeutils):
-    def __init__(self, adatas, selectgenes = 800, make_even = True, pca = 20, umaps = [2],
+    def __init__(self, adatas, selectgenes = 800,
+            make_even = True, pca = 20, umaps = [2],
             joint_space = True,
             sortfield = 0,
             titles = "ABCDEFGHIJKIJ"):
@@ -98,29 +100,203 @@ class merge(mergeutils):
 
 from cellsaw.merge.diffusion import stringdiffuse
 
+def mergewrap(a,b,umap_dim,**kwargs):
+
+    if not isinstance(umap_dim,int):
+        umaps = []
+    else:
+        umaps = [umap_dim]
+    return  merge([a,b],umaps=umaps,**kwargs)
+
+
+
+
+
 def annotate_label(target,
                    source,
-
                    source_label = 'celltype',
                    target_label='predicted_celltype',
-
                    pca_dim = 20,
                    umap_dim = 0,
-
+                   make_even = True,
+                   sigmafac = 1,
                    n_intra_neighbors = 7,
                    n_inter_neighbors = 2,
-                   similarity_scale_factor = 1.0
-                   ):
+                   similarity_scale_factor = 1.0):
 
     # TODO: prepare to make sources a list so we can annotate more, maybe get some consensus
     assert similarity_scale_factor == 1.0, 'not implemented'
 
-
-    merged = merge([target,source],pca=pca_dim,umaps=[umap_dim])
-
-    target.obs[target_label] = stringdiffuse(merged,source.obs[source_label],pid = umap_dim>0+umap_dim> 0,
+    pid = (pca_dim>0)+isinstance(umap_dim,int)
+    merged = mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
+    newlabels = stringdiffuse(merged,merged.data[1].obs[source_label],sigmafac=sigmafac,
+            pid = pid,
             neighbors_inter=n_inter_neighbors,
             neighbors_intra=n_intra_neighbors)
-
+    target.obs[target_label] = newlabels
     return target
+
+from collections import Counter
+import scanpy as sc
+def multi_annotate(target,
+                   sources,
+                   annotator = lambda x:x,
+                   source_label = 'celltype',
+                   target_label='multisrc',
+                   **kwargs):
+
+    # we should not be loosing cells:
+    sc.pp.subsample(target,
+            fraction=None,
+            n_obs=min([a.shape[0] for a in sources+[target]]),
+            random_state=1227, copy=False)
+
+
+    # annotate
+    allobs = []
+    for i,source in enumerate(sources):
+        # we send a copy in as merge will delete genes :)
+        target_tmp = annotator(target.copy(),source.copy(),
+                source_label = source_label,
+                target_label = f'{target_label}_{i}',
+                **kwargs)
+        allobs.append(target_tmp.obs[f'{target_label}_{i}'])
+
+    def calclabel(a):
+        c = Counter(a)
+        maxcount = max(c.values())
+        # so we return the majority,
+        # problem might be that the cardinality might show up twice
+        # this is no problem since counter seems to list keys in order of reading
+        # so we get the 'left' most value in case of a collision
+        for k,v in c.items():
+            if maxcount ==v:
+                return k
+
+    target.obs[target_label] = [ calclabel(a) for a in zip(*allobs)  ]
+    return target
+
+
+
+
+from cellsaw.merge.mergehelpers import hungarian
+
+def annotate_label_linsum_copylabel(
+                                target,
+                                source,
+                               source_label = 'celltype',
+                               target_label= 'diffuseknn',
+                               pca_dim = 20, umap_dim = None):
+
+    pid = (pca_dim>0)+isinstance(umap_dim,int)
+    merged = mergewrap(target,source,umap_dim,pca=pca_dim, sortfield = pid)
+    target.obs[target_label] = list(merged.data[1].obs[source_label])
+    return target
+
+
+from sklearn.neighbors import KNeighborsClassifier as knn
+def annotate_label_knn(target,source,
+                              source_label = 'celltype',
+                              target_label='knn',
+                              pca_dim = 20, umap_dim = None, k = 5):
+
+
+    pid = (pca_dim>0)+isinstance(umap_dim,int)
+    merged = mergewrap(target,source,umap_dim,pca=pca_dim)
+    a,b = merged.projections[pid]
+    y = merged.data[1].obs['celltype']
+    model = knn(n_neighbors=k).fit(a,y)
+    target.obs[target_label] = model.predict(b)
+    return target
+
+
+
+from sklearn.semi_supervised import LabelPropagation as lapro
+from sklearn.semi_supervised import LabelSpreading as laspre
+def annotate_label_raw_diffusion(target,source,source_label = 'celltype',
+                               target_label='raw_diffusion',
+                               pca_dim = 20, umap_dim = None):
+    pid = (pca_dim>0)+isinstance(umap_dim,int)
+    print(f"{pid=}")
+    merged = mergewrap(target,source,umap_dim,pca=pca_dim)
+    a,b = merged.projections[pid]
+    y = merged.data[1].obs[source_label]
+    #diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
+    diffusor = lapro( gamma = 10, n_neighbors = 5).fit(b,y)
+    target.obs[target_label] = diffusor.predict(a)
+    return target
+
+
+
+
+
+
+from MarkerCount.marker_count import MarkerCount_Ref, MarkerCount
+import warnings
+
+
+def markercount(target,source,source_label = 'celltype',
+                               target_label='markercount_celltype',
+                               pca_dim = 20, umap_dim = None):
+
+
+    pid = (pca_dim>0)+isinstance(umap_dim,int)
+    merged = mergewrap(target,source,umap_dim,pca=pca_dim)
+
+    X_ref=merged.data[1].to_df()
+    X_test=merged.data[0].to_df()
+    reflabels = merged.data[1].obs[source_label]
+    #print(f"{X_ref.shape=}{X_test.shape=}{reflabels=}")
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        df_res = MarkerCount_Ref( X_ref, reflabels, X_test,
+                      cell_types_to_excl = ['Unknown'],
+                      log_transformed = True,
+                      file_to_save_marker = 'my_markers',
+                      verbose = False )
+        # get results :D
+        predict = df_res['cell_type_pred']
+        target.obs[target_label] = predict
+    return target
+
+from ubergauss import tools as ut
+
+
+def plot(source,target,source_label = '', target_label ='', pca= 20):
+
+    if id(source) == id(target):
+        merged = merge([target, target.copy()], umaps=[2],pca = pca)
+    else:
+        merged = merge([source,target], umaps=[2], pca = pca)
+
+
+    s,t = merged.projections[2]
+    d = draw.tinyUmap(dim=(1,3))
+
+    tlab = list(merged.data[1].obs[target_label])
+    slab = list(merged.data[0].obs[source_label])
+    allthelabels = tlab + slab
+    all,sm = ut.labelsToIntList(allthelabels)
+
+
+    labeld = {k:v[:8] for k,v in sm.getitem.items()}
+
+    size = 10
+    d.draw(t,sm.encode(tlab), title = f'T:{target_label}', labeldict = labeld,size= size)
+    d.draw(s,sm.encode(slab), title = f'S:{source_label}', labeldict = labeld, size=size)
+    d.draw(np.vstack((t,s)),all, title = 'Both', labeldict = labeld,size= size)
+    #draw.plt.legend()
+
+    draw.plt.legend(markerscale=4,ncol=3,bbox_to_anchor=(1, -.12) )
+
+
+from sklearn.metrics import accuracy_score as acc
+def accuracy_evaluation(target, true = '', predicted = ''):
+    t = target.obs[true]
+    p = target.obs[predicted]
+    t =list(t)
+    p=list(p)
+    #for a in zip(t,p): print (a)
+    return acc(t,p)
+
 
