@@ -98,7 +98,6 @@ class merge(mergeutils):
 
 
 
-from cellsaw.merge.diffusion import stringdiffuse
 
 def mergewrap(a,b,umap_dim,**kwargs):
 
@@ -261,7 +260,7 @@ def markercount(target,source,source_label = 'celltype',
 
 from ubergauss import tools as ut
 
-
+import matplotlib.pyplot as plt
 def plot(source,target,source_label = '', target_label ='', pca= 20):
 
     if id(source) == id(target):
@@ -271,6 +270,17 @@ def plot(source,target,source_label = '', target_label ='', pca= 20):
 
 
     s,t = merged.projections[2]
+
+
+    # TODO this block needs to goto draw
+    concatX  = np.vstack([s,t])
+    xmin,ymin = concatX.min(axis = 0)
+    xmax,ymax = concatX.max(axis = 0)
+    def setlim():
+        plt.xlim(xmin, xmax)
+        plt.ylim(ymin, ymax)
+
+
     d = draw.tinyUmap(dim=(1,3))
 
     tlab = list(merged.data[1].obs[target_label])
@@ -283,11 +293,21 @@ def plot(source,target,source_label = '', target_label ='', pca= 20):
 
     size = 10
     d.draw(t,sm.encode(tlab), title = f'T:{target_label}', labeldict = labeld,size= size)
+    setlim()
+
+    def tex(t):
+        [plt.text(a, b, str(i)) for i,(a,b) in enumerate(t.tolist())]
+
+    tex(t)
     d.draw(s,sm.encode(slab), title = f'S:{source_label}', labeldict = labeld, size=size)
+    setlim()
+    tex(s)
     d.draw(np.vstack((t,s)),all, title = 'Both', labeldict = labeld,size= size)
+    setlim()
     #draw.plt.legend()
 
     draw.plt.legend(markerscale=4,ncol=3,bbox_to_anchor=(1, -.12) )
+    return merged
 
 
 from sklearn.metrics import accuracy_score as acc
