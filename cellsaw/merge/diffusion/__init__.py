@@ -25,9 +25,8 @@ def stringdiffuse(mergething, labels, pid = 1,
 
 
     diffusor = Diffusion(n_neighbors_inter = neighbors_inter,sigmafac= sigmafac, n_neighbors_intra  = neighbors_intra)
-    diffusor.fit(mergething.projections[pid][0], sm.encode(labels))
-
-    intresults =  diffusor.predict(mergething.projections[pid][1])
+    diffusor.fit(mergething.projections[pid][1], sm.encode(labels))
+    intresults =  diffusor.predict(mergething.projections[pid][0])
     return sm.decode(intresults)
 
 class Diffusion:
@@ -36,8 +35,7 @@ class Diffusion:
                 n_neighbors_intra = 7,
                 n_neighbors_inter=1,
                 sigmafac = 1,
-                lp_model= LabelSpreading(kernel = None, alpha=0.001, max_iter=1000),
-                #lp_model= LabelPropagation(kernel = None, max_iter=1000),
+                lp_model= LabelPropagation(kernel = None, max_iter=1000),
                 kernel = linear_assignment_kernel):
 
         """we just run diffusion as sklearn would i.e. expect no string labels etc"""
@@ -67,10 +65,10 @@ class Diffusion:
         assert self.y.shape == y.shape, 'assert everything!'
 
 
-        print(f"FITT")
+        # print(f"FITT")
         self.lp_model.fit(self.X, self.y)
-        print(f"{self.lp_model.label_distributions_=}")
-        print(f"PREDICT")
+        # print(f"{self.lp_model.label_distributions_=}")
+        # print(f"PREDICT")
         res = self.lp_model.predict(X)
         return res
 
@@ -79,12 +77,4 @@ class Diffusion:
         # all_labels = self.lp_model.fit(Xstack, Ystack).transduction_
         # self.correctedlabels = all_labels[self.train_ncells]
         # return  all_labels[self.train_ncells:]
-
-
-
-
-
-
-
-
 

@@ -263,13 +263,16 @@ from ubergauss import tools as ut
 import matplotlib.pyplot as plt
 def plot(source,target,source_label = '', target_label ='', pca= 20):
 
+
+
+
+    umaps = [2] if pca >2 else []
     if id(source) == id(target):
-        merged = merge([target, target.copy()], umaps=[2],pca = pca)
+        merged = merge([target, target.copy()], umaps=umaps,pca = pca)
     else:
-        merged = merge([source,target], umaps=[2], pca = pca)
+        merged = merge([source,target], umaps=umaps, pca = pca)
 
-
-    s,t = merged.projections[2]
+    s,t = merged.projections[2] if pca > 2 else merged.projections[1]
 
 
     # TODO this block needs to goto draw
@@ -295,13 +298,13 @@ def plot(source,target,source_label = '', target_label ='', pca= 20):
     d.draw(t,sm.encode(tlab), title = f'T:{target_label}', labeldict = labeld,size= size)
     setlim()
 
-    def tex(t):
-        [plt.text(a, b, str(i)) for i,(a,b) in enumerate(t.tolist())]
+    def plot_cellids(t):
+        [plt.text(a, b, str(i),fontsize='xx-small') for i,(a,b) in enumerate(t.tolist())]
 
-    tex(t)
+    # plot_cellids(t)
     d.draw(s,sm.encode(slab), title = f'S:{source_label}', labeldict = labeld, size=size)
     setlim()
-    tex(s)
+    # plot_cellids(s)
     d.draw(np.vstack((t,s)),all, title = 'Both', labeldict = labeld,size= size)
     setlim()
     #draw.plt.legend()
