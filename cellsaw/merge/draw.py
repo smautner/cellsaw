@@ -89,12 +89,23 @@ def tinyumap(X,Y,
 
 class tinyUmap():
 
-    def __init__(self, dim=(3,3), size= 2):
+    def __init__(self, dim=(3,3), size= 2, lim = False):
         figs = (size*dim[1], size*dim[0])
-
         plt.figure( figsize=figs, dpi=300)
         self.i =0
         self.dim = dim
+        if lim:
+            concatX = np.vstack(lim)
+            xmin, ymin = concatX.min(axis=0)
+            xmax, ymax = concatX.max(axis=0)
+
+            def setlim():
+                plt.xlim(xmin, xmax)
+                plt.ylim(ymin, ymax)
+
+            lim = setlim()
+        self.lim = lim if lim else lambda:0
+
 
     def next(self):
         self.i= self.i+1
@@ -102,6 +113,7 @@ class tinyUmap():
 
     def draw(self, *a, **b):
         self.next()
+        self.lim()
         tinyumap(*a,**b)
 
 

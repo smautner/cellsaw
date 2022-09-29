@@ -8,9 +8,12 @@ import numpy as np
 import random
 
 
-####
-# oldest datasets
-#######
+
+'''
+You can ignore this file :) 
+'''
+
+
 load = lambda f: [l for l in open(f,'r').read().split('\n') if len(l)>1]
 
 

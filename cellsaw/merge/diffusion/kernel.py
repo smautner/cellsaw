@@ -27,15 +27,25 @@ def iterated_linear_sum_assignment(distances, repeats):
 
 
 
-def linear_sum_assignment_matrices(x1, x2, repeats, dist = True, dense = True, debug = False):
+def linear_sum_assignment_matrices(x1, x2, repeats,
+                                   dist = True,
+                                   dense = True):
         x= metrics.euclidean_distances(x1,x2)
         a,b, distances = iterated_linear_sum_assignment(x, repeats)
         r = np.zeros(shape) if dense else sparse.csr_matrix(x.shape, dtype=np.float32)
         r[a,b] = (distances[a] + 0.0001) if dist else 1
-        if debug:
-            pprint(Zip(a,b,distances))
+
 
         return r,r.T
+
+#######
+# 1nn distance
+###########
+def avg1nndistance(listofdistancemat):
+    def calculate1nn_distance(q):
+        return np.mean([ np.min(q[q!=0])  for row in q])
+    list1nn_means = Map(calculate1nn_distance,listofdistancemat)
+    return np.mean(list1nn_means)
 
 
 ###################
@@ -53,7 +63,7 @@ def neighborgraph(x, neighbors):
 
 from matplotlib import pyplot as plt
 def linear_assignment_kernel(x1,x2, neighbors = 3,
-        neighbors_inter= 1, sigmafac = 1):
+        neighbors_inter= 1, sigmafac = 1, linear_assignment_factor = 1):
 
 
     '''
@@ -67,44 +77,36 @@ def linear_assignment_kernel(x1,x2, neighbors = 3,
 
     '''
     # TODO try uneven length x1 and x2
-
     q1,q3 = linear_sum_assignment_matrices(x1,x2, neighbors_inter,
                                             dist = True,
-                                            dense = False,
-                                            debug = False)
+                                            dense = False)
+
     q2,q4 = [neighborgraph(x,neighbors) for x in [x1,x2]]
 
 
 
-    # TODO make a factor here and expose it
-    q1 = q1
-    q3 = q3
+    q1 = q1*linear_assignment_factor
+    q3 = q3*linear_assignment_factor
 
 
 
 
-
-    # combine and fill missing
     distance_matrix = sparse.hstack((sparse.vstack((q2,q3)),sparse.vstack((q1,q4)))).todense()
 
-    def eee(q):
-        return np.mean([ np.min(q[q!=0])  for row in q])
-    nndist = (eee(q2)+eee(q4))/2
+
     # print(f"raw dist")
     # sns.heatmap(distance_matrix);plt.show()
 
 
     distance_matrix = dijkstra(distance_matrix, directed = False)
-    # print('dijkstra');sns.heatmap(distance_matrix);  plt.show()
-    distance_matrix = distance_matrix[:x1.shape[0],x1.shape[0]:]
-    # print('dijkstra zoom');sns.heatmap(distance_matrix); plt.xlabel('target'); plt.show()
+    dijkstraQ1 = distance_matrix[:x1.shape[0],x1.shape[0]:]
 
+    sigma = avg1nndistance([q2,q4])*sigmafac
+    similarity_matrix = np.exp(-dijkstraQ1/sigma)
 
-
-    sigma = sigmafac* nndist#np.mean(distance_matrix.data)
-    similarity_matrix = np.exp(-distance_matrix/sigma)
-    print(f'gaussed  sigme:{sigma}')
-    sns.heatmap(similarity_matrix); plt.show()
+    # print('dijkstra zoom');sns.heatmap(dijkstraQ1); plt.xlabel('target'); plt.show()
+    # print(f'gaussed  sigme:{sigma}')
+    # sns.heatmap(similarity_matrix); plt.show()
 
     return  similarity_matrix
 

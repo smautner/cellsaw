@@ -7,7 +7,7 @@ from cellsaw.merge.diffusion.kernel import linear_assignment_kernel
 def stringdiffuse(mergething, labels, pid = 1,
                                 sigmafac = 1,
                               neighbors_inter = 1,
-                              neighbors_intra = 7):
+                              neighbors_intra = 7,linear_assignment_factor=1):
 
     '''
     will use the first dataset to train and return prediction on the second
@@ -24,7 +24,10 @@ def stringdiffuse(mergething, labels, pid = 1,
             ))
 
 
-    diffusor = Diffusion(n_neighbors_inter = neighbors_inter,sigmafac= sigmafac, n_neighbors_intra  = neighbors_intra)
+    diffusor = Diffusion(n_neighbors_inter = neighbors_inter,
+                         sigmafac= sigmafac,
+                         n_neighbors_intra  = neighbors_intra,
+                         linear_assignment_factor=linear_assignment_factor)
     diffusor.fit(mergething.projections[pid][1], sm.encode(labels))
     intresults =  diffusor.predict(mergething.projections[pid][0])
     return sm.decode(intresults)
@@ -36,6 +39,7 @@ class Diffusion:
                 n_neighbors_inter=1,
                 sigmafac = 1,
                 lp_model= LabelPropagation(kernel = None, max_iter=1000),
+                linear_assignment_factor = 1,
                 kernel = linear_assignment_kernel):
 
         """we just run diffusion as sklearn would i.e. expect no string labels etc"""
@@ -45,6 +49,7 @@ class Diffusion:
         self.lp_model = lp_model
         self.kernel = kernel
         self.sigmafac = sigmafac
+        self.linear_assignment_factor =linear_assignment_factor
 
 
     def fit(self,X,y):
@@ -54,7 +59,8 @@ class Diffusion:
         kernel = lambda x1, x2: self.kernel(x1,x2,
                                             neighbors = self.neighbors_intra,
                                             neighbors_inter = self.neighbors_inter,
-                                            sigmafac = self.sigmafac)
+                                            sigmafac = self.sigmafac,
+                                            linear_assignment_factor=self.linear_assignment_factor)
         self.lp_model.set_params(kernel = kernel)
 
 

@@ -85,7 +85,7 @@ ranked_datasets_list, similarity_df = rank_by_similarity(target = target_dataset
                                     return_similarity = True)
 '''
 
-from cellsaw.load.preprocess import annotate_genescores # TODO should we move this to bla
+from cellsaw.preprocess import annotate_genescores
 
 def rank_by_similarity(target = False,
                         source = False,
@@ -96,7 +96,6 @@ def rank_by_similarity(target = False,
     return_similarity: returns (list, similarity_matrix) otherwise only the list
     '''
 
-    # todo: minscore is set to 200 here,.,,  should be dont in the laoder
     source = Map(annotate_genescores, source)
     target = Map(annotate_genescores, target)
 

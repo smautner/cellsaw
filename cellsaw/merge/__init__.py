@@ -45,6 +45,7 @@ class merge(mergeutils):
 
 
         print("preprocess:", end= '')
+        print(f"{make_even=}")
         for a,b in zip(shapesbevorepp, self.data):
             print(f"{a} -> {b.shape}")
 
@@ -100,12 +101,11 @@ class merge(mergeutils):
 
 
 def mergewrap(a,b,umap_dim,**kwargs):
+    assert  isinstance(umap_dim, int), 'umap_dim must be an integer'
+    umaps = [] if umap_dim == 0 else [umap_dim]
+    m =  merge([a,b],umaps=umaps,**kwargs)
 
-    if not isinstance(umap_dim,int):
-        umaps = []
-    else:
-        umaps = [umap_dim]
-    return  merge([a,b],umaps=umaps,**kwargs)
+    return m
 
 
 
@@ -121,17 +121,18 @@ def annotate_label(target,
                    sigmafac = 1,
                    n_intra_neighbors = 7,
                    n_inter_neighbors = 2,
+                   premerged = False,
+                   linear_assignment_factor= 1,
                    similarity_scale_factor = 1.0):
 
-    # TODO: prepare to make sources a list so we can annotate more, maybe get some consensus
     assert similarity_scale_factor == 1.0, 'not implemented'
 
-    pid = (pca_dim>0)+isinstance(umap_dim,int)
-    merged = mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
+    pid = (pca_dim>0)+ (umap_dim>0)
+    merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
     newlabels = stringdiffuse(merged,merged.data[1].obs[source_label],sigmafac=sigmafac,
             pid = pid,
             neighbors_inter=n_inter_neighbors,
-            neighbors_intra=n_intra_neighbors)
+            neighbors_intra=n_intra_neighbors, linear_assignment_factor=linear_assignment_factor)
     target.obs[target_label] = newlabels
     return target
 
@@ -185,10 +186,11 @@ def annotate_label_linsum_copylabel(
                                 source,
                                source_label = 'celltype',
                                target_label= 'diffuseknn',
+                               premerged = False,
                                pca_dim = 20, umap_dim = None):
 
-    pid = (pca_dim>0)+isinstance(umap_dim,int)
-    merged = mergewrap(target,source,umap_dim,pca=pca_dim, sortfield = pid)
+    pid = (pca_dim>0)+ (umap_dim>0)
+    merged =   premerged or            mergewrap(target,source,umap_dim,pca=pca_dim, sortfield = pid)
     target.obs[target_label] = list(merged.data[1].obs[source_label])
     return target
 
@@ -197,11 +199,12 @@ from sklearn.neighbors import KNeighborsClassifier as knn
 def annotate_label_knn(target,source,
                               source_label = 'celltype',
                               target_label='knn',
+                              premerged = False,
                               pca_dim = 20, umap_dim = None, k = 5):
 
 
-    pid = (pca_dim>0)+isinstance(umap_dim,int)
-    merged = mergewrap(target,source,umap_dim,pca=pca_dim)
+    pid = (pca_dim>0)+ (umap_dim>0)
+    merged = premerged or  mergewrap(target,source,umap_dim,pca=pca_dim)
     a,b = merged.projections[pid]
     y = merged.data[1].obs['celltype']
     model = knn(n_neighbors=k).fit(a,y)
@@ -214,14 +217,16 @@ from sklearn.semi_supervised import LabelPropagation as lapro
 from sklearn.semi_supervised import LabelSpreading as laspre
 def annotate_label_raw_diffusion(target,source,source_label = 'celltype',
                                target_label='raw_diffusion',
+                                 premerged = False,
+                                 n_neighbors = 5,gamma = 10,
                                pca_dim = 20, umap_dim = None):
-    pid = (pca_dim>0)+isinstance(umap_dim,int)
+    pid = (pca_dim>0)+ (umap_dim>0)
     print(f"{pid=}")
-    merged = mergewrap(target,source,umap_dim,pca=pca_dim)
+    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
     a,b = merged.projections[pid]
     y = merged.data[1].obs[source_label]
     #diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
-    diffusor = lapro( gamma = 10, n_neighbors = 5).fit(b,y)
+    diffusor = lapro( gamma = gamma, n_neighbors = n_neighbors).fit(b,y)
     target.obs[target_label] = diffusor.predict(a)
     return target
 
@@ -235,12 +240,12 @@ import warnings
 
 
 def markercount(target,source,source_label = 'celltype',
-                               target_label='markercount_celltype',
+                               target_label='markercount_celltype',premerged = False,
                                pca_dim = 20, umap_dim = None):
 
 
-    pid = (pca_dim>0)+isinstance(umap_dim,int)
-    merged = mergewrap(target,source,umap_dim,pca=pca_dim)
+    pid = (pca_dim>0)+ (umap_dim>0)
+    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
 
     X_ref=merged.data[1].to_df()
     X_test=merged.data[0].to_df()
@@ -275,16 +280,8 @@ def plot(source,target,source_label = '', target_label ='', pca= 20):
     s,t = merged.projections[2] if pca > 2 else merged.projections[1]
 
 
-    # TODO this block needs to goto draw
-    concatX  = np.vstack([s,t])
-    xmin,ymin = concatX.min(axis = 0)
-    xmax,ymax = concatX.max(axis = 0)
-    def setlim():
-        plt.xlim(xmin, xmax)
-        plt.ylim(ymin, ymax)
 
-
-    d = draw.tinyUmap(dim=(1,3))
+    d = draw.tinyUmap(dim=(1,3), lim = [s,t])
 
     tlab = list(merged.data[1].obs[target_label])
     slab = list(merged.data[0].obs[source_label])

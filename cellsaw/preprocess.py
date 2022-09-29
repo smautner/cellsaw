@@ -8,12 +8,12 @@ import pandas as pd
 import scanpy as sc
 from scipy.sparse import csr_matrix
 from lmz import *
+import logging
 
 def annotate_genescores(adata, selector='natto',
                         donormalize=True,
                         nattoargs = {'mean':(0.015, 4),'bins':(.25, 1)},
                         mingenes = 200,
-                        quiet = False,
                         plot=False):
 
     incommingshape= adata.X.shape
@@ -49,8 +49,7 @@ def annotate_genescores(adata, selector='natto',
     fullscores[okgenes==1] = scores
     adata.varm["scores"]=  fullscores
     adata.varm['genes'] = okgenes
-    if not quiet: # TODO logging
-        print(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")
+    logging.info(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")
     return adata
 
 

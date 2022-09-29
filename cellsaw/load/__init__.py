@@ -1,15 +1,18 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 from cellsaw.load.loadadata import get41names, get100names, load100
-from cellsaw.load.preprocess import annotate_genescores
+from cellsaw.preprocess import annotate_genescores
 from scipy.sparse import csr_matrix
 import pandas as pd
 
+
+
 def easyLoad100(name, path = None, remove_unlabeled = False, mingenes= 200,subsample = None,
                 preprocessingmethod = 'natto', donormalize= True,
-                plot=False,quiet=True, nattoargs=  {'mean': (0.015, 4), 'bins': (.25, 1)}):
+                plot=False, nattoargs=  {'mean': (0.015, 4), 'bins': (.25, 1)}):
+    '''this would be the sane way to load data, but we dont use this anymore... '''
     adata = load100(name, path=path, remove_unlabeled=remove_unlabeled, subsample = subsample)
     gs = annotate_genescores(adata, mingenes=mingenes, selector=preprocessingmethod,
-            donormalize= donormalize, nattoargs= nattoargs, plot=plot, quiet=quiet)
+            donormalize= donormalize, nattoargs= nattoargs, plot=plot)
     return gs
 
 import anndata
@@ -23,6 +26,7 @@ import scanpy as sc
 
 def read(dir, suffix = '.gz',
         datasets=[],
+         sampleseed = None,
         delimiter= '\t',
         sample_size = 0,
         remove_cells = {}):
@@ -44,16 +48,24 @@ def read(dir, suffix = '.gz',
 
     # read an h5 file
     def openh5(fname):
-        adata = anndata.read_h5ad(fname, backed = None)
+        try:
+            adata = anndata.read_h5ad(fname, backed = None)
+        except:
+            print('basic h5 loading failed:', fname)
+            return 0
 
         # reduce cell count
         for k,v in remove_cells.items():
-            for delete_label in v:
-                adata = adata[adata.obs[k]!=delete_label]
+            try:
+                for delete_label in v:
+                    adata = adata[adata.obs[k]!=delete_label]
+            except:
+                print('deletelabel failed in:', fname)
+
         if sample_size:
             try:
                 sc.pp.subsample(adata, fraction=None, n_obs=sample_size,
-                        random_state=None, copy=False)
+                        random_state=sampleseed, copy=False)
             except:
                 print  (f"COULD NOT SUBSAMPLE {sample_size} items\
                         from {adata.uns['fname']} cells(labeled)= {adata.X.shape}")
