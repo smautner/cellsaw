@@ -1,5 +1,5 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
-from cellsaw.load.loadadata import get41names, get100names, load100
+from cellsaw.io_utils.loadadata import get41names, get100names, load100
 from cellsaw.preprocess import annotate_genescores
 from scipy.sparse import csr_matrix
 import pandas as pd
@@ -17,7 +17,7 @@ def easyLoad100(name, path = None, remove_unlabeled = False, mingenes= 200,subsa
 
 import anndata
 import glob
-import cellsaw.load.loadadata as ldata
+import cellsaw.io_utils.loadadata as ldata
 from ubergauss import tools as t
 import os
 import scanpy as sc

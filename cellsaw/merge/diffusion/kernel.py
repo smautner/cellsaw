@@ -76,7 +76,6 @@ def linear_assignment_kernel(x1,x2, neighbors = 3,
     - we do dijkstra to get a complete distance matrix
 
     '''
-    # TODO try uneven length x1 and x2
     q1,q3 = linear_sum_assignment_matrices(x1,x2, neighbors_inter,
                                             dist = True,
                                             dense = False)
