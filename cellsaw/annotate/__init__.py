@@ -16,13 +16,25 @@ def predict_celltype(target,
                    n_intra_neighbors = 7,
                    n_inter_neighbors = 2,
                    premerged = False,
+                   n_genes = 800,
+                   pp = False,
                    linear_assignment_factor= 1,
                    similarity_scale_factor = 1.0):
 
     assert similarity_scale_factor == 1.0, 'not implemented'
 
     pid = (pca_dim>0)+ (umap_dim>0)
-    merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
+    #merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
+    if pp:
+
+        target = pp(target)
+        source = pp(source)
+    merged = premerged or mergewrap(target,
+                                   source,
+                                   umap_dim,
+                                   pca = pca_dim,
+                                    selectgenes = n_genes,
+                                   make_even=make_even, sortfield = -1)
     newlabels = stringdiffuse(merged,merged.data[1].obs[source_label],sigmafac=sigmafac,
             pid = pid,
             neighbors_inter=n_inter_neighbors,

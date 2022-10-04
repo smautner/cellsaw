@@ -8,7 +8,7 @@ from scipy import sparse
 from scipy.sparse.csgraph import dijkstra
 from ubergauss import tools
 import seaborn as sns
-
+from matplotlib import pyplot as plt
 
 
 ####################
@@ -33,7 +33,9 @@ def linear_sum_assignment_matrices(x1, x2, repeats,
         x= metrics.euclidean_distances(x1,x2)
         a,b, distances = iterated_linear_sum_assignment(x, repeats)
         r = np.zeros(shape) if dense else sparse.csr_matrix(x.shape, dtype=np.float32)
-        r[a,b] = (distances[a] + 0.0001) if dist else 1
+        # print(f"{a.shape=} {b.shape=} {distances.shape=}]")
+        # print(f"{a=} {b=} {distances=}]")
+        r[a,b] = (distances + 0.0001) if dist else 1
 
 
         return r,r.T

@@ -4,19 +4,22 @@ from cellsaw.merge import  Merge
 from cellsaw.merge import draw as mergedraw
 from ubergauss import tools as ut
 import numpy as np
+import seaborn as sns
 
 def plot(source,target,source_label = '', target_label ='', pca= 20):
 
-    umaps = [2] if pca >2 else []
+
     if id(source) == id(target):
-        merged = Merge([target, target.copy()], umaps=umaps, pca = pca)
+        datasets = [target, target.copy()]
     else:
-        merged = Merge([source, target], umaps=umaps, pca = pca)
+        datasets = [source, target]
+    umaps = [2] if pca >2 else []
+    merged = Merge(datasets, umaps=umaps, pca = pca, make_even = False, sortfield=-1)
 
     s,t = merged.projections[2] if pca > 2 else merged.projections[1]
 
 
-
+    sns.set_theme(style = 'whitegrid')
     d = mergedraw.tinyUmap(dim=(1,3), lim = [s,t])
 
     tlab = list(merged.data[1].obs[target_label])
@@ -39,5 +42,5 @@ def plot(source,target,source_label = '', target_label ='', pca= 20):
     d.draw(np.vstack((t,s)),all, title = 'Both', labeldict = labeld,size= size)
     #draw.plt.legend()
 
-    plt.legend(markerscale=4,ncol=3,bbox_to_anchor=(1, -.12) )
+    plt.legend(markerscale=2,ncol=4,bbox_to_anchor=(1, -.12),fontsize = 'small' )
     return merged

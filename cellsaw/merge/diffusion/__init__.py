@@ -23,7 +23,6 @@ def stringdiffuse(mergething, labels, pid = 1,
                 [xx for xx in labels if isinstance(xx, str)]
             ))
 
-
     diffusor = Diffusion(n_neighbors_inter = neighbors_inter,
                          sigmafac= sigmafac,
                          n_neighbors_intra  = neighbors_intra,
@@ -67,8 +66,10 @@ class Diffusion:
     def predict(self,X,y = False):
         if not y:
             y = np.full(X.shape[0],-1)
-        assert self.X.shape == X.shape, 'not sure why i assert this... probably because i havent tested it'
-        assert self.y.shape == y.shape, 'assert everything!'
+
+
+        #assert self.X.shape == X.shape, 'not sure why i assert this... probably because i havent tested it'
+        #assert self.y.shape == y.shape, 'assert everything!'
 
 
         # print(f"FITT")

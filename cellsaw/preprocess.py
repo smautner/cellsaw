@@ -166,7 +166,6 @@ def getgenes_natto(adata, selectgenes,
         plt.show()
 
         print(f"ft selected:{sum(accept)}")
-
     raw = np.zeros(len(mask))
     raw[mask] = Y[mask]
 

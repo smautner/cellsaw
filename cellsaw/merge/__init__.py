@@ -2,7 +2,7 @@ import cellsaw.merge.mergehelpers  as mergehelpers
 import numpy as np
 from cellsaw.merge.diffusion import Diffusion, stringdiffuse
 from cellsaw.merge import draw
-
+import logging
 class mergeutils:
     def getlabels(self,masked = [], label = 'true', fill = -1):
         f = lambda i,e: np.full_like(e.obs[label],fill)  if i in masked else e.obs[label]
@@ -16,6 +16,8 @@ class mergeutils:
 
         draw.confuse2(labels)
 
+    def size(self, pid=-1):
+        return [x.shape for x in self.projections[pid]]
 
     def plot(self, labels, **kwargs):
         draw.plot(self, labels,**kwargs)
@@ -44,10 +46,10 @@ class Merge(mergeutils):
             self.data = mergehelpers.make_even(self.data)
 
 
-        print("preprocess:", end= '')
-        print(f"{make_even=}")
+        logging.info("preprocess:", end= '')
+        logging.info(f"{make_even=}")
         for a,b in zip(shapesbevorepp, self.data):
-            print(f"{a} -> {b.shape}")
+            logging.info(f"{a} -> {b.shape}")
 
         ######################
         self.titles = titles
@@ -64,6 +66,7 @@ class Merge(mergeutils):
             self.PCA = self.projections[1]
 
         if sortfield >=0:
+            assert make_even==True, 'sorting uneven datasets will result in an even dataset :)'
             self.sort_cells(sortfield)
 
         if umaps:
