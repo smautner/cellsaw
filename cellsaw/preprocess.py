@@ -24,7 +24,8 @@ def annotate_genescores(adata, selector='natto',
     okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
     if donormalize:
         sc.pp.normalize_total(adata, 1e4)
-        sc.pp.log1p(adata)
+        #if "log1p" not in adata.uns_keys():
+        sc.pp.log1p(adata) # TODO look here, log1p is already set,, but its probably not transformed..
 
     adata2 = adata.copy()
 

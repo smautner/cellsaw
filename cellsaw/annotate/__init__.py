@@ -3,6 +3,8 @@ from collections import Counter
 import scanpy as sc
 from cellsaw.annotate.draw import plot
 from cellsaw.annotate.annotators import label_knn, linsum_copylabel, raw_diffusion, markercount, mergewrap
+import cellsaw.preprocess as preprocess
+import numpy as np
 
 
 def predict_celltype(target,
@@ -26,9 +28,15 @@ def predict_celltype(target,
     pid = (pca_dim>0)+ (umap_dim>0)
     #merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
     if pp:
+        def prep(x):
+            x.X = np.expm1(x.X)
+            x._uns.pop("log1p")
+            x.uns
+            target = preprocess.annotate_genescores(x,selector = pp)
+            sc.pp.log1p(x)
 
-        target = pp(target)
-        source = pp(source)
+        prep(target)
+        prep(source)
     merged = premerged or mergewrap(target,
                                    source,
                                    umap_dim,

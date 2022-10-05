@@ -32,7 +32,7 @@ def linear_sum_assignment_matrices(x1, x2, repeats,
                                    dense = True):
         x= metrics.euclidean_distances(x1,x2)
         a,b, distances = iterated_linear_sum_assignment(x, repeats)
-        r = np.zeros(shape) if dense else sparse.csr_matrix(x.shape, dtype=np.float32)
+        r = np.zeros(x.shape) if dense else sparse.csr_matrix(x.shape, dtype=np.float32)
         # print(f"{a.shape=} {b.shape=} {distances.shape=}]")
         # print(f"{a=} {b=} {distances=}]")
         r[a,b] = (distances + 0.0001) if dist else 1
@@ -72,27 +72,25 @@ def linear_assignment_kernel(x1,x2, neighbors = 3,
     X are the stacked projections[0] (normalized read matrices)
     since this is a kernel, we return a similarity matrix
 
-    - we can split it by 2 to get the original projections
     - we do neighbors to get quadrant 2 and 4
     - we do hungarian to do quadrants 1 and 3
     - we do dijkstra to get a complete distance matrix
 
+    - dijkstra wants dense matrices, so we can not go sparse
+
     '''
     q1,q3 = linear_sum_assignment_matrices(x1,x2, neighbors_inter,
                                             dist = True,
-                                            dense = False)
+                                            dense = True)
 
-    q2,q4 = [neighborgraph(x,neighbors) for x in [x1,x2]]
-
+    q2,q4 = [neighborgraph(x,neighbors).todense() for x in [x1,x2]]
 
 
     q1 = q1*linear_assignment_factor
     q3 = q3*linear_assignment_factor
 
-
-
-
-    distance_matrix = sparse.hstack((sparse.vstack((q2,q3)),sparse.vstack((q1,q4)))).todense()
+    #distance_matrix = sparse.hstack((sparse.vstack((q2,q3)),sparse.vstack((q1,q4)))).todense()
+    distance_matrix = np.hstack((np.vstack((q2,q3)),np.vstack((q1,q4))))
 
 
     # print(f"raw dist")
@@ -100,6 +98,7 @@ def linear_assignment_kernel(x1,x2, neighbors = 3,
 
 
     distance_matrix = dijkstra(distance_matrix, directed = False)
+
     dijkstraQ1 = distance_matrix[:x1.shape[0],x1.shape[0]:]
 
     sigma = avg1nndistance([q2,q4])*sigmafac

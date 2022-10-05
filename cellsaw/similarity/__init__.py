@@ -95,7 +95,6 @@ def rank_by_similarity(target = False,
     source: the database
     return_similarity: returns (list, similarity_matrix) otherwise only the list
     '''
-
     source = Map(annotate_genescores, source)
     target = Map(annotate_genescores, target)
 
