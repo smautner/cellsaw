@@ -89,18 +89,22 @@ from cellsaw.preprocess import annotate_genescores
 
 def rank_by_similarity(target = False,
                         source = False,
-                        return_similarity = True):
+                        numgenes = 500,
+                        return_similarity = True, method = 'natto'):
     '''
     target: the ones we want to annotate
     source: the database
     return_similarity: returns (list, similarity_matrix) otherwise only the list
     '''
-    source = Map(annotate_genescores, source)
-    target = Map(annotate_genescores, target)
+    source = [annotate_genescores(s,selector = method) for s in source]
+    target = [annotate_genescores(t,selector = method) for t in target]
+
+    # source = Map(annotate_genescores, source)
+    # target = Map(annotate_genescores, target)
 
 
 
-    ff = lambda a,b,c: cosine(a,b, numgenes=500)
+    ff = lambda a,b,c: cosine(a,b, numgenes=numgenes)
     distances = matrixmap_odd(ff,target,source,repeats = 2)
     distances = np.mean(distances, axis =2)
     ranksim = np.argsort(-distances)

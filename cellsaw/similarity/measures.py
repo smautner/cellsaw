@@ -36,3 +36,10 @@ def precision(matrix,shortlabels, k):
     pred = truth[ [ srt[i,-j]  for j in range(1,k+1) for i in Range(truth)] ]
     true = np.hstack([truth for i in range(k)])
     return  precision_score(true, pred, average='micro')
+
+
+def mkshortnames(li):
+    return [l[:5] for l in li]
+
+def dfPrecision(df,k):
+    return precision(df.to_numpy(),mkshortnames(df.columns),k)

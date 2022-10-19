@@ -19,6 +19,11 @@ def annotate_genescores(adata, selector='natto',
                         mingenes = 200,
                         plot=False):
 
+    if 'scores' in adata.varm:
+        print('#',end='')
+        return adata
+
+
     incommingshape= adata.X.shape
     sc.pp.filter_cells(adata, min_genes=mingenes, inplace=True)
     okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
