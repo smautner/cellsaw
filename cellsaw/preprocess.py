@@ -46,7 +46,7 @@ def annotate_genescores(adata, selector='natto',
         scores = genes.as_type(int)
 
     else:
-        hvg_df = sc.pp.highly_variable_genes(adata2, n_top_genes=1000, flavor=selector, inplace=False)
+        hvg_df = sc.pp.highly_variable_genes(adata2, n_top_genes=5000, flavor=selector, inplace=False)
         genes = np.array(hvg_df['highly_variable'])
         if selector == 'seurat_v3':
             ### Best used for raw_count data

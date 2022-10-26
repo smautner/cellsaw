@@ -32,6 +32,7 @@ class Merge(mergeutils):
             titles = "ABCDEFGHIJKIJ"):
 
         shapesbevorepp= [a.X.shape for a in adatas]
+        assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
         self.genescores = [a.varm['scores'] for a in adatas]
         self.geneab = [a.varm['genes'] for a in adatas]
         self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)

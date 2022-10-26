@@ -28,7 +28,6 @@ def jaccard(a,b ,ngenes= False):
     return intersect/union
 
 
-
 def precision(matrix,shortlabels, k):
     truth = preprocessing.LabelEncoder().fit_transform(shortlabels)
     srt = np.argsort(matrix, axis=1)

@@ -26,9 +26,9 @@ def make_even(data):
 
 
 def unioncut(scores, numGenes, data):
+
     indices = np.argpartition(scores, -numGenes)[:,-numGenes:]
     indices = np.unique(indices.flatten())
-
     [d._inplace_subset_var(indices) for d in data]
     return data
     #return [d[:,indices].copy() for d in data]

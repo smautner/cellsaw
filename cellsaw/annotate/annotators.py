@@ -50,7 +50,6 @@ def raw_diffusion(target, source, source_label ='celltype',
                   n_neighbors = 5, gamma = 10,
                   pca_dim = 20, umap_dim = 0):
     pid = (pca_dim>0)+ (umap_dim>0)
-    print(f"{pid=}")
     merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
     a,b = merged.projections[pid]
     y = merged.data[1].obs[source_label]
@@ -74,13 +73,47 @@ def markercount(target, source, source_label ='celltype',
     #print(f"{X_ref.shape=}{X_test.shape=}{reflabels=}")
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        df_res = MarkerCount_Ref( X_ref, reflabels, X_test,
+        try:
+            df_res = MarkerCount_Ref( X_ref, reflabels, X_test,
                                   cell_types_to_excl = ['Unknown'],
                                   log_transformed = True,
                                   file_to_save_marker = 'my_markers',
                                   verbose = False )
+        except:
+            # get results :D
+            predict = ['failed to run markercount']*target.X.shape[0]
+            target.obs[target_label] = predict
+            return target
         # get results :D
         predict = df_res['cell_type_pred']
         target.obs[target_label] = predict
     return target
 
+
+import anndata as ad
+def raw_diffusion_combat(target, source, source_label ='celltype',
+                  target_label='raw_diffusion',
+                  premerged = False,
+                  n_neighbors = 5, gamma = 10,
+                  pca_dim = 20, umap_dim = 0):
+    pid = (pca_dim>0)+ (umap_dim>0)
+
+    target.obs['batch'] = [1]*target.X.shape[0]
+    source.obs['batch'] = [2]*source.X.shape[0]
+    scr = [a.varm['scores'] for a in [target,source]]
+    z = ad.concat([target,source])
+    z.obs_names_make_unique()
+    sc.pp.combat(z,key= 'batch')
+    target = z[z.obs['batch'] == 1]
+    source = z[z.obs['batch'] == 2]
+
+    target.varm['scores']= scr[0]
+    source.varm['scores']= scr[1]
+
+    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
+    a,b = merged.projections[pid]
+    y = merged.data[1].obs[source_label]
+    #diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
+    diffusor = lapro( gamma = gamma, n_neighbors = n_neighbors).fit(b,y)
+    target.obs[target_label] = diffusor.predict(a)
+    return target
