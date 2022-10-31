@@ -11,15 +11,22 @@ col = plt.cm.get_cmap('tab20').colors
 col = col+col+col+ ((0,0,0),)
 
 
+col = plt.cm.get_cmap('prism')
+col = [col(i) for i in np.linspace(0, 1, 35)]
+col = col+[(0,0,0)]
 
-def plot(merge, labels, plotsperline =3, grad=False):
+
+
+
+
+def plot(merge, labels, plotsperline =3, grad=False, size =3.5):
 
 
     # make a tinyumap with the right dimensions
     X = merge.d2
     rows = ((len(X)-1)//plotsperline)+1
     columns  = plotsperline if  len(X) > plotsperline else len(X)
-    d = tinyUmap(dim = (rows, columns))  # default is a row
+    d = tinyUmap(dim = (rows, columns), size = size)  # default is a row
 
 
 
@@ -40,7 +47,7 @@ def plot(merge, labels, plotsperline =3, grad=False):
 
             #plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
             #plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
-            plt.legend(markerscale=1.2, fontsize=3.5)
+            plt.legend(bbox_to_anchor=(1,1), loc="upper left", markerscale=1.2, fontsize=3.5)
         else:
             d.next()
             plt.gca().axes.yaxis.set_ticklabels([])
@@ -77,9 +84,11 @@ def tinyumap(X,Y,
                     embed[Y==cla, 1],
                     color= col[cla],
                     s=size,
+                    marker = f"${cla}$",
                     edgecolors = 'none',
                     alpha = alpha,
-                    label= labeldict.get(cla,str(cla)), **getmarker(cla)) #str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
+                    #label= labeldict.get(cla,str(cla)), **getmarker(cla)) #str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
+                    label= labeldict.get(cla,str(cla))) #str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
     #plt.axis('off')
     #plt.xlabel('UMAP 2')
     #plt.ylabel('UMAP 1')
