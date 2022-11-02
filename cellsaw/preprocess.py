@@ -10,7 +10,6 @@ from scipy.sparse import csr_matrix
 from lmz import *
 import logging
 
-import cellsaw.annotate
 
 
 def annotate_genescores(adata, selector='natto',
@@ -153,8 +152,8 @@ def getgenes_natto(adata, selectgenes,
 
     if plot:
         srt = np.argsort(X[mask])
-        cellsaw.annotate.plot(X[mask][srt], y_predicted[srt], color='k', label='regression')
-        cellsaw.annotate.plot(X[mask][srt], std_predicted[srt], color='g', label='regression of std')
+        plt.plot(X[mask][srt], y_predicted[srt], color='k', label='regression')
+        plt.plot(X[mask][srt], std_predicted[srt], color='g', label='regression of std')
         plt.scatter(x_bin, ystd_bin, alpha=.4, label='Std of bins', color='g')
         plt.legend(bbox_to_anchor=(.6, -.2))
         plt.title("dispersion of genes")

@@ -1,4 +1,6 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
+
+import cellsaw.draw
 from cellsaw.similarity.measures import cosine, jaccard, precision
 import numpy as np
 from ubergauss import tools as ut
@@ -128,7 +130,7 @@ def rank_by_similarity(target = False,
 
 
 def plot_dendrogram(similarity_df):
-    draw.dendro_degen(similarity_df.to_numpy(),similarity_df.columns ,similarity_df.index)
+    cellsaw.draw.dendro_degen(similarity_df.to_numpy(), similarity_df.columns, similarity_df.index)
 
 
 

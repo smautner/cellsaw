@@ -6,13 +6,17 @@ from ubergauss import tools as ut
 import numpy as np
 import seaborn as sns
 
-def plot(source,target,source_label = '', target_label ='', pca= 20):
-
+def plot_annopair(source,target,source_label = '', target_label ='', pca= 20):
+    '''
+    annotate will transfer labels between andata objects -> plot these
+    '''
 
     if id(source) == id(target):
         datasets = [target, target.copy()]
     else:
         datasets = [source, target]
+
+
     umaps = [2] if pca >2 else []
     merged = Merge(datasets, umaps=umaps, pca = pca, make_even = False, sortfield=-1)
 

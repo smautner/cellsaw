@@ -1,7 +1,7 @@
 import cellsaw.merge.mergehelpers  as mergehelpers
 import numpy as np
 from cellsaw.merge.diffusion import Diffusion, stringdiffuse
-from cellsaw.merge import draw
+from cellsaw.draw import plot_merge, confuse2
 import logging
 class mergeutils:
     def getlabels(self,masked = [], label = 'true', fill = -1):
@@ -14,13 +14,13 @@ class mergeutils:
         assert len(labels[0])== self.data[0].shape[0]
         assert len(labels[1])== self.data[1].shape[0]
 
-        draw.confuse2(labels)
+        confuse2(labels)
 
     def size(self, pid=-1):
         return [x.shape for x in self.projections[pid]]
 
     def plot(self, labels, **kwargs):
-        draw.plot(self, labels,**kwargs)
+        plot_merge(self, labels,**kwargs)
 
 
 
