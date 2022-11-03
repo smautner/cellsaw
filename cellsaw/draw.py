@@ -276,3 +276,6 @@ def plotPrecision(data, wg = True, method='cosine similarity'):
     plt.ylim([.75,1])
     plt.ylabel('precision of neighbors (40 datasets)')
     plt.xlabel('number of genes')
+
+
+

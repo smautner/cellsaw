@@ -1,7 +1,7 @@
-from cellsaw.merge import Merge, stringdiffuse, draw
+from cellsaw.merge import Merge, stringdiffuse
 from collections import Counter
 import scanpy as sc
-from cellsaw.annotate.draw import plot
+from cellsaw.annotate.draw import plot_annopair
 from cellsaw.annotate.annotators import label_knn, linsum_copylabel, raw_diffusion, markercount, mergewrap, raw_diffusion_combat
 import cellsaw.preprocess as preprocess
 import numpy as np

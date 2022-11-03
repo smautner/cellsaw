@@ -18,9 +18,13 @@ def annotate_genescores(adata, selector='natto',
                         mingenes = 200,
                         plot=False):
 
-    if 'scores' in adata.varm:
+
+    arumethod = adata.uns.get('genescoremethod','ney')
+    if arumethod == selector:
         print('#',end='')
         return adata
+
+    adata.uns['genescoremethod'] = selector
 
 
     incommingshape= adata.X.shape

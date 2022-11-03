@@ -19,10 +19,10 @@ def cosine(a,b, numgenes = 500):
 
 
 
-def jaccard(a,b ,ngenes= False):
+def jaccard(a,b ,numgenes= False):
     # intersect/union
-    assert n_genes > 3
-    asd = np.array([ ut.binarize(d.varm['scores'],ngenes)  for d in [a,b]])
+    assert numgenes > 3
+    asd = np.array([ ut.binarize(d.varm['scores'],numgenes)  for d in [a,b]])
     union = np.sum(np.any(asd, axis=0))
     intersect = np.sum(np.sum(asd, axis=0) ==2)
     return intersect/union

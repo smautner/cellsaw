@@ -4,8 +4,9 @@ import cellsaw.draw
 from cellsaw.similarity.measures import cosine, jaccard, precision
 import numpy as np
 from ubergauss import tools as ut
-from cellsaw.similarity import draw
 import pandas as pd
+import logging
+import time
 
 def matrixmap(method, instances, repeats = 5):
     l = len(instances)
@@ -73,7 +74,8 @@ def matrixmap_odd(method, targets,sources, repeats = 5):
     tmptasks =([targets[i],sources[j],list(range(repeats)), i,j]
                for i in range(l) for j in range(l2))
 
-    for r,i,j in ut.xmap(func,tmptasks):
+    #for r,i,j in ut.xmap(func,tmptasks):
+    for r,i,j in map(func,tmptasks):
         for x,val in enumerate(r):
             res[i,j,x] = val
 
@@ -92,27 +94,33 @@ from cellsaw.preprocess import annotate_genescores
 def rank_by_similarity(target = False,
                         source = False,
                         numgenes = 500,
+                        similarity = 'cosine',
                         return_similarity = True, method = 'natto'):
     '''
     target: the ones we want to annotate
     source: the database
     return_similarity: returns (list, similarity_matrix) otherwise only the list
     '''
+    starttime = time.time()
     source = ut.xmap(lambda x: annotate_genescores(x,selector=method), source)
     #source = [annotate_genescores(s,selector = method) for s in source]
     target = [annotate_genescores(t,selector = method) for t in target]
-
+    logging.info(f'obtained genescores {time.time()-starttime}')
     # source = Map(annotate_genescores, source)
     # target = Map(annotate_genescores, target)
 
-
-
-    ff = lambda a,b,c: cosine(a,b, numgenes=numgenes)
-    distances = matrixmap_odd(ff,target,source,repeats = 2)
+    if similarity  == 'cosine':
+        ff = lambda a,b,c: cosine(a,b, numgenes=numgenes)
+    elif similarity == 'jaccard':
+        ff = lambda a,b,c: jaccard(a,b, numgenes=numgenes)
+    else:
+        raise('similarity should be either cosine or jaccard')
+    distances = matrixmap_odd(ff,target,source,repeats = 1)
     distances = np.mean(distances, axis =2)
     ranksim = np.argsort(-distances)
     ranklist = [[source[col] for col in row]for row in ranksim]
 
+    logging.info(f'did matrixmap {time.time()-starttime}')
 
     def getname(ada):
         return ada.uns['tissue5id']
@@ -123,6 +131,7 @@ def rank_by_similarity(target = False,
     distances = pd.DataFrame( distances, index = ind, columns = col)
 
 
+    logging.info(f'nearly done...{time.time()-starttime}')
     if return_similarity:
         return ranklist, distances
     else:

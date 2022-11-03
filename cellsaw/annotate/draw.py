@@ -1,7 +1,7 @@
 
 import matplotlib.pyplot as plt
 from cellsaw.merge import  Merge
-from cellsaw.merge import draw as mergedraw
+from cellsaw import draw
 from ubergauss import tools as ut
 import numpy as np
 import seaborn as sns
@@ -24,7 +24,7 @@ def plot_annopair(source,target,source_label = '', target_label ='', pca= 20):
 
 
     sns.set_theme(style = 'whitegrid')
-    d = mergedraw.tinyUmap(dim=(1,3), lim = [s,t])
+    d = draw.tinyUmap(dim=(1,3), lim = [s,t])
 
     tlab = list(merged.data[1].obs[target_label])
     slab = list(merged.data[0].obs[source_label])
