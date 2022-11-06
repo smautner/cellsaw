@@ -10,6 +10,7 @@ def getmousecortex(subsample=1000):
     cortexdata = [natto.input.loadCortex(subsample = subsample,
                                          pathprefix=f'/home/ubuntu/data/jack/MouseCortexData/raw{e}',
                                          batch = 1) for e in cortexfiles ]
+    return cortexdata
 
 
 ########
@@ -51,7 +52,8 @@ def loadcereb(timeNames = ['E10', 'E12', 'E14', 'E16', 'E18','P0', 'P5', 'P7', '
 
 def loadimm(subsample=1000):
     dir = '/home/ubuntu/repos/HungarianClustering/data/immune_stim/'
-    return [natto.input.loadpbmc(path=dir+s, subsample=subsample) for s in '89']
+    return [natto.input.loadpbmc(path=dir+s, subsample=subsample)
+                    for s in '89']
 
 
 
@@ -71,10 +73,13 @@ def loadwater(subsample=None):
     def choose(item):
         z = d[d.obs['batch']==item]
         if subsample:
+            z = z[z.obs['label']==z.obs['label']] # removes the nan
             sc.pp.subsample(z,n_obs= subsample)
         return z
     names = np.unique(d.obs['batch'])
-    return [ choose(item) for item in names], names
+
+    r= [ choose(item) for item in names] #, names
+    return r[:3]+r[5:] # removed 3rd dataset becasue it is the second batch of 2nd and is strange
 
 
 
@@ -109,11 +114,13 @@ def centers(arg):
     X,y = arg
     cents = []
     for i in np.unique(y):
-        cents.append(X[y==i].mean(axis=0))
+        m = X[y==i].mean(axis=0)
+        cents.append(np.hstack([i,m]))
     return np.array(cents)
 
 def getcenters(xx,yy):
     return np.vstack(Map(centers,Zip(xx,yy)))
+
 
 from sklearn.neighbors import NearestNeighbors as nn
 from sklearn.metrics.pairwise import euclidean_distances as ed

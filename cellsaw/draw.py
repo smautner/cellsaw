@@ -44,10 +44,9 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5):
     plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
 
     for x, y in zip(X, labels):
-
+        y,sm = tools.labelsToIntList(y)
         if not grad:
-            d.draw(x, y, title=None)
-
+            d.draw(x, y, title=None, labeldict=sm.getitem)
             # plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
             # plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
             plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
@@ -240,7 +239,7 @@ def dendro_degen(similarity, xlabels,ylabels, distancecut = 1):
     # HEATMAP
     ax.set_title('complete similarity matrix', fontsize=20)
     sns.heatmap(similarity, xticklabels = xlabels,
-            yticklabels = ylabels,  cmap="YlGnBu")
+            yticklabels = ylabels,  cmap="hot")
     locs, labels = plt.yticks()
     plt.setp(labels,size = 8)
 

@@ -102,9 +102,10 @@ def rank_by_similarity(target = False,
     return_similarity: returns (list, similarity_matrix) otherwise only the list
     '''
     starttime = time.time()
-    source = ut.xmap(lambda x: annotate_genescores(x,selector=method), source)
-    #source = [annotate_genescores(s,selector = method) for s in source]
+    #source = ut.xmap(lambda x: annotate_genescores(x,selector=method), source)
+    source = [annotate_genescores(s,selector = method) for s in source]
     target = [annotate_genescores(t,selector = method) for t in target]
+    print('got target')
     logging.info(f'obtained genescores {time.time()-starttime}')
     # source = Map(annotate_genescores, source)
     # target = Map(annotate_genescores, target)
@@ -115,6 +116,7 @@ def rank_by_similarity(target = False,
         ff = lambda a,b,c: jaccard(a,b, numgenes=numgenes)
     else:
         raise('similarity should be either cosine or jaccard')
+
     distances = matrixmap_odd(ff,target,source,repeats = 1)
     distances = np.mean(distances, axis =2)
     ranksim = np.argsort(-distances)
@@ -123,7 +125,7 @@ def rank_by_similarity(target = False,
     logging.info(f'did matrixmap {time.time()-starttime}')
 
     def getname(ada):
-        return ada.uns['tissue5id']
+        return ada.uns.get('tissue5id','no name')
 
     ind = Map(getname,target)
     col = Map(getname,source)

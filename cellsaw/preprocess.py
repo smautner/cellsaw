@@ -38,10 +38,12 @@ def annotate_genescores(adata, selector='natto',
     adata2 = adata.copy()
 
     adata2 = adata2[:,okgenes]
-    if selector == 'preselected':
+    if selector == 'meanexpression':
+        scores = np.nanmean(adata2.X.todense(),axis = 0).A1
+    elif selector == 'preselected':
         self.preselected_genes = self.data[0].preselected_genes
 
-    if selector == 'natto':
+    elif selector == 'natto':
         genes, scores = getgenes_natto(adata2, 1000, plot=plot, **nattoargs)
 
     elif selector == 'preselected':
@@ -58,7 +60,9 @@ def annotate_genescores(adata, selector='natto',
             scores = np.array(hvg_df['dispersions_norm'].fillna(0))
 
     fullscores = np.full(adata.X.shape[1],np.NINF,np.float)
+
     fullscores[okgenes==1] = scores
+
     adata.varm["scores"]=  fullscores
     adata.varm['genes'] = okgenes
     logging.info(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")

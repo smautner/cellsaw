@@ -40,5 +40,5 @@ def precision(matrix,shortlabels, k):
 def mkshortnames(li):
     return [l[:5] for l in li]
 
-def dfPrecision(df,k):
+def precission_at(df,k):
     return precision(df.to_numpy(),mkshortnames(df.columns),k)

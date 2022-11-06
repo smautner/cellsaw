@@ -47,7 +47,7 @@ class Merge(mergeutils):
             self.data = mergehelpers.make_even(self.data)
 
 
-        logging.info("preprocess:", end= '')
+        logging.info("preprocess:")
         logging.info(f"{make_even=}")
         for a,b in zip(shapesbevorepp, self.data):
             logging.info(f"{a} -> {b.shape}")
