@@ -5,11 +5,23 @@ import natto
 import pandas as pd
 import numpy as np
 
+'''
+there are loaders for timeseries data
+'''
+
+
+dataset_name_field ='shortname'
+
+
+
 def getmousecortex(subsample=1000):
     cortexfiles = ['e11', 'e13', 'e15', 'e17']
     cortexdata = [natto.input.loadCortex(subsample = subsample,
                                          pathprefix=f'/home/ubuntu/data/jack/MouseCortexData/raw{e}',
                                          batch = 1) for e in cortexfiles ]
+
+    for d,name in zip(cortexdata,cortexfiles):
+        d.uns[dataset_name_field]=name
     return cortexdata
 
 
@@ -39,12 +51,14 @@ def cerebellum(who = 'raw'):
     return d
     #csv = pd.read_csv('/home/ubuntu/data/mousecereblabels.csv')
 
-def loadcereb(timeNames = ['E10', 'E12', 'E14', 'E16', 'E18','P0', 'P5', 'P7', 'P14'],who='raw',subsample=None):
+def loadcereb(timeNames = ['E10', 'E12', 'E14', 'E16', 'E18','P0', 'P5', 'P7', 'P14'],
+              who='raw',subsample=1000):
     d = sc.read(f'/home/ubuntu/data/MC_{who}_all.h5')
     def choose(item):
         z = d[d.obs['slice']==item]
         if subsample:
             sc.pp.subsample(z,n_obs= subsample)
+            z.uns[dataset_name_field] = item
         return z
     return [ choose(item) for item in timeNames]
 
@@ -52,9 +66,13 @@ def loadcereb(timeNames = ['E10', 'E12', 'E14', 'E16', 'E18','P0', 'P5', 'P7', '
 
 def loadimm(subsample=1000):
     dir = '/home/ubuntu/repos/HungarianClustering/data/immune_stim/'
-    return [natto.input.loadpbmc(path=dir+s, subsample=subsample)
+    r =  [natto.input.loadpbmc(path=dir+s, subsample=subsample)
                     for s in '89']
 
+    for d,name in zip(r,'89'):
+        d.uns[dataset_name_field]= f'immune_{name}'
+
+    return r
 
 
 def getwater(subsample=1000):
@@ -67,7 +85,7 @@ def getwater(subsample=1000):
     return z,d
 
 
-def loadwater(subsample=None):
+def loadwater(subsample=1000):
     d = sc.read(f'/home/ubuntu/data/waterston.h5')
 
     def choose(item):
@@ -75,11 +93,13 @@ def loadwater(subsample=None):
         if subsample:
             z = z[z.obs['label']==z.obs['label']] # removes the nan
             sc.pp.subsample(z,n_obs= subsample)
+        z.uns[dataset_name_field] = item
         return z
+
     names = np.unique(d.obs['batch'])
 
     r= [ choose(item) for item in names] #, names
-    return r[:3]+r[5:] # removed 3rd dataset becasue it is the second batch of 2nd and is strange
+    return r # r[:3]+r[5:] # removed 3rd dataset becasue it is the second batch of 2nd and is strange
 
 
 
@@ -93,6 +113,7 @@ def pancreatic(subsample=1000):
                                       labelFile='theirLabels.csv')
         nonBloodGenesList = [name for name in anndata.var_names if (not name.startswith('Hb') and not name.startswith('Ft'))]
         anndata= anndata[:, nonBloodGenesList]
+        anndata.uns[dataset_name_field] = item
         if subsample:
             sc.pp.subsample(anndata,n_obs=subsample)
         return anndata
@@ -103,6 +124,7 @@ def pancv2(subsample=1000):
     inputDirectory = "/home/ubuntu/data/jack/GSE101099_data/GSM314091"
     def load(item):
         anndata = natto.input.loadGSM(f'{inputDirectory}{item}/', subsample=subsample, cellLabels=True)
+        anndata.uns[dataset_name_field] = item
         if subsample:
             sc.pp.subsample(anndata,n_obs=subsample)
         return anndata
@@ -135,4 +157,28 @@ def score(m,proj,labels):
 
 
 
+
+
+# from cellsaw import preprocess
+# from lmz import *
+# from cellsaw import merge
+# from natto.process import kNearestNeighbours as knn
+# import structout as so
+
+loaders = [getmousecortex, loadwater, pancreatic,
+               loadcereb, loadimm]
+labels = ['labels','label','labels','celltype','labels']
+ll = Zip(loaders, labels)
+
+from cellsaw import similarity
+def getmatrix(loader, label):
+    ata = loader(subsample=1000)
+    ranked_datasets_list, similarity_df = similarity.rank_by_similarity(
+                                        target = ata,
+                                        source = ata,
+                                        method = 'meanexpression',
+                                        numgenes = 1000,
+                                        return_similarity = True)
+    return similarity_df
+    #so.heatmap(similarity_df.to_numpy())
 

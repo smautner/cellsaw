@@ -95,6 +95,7 @@ def rank_by_similarity(target = False,
                         source = False,
                         numgenes = 500,
                         similarity = 'cosine',
+                        dataset_name_field ='tissue5id',
                         return_similarity = True, method = 'natto'):
     '''
     target: the ones we want to annotate
@@ -125,7 +126,7 @@ def rank_by_similarity(target = False,
     logging.info(f'did matrixmap {time.time()-starttime}')
 
     def getname(ada):
-        return ada.uns.get('tissue5id','no name')
+        return ada.uns.get(dataset_name_field,'no name')
 
     ind = Map(getname,target)
     col = Map(getname,source)
