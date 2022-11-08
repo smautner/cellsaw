@@ -169,16 +169,90 @@ loaders = [getmousecortex, loadwater, pancreatic,
                loadcereb, loadimm]
 labels = ['labels','label','labels','celltype','labels']
 ll = Zip(loaders, labels)
-
 from cellsaw import similarity
+
+# this is useful for drawing all the matrices...
+# for l in jack.ll:   jack.so.heatmap(jack.getmatrix(*l).to_numpy())
 def getmatrix(loader, label):
     ata = loader(subsample=1000)
     ranked_datasets_list, similarity_df = similarity.rank_by_similarity(
                                         target = ata,
                                         source = ata,
                                         method = 'meanexpression',
-                                        numgenes = 1000,
+                                        numgenes = 500,
                                         return_similarity = True)
     return similarity_df
     #so.heatmap(similarity_df.to_numpy())
+
+
+def scorematrix(m):
+    error = 0
+    l = m.shape[0]
+    good, bad = 0,0
+    for i in range(l-2):
+        for j in range(i+2,l):
+
+            if (m[i+1,j] > m[i,j]) and (m[i,j-1] > m[i,j]):
+                good+=1
+            else:
+                bad +=1
+                if (m[i+1,j] > m[i,j]):
+                    error += m[i+1,j] - m[i,j]
+                if (m[i,j-1] > m[i,j]):
+                    error += m[i,j-1] - m[i,j]
+
+    return good/(good+bad), error
+
+
+import structout as so
+def optimizescore(loader,label):
+    ata = loader(subsample=1000)
+    ata.pop(4)
+    # for l in jack.ll:   jack.so.heatmap(jack.getmatrix(*l).to_numpy())
+
+    scores = []
+    params = []
+    for method in ['meanexpression','natto','cell_ranger','seurat_v3']:
+        for sim in ['jaccard','cosine' ]:
+            if sim == 'jaccard':
+                ng = list(range(1500,5000,200))
+            else:
+                ng = list(range(500,2000,100))
+            for numgen in ng:
+                ranked_datasets_list, similarity_df = similarity.rank_by_similarity(
+                                                target = ata,
+                                                source = ata,
+                                                method = method,
+                                                numgenes = numgen,
+                                                similarity = sim,
+                                                return_similarity = True)
+                #so.heatmap(similarity_df.to_numpy(),legend=False)
+                scores.append(scorematrix(similarity_df.to_numpy()))
+                params.append(f'{method}{sim}{numgen}')
+    return scores,params
+    #so.heatmap(similarity_df.to_numpy())
+    # for l in jack.ll:   jack.so.heatmap(jack.getmatrix(*l).to_numpy())
+
+
+
+
+def is_pareto(costs):
+    is_efficient = np.ones(costs.shape[0], dtype=bool)
+
+    for i, c in enumerate(costs):
+        if is_efficient[i]:
+           is_efficient[is_efficient] = np.any(costs[is_efficient]<=c, axis=1)
+
+    return is_efficient
+
+
+
+def pareto(s,c):
+    s = np.array(s)
+    s[:,0] *= -1
+    mask = is_pareto(s)
+    for m,ss,cc in zip(mask,s,c):
+        if m==1:
+            print(cc,ss)
+
 
