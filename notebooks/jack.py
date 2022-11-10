@@ -131,7 +131,6 @@ def pancv2(subsample=1000):
     return [load(x) for x in ['5_E12_v2', '6_E14_v2', '7_E17_1_v2', '8_E17_2_v2']]
 
 
-
 def centers(arg):
     X,y = arg
     cents = []
@@ -238,6 +237,7 @@ def optimizescore(loader,label):
 
 def is_pareto(costs):
     is_efficient = np.ones(costs.shape[0], dtype=bool)
+
 
     for i, c in enumerate(costs):
         if is_efficient[i]:

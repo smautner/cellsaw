@@ -23,7 +23,7 @@ col = col + col + col + ((0, 0, 0),)
 # col = col+[(0,0,0)]
 
 
-def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5):
+def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False):
     '''scatterplots for merge.d2'''
 
     # make a tinyumap with the right dimensions
@@ -38,15 +38,19 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5):
     concatX = np.vstack(X)
     xmin, ymin = concatX.min(axis=0)
     xmax, ymax = concatX.max(axis=0)
-    xdiff = np.abs(xmax - xmin)
-    ydiff = np.abs(ymax - ymin)
-    plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
-    plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
+
+    # xdiff = np.abs(xmax - xmin)
+    # ydiff = np.abs(ymax - ymin)
+    # plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
+    # plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
+
+    themap = tools.spacemap(np.unique(np.concatenate(labels)))
 
     for x, y in zip(X, labels):
-        y,sm = tools.labelsToIntList(y)
+        #y,sm = tools.labelsToIntList(y)
+        y = themap.encode(y)
         if not grad:
-            d.draw(x, y, title=None, labeldict=sm.getitem)
+            d.draw(x, y, title=None, labeldict=themap.getitem)
             # plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
             # plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
             plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
@@ -57,6 +61,11 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5):
             plt.scatter(x[:, 0], x[:, 1], c=y, s=1)
             # plt.colorbar(shrink=.5)
             # plt.tick_params(labelsize=4)
+        if plug:
+            plug.draw(themap)
+        plt.xlim(xmin, xmax)
+        plt.ylim(ymin, ymax)
+
     plt.show()
 
 
@@ -124,6 +133,35 @@ class tinyUmap():
         self.next()
         self.lim()
         tinyumap(*a, **b)
+
+
+class drawMovingCenters:
+    def __init__(self,XX,yy):
+        # we build something like:
+        # clusterid -> center1 False center3
+        self.clustercenters ={}
+        self.numframes = len(XX)
+        self.frameid = 0
+
+        def getacenter(x,y,label):
+            y= y.values
+            if label not in y:
+                return False
+            return x[y==label].mean(axis=0)
+
+        for label in np.unique(np.concatenate(yy)):
+            self.clustercenters[label] = [getacenter(x,y,label) for x,y in zip(XX,yy)]
+
+    def draw(self, labelmap):
+        # now we draw a frame
+        alphas = 1/2**np.abs(np.array(Range(self.numframes))-self.frameid)
+        for label in self.clustercenters:
+            for coordinate, alpha in zip(self.clustercenters[label],alphas):
+                if not isinstance( coordinate, bool):
+                    intlabel = labelmap.getint.get(label)
+                    plt.text(x=coordinate[0], y= coordinate[1],s= intlabel, alpha = alpha, color = col[intlabel])
+        self.frameid += 1
+
 
 
 def mkconfusion(y1, y2):
