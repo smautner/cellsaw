@@ -12,28 +12,35 @@ import logging
 
 
 
-def annotate_genescores(adata, selector='natto',
-                        donormalize=True,
+def annotate_genescores(adatas, **kwargs):
+    return [annotate_genescores_single(adata,**kwargs) for adata in adatas]
+
+def annotate_genescores_single(adata, selector='natto',
+                        donormalize='auto',
                         nattoargs = {'mean':(0.015, 4),'bins':(.25, 1)},
                         mingenes = 200,
                         plot=False):
 
-
-    arumethod = adata.uns.get('genescoremethod','ney')
-    if arumethod == selector:
-        print('#',end='')
+    if selector in adata.varm:
         return adata
-
-    adata.uns['genescoremethod'] = selector
 
 
     incommingshape= adata.X.shape
     sc.pp.filter_cells(adata, min_genes=mingenes, inplace=True)
     okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
+
+    if isinstance(donormalize, str):
+        if selector == 'seurat_v3':
+            donormalize = False
+        else:
+            donormalize = True
+
     if donormalize:
-        sc.pp.normalize_total(adata, 1e4)
-        #if "log1p" not in adata.uns_keys():
-        sc.pp.log1p(adata) # TODO look here, log1p is already set,, but its probably not transformed..
+        if 'normlog' not in adata.uns:
+            sc.pp.normalize_total(adata, 1e4)
+            #if "log1p" not in adata.uns_keys():
+            sc.pp.log1p(adata) # TODO look here, log1p is already set,, but its probably not transformed..
+            adata.uns['normlog'] = True
 
     adata2 = adata.copy()
 
@@ -71,7 +78,8 @@ def annotate_genescores(adata, selector='natto',
 
     fullscores[okgenes==1] = scores
 
-    adata.varm["scores"]=  fullscores
+    adata.varm[selector]=  fullscores
+    adata.uns['lastscores'] = selector
     adata.varm['genes'] = okgenes
     logging.info(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")
     return adata

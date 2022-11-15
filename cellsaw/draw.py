@@ -43,9 +43,7 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False
     # ydiff = np.abs(ymax - ymin)
     # plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
     # plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
-
     themap = tools.spacemap(np.unique(np.concatenate(labels)))
-
     for x, y in zip(X, labels):
         #y,sm = tools.labelsToIntList(y)
         y = themap.encode(y)
@@ -65,7 +63,6 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False
             plug.draw(themap)
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
-
     plt.show()
 
 
@@ -155,6 +152,14 @@ class drawMovingCenters:
     def draw(self, labelmap):
         # now we draw a frame
         alphas = 1/2**np.abs(np.array(Range(self.numframes))-self.frameid)
+
+        for label in self.clustercenters:
+            for i,(coordinate, alpha) in enumerate(zip(self.clustercenters[label][:-1],alphas)):
+                if not isinstance( coordinate, bool) and not isinstance(self.clustercenters[label][i+1],bool):
+                    intlabel = labelmap.getint.get(label)
+                    plt.plot((coordinate[0],self.clustercenters[label][i+1][0]),
+                             (coordinate[1], self.clustercenters[label][i+1][1]) , alpha = alpha, color = col[intlabel])
+
         for label in self.clustercenters:
             for coordinate, alpha in zip(self.clustercenters[label],alphas):
                 if not isinstance( coordinate, bool):
@@ -302,7 +307,7 @@ def plotPrecision(data, wg = True, method='cosine similarity'):
     # plor precision at k :)
     # [val,rep,p@k,n_genes]
     df = pd.DataFrame(data)
-    df.columns = 'precision rep neighbors±σ genes '.split()
+    df.columns = 'precision rep neighbors±σ genes sim preproc'.split()
     title = f'Searching for similar datasets via {method}'
 
     if wg:
@@ -315,4 +320,43 @@ def plotPrecision(data, wg = True, method='cosine similarity'):
     plt.xlabel('number of genes')
 
 
+import gif
+def makegif(merge, labels, plug):
+	gif.options.matplotlib["dpi"] = 200
+	def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False):
+		X = merge.d2
+		#rows = ((len(X) - 1) // plotsperline) + 1
+		#columns = plotsperline if len(X) > plotsperline else len(X)
+		d = tinyUmap(dim=(1, len(merge.d2)), size=size)  # default is a row
+		plt.close()
+		# set same limit for all the plots
+		concatX = np.vstack(X)
+		xmin, ymin = concatX.min(axis=0)
+		xmax, ymax = concatX.max(axis=0)
 
+		themap = tools.spacemap(np.unique(np.concatenate(labels)))
+		@gif.frame
+		def myplotter(x,y):
+			#y,sm = tools.labelsToIntList(y)
+			y = themap.encode(y)
+			if not grad:
+				tinyumap(x, y, title=None, labeldict=themap.getitem)
+				# plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
+				# plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
+				plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
+			else:
+				plt.gca().axes.yaxis.set_ticklabels([])
+				plt.gca().axes.xaxis.set_ticklabels([])
+				plt.scatter(x[:, 0], x[:, 1], c=y, s=1)
+				# plt.colorbar(shrink=.5)
+				# plt.tick_params(labelsize=4)
+			if plug:
+				plug.draw(themap)
+			plt.xlim(xmin, xmax)
+			plt.ylim(ymin, ymax)
+
+		frames = []
+		for x, y in zip(X, labels):
+			frames.append(myplotter(x,y))
+		gif.save(frames, 'meganice.gif', duration=1000)
+	plot_merge(merge,labels,plug=plug)

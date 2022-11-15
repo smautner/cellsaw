@@ -65,8 +65,9 @@ def read(dir, suffix = '.gz',
         if sample_size:
             try:
                 sc.pp.subsample(adata, fraction=None, n_obs=sample_size,
-                        random_state=sampleseed, copy=False)
-            except:
+                        random_state=sampleseed,copy=False)
+            except Exception as e:
+                print(e)
                 print  (f"COULD NOT SUBSAMPLE {sample_size} items\
                         from {adata.uns['fname']} cells(labeled)= {adata.X.shape}")
                 return adata

@@ -1,7 +1,7 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 
 import cellsaw.draw
-from cellsaw.similarity.measures import cosine, jaccard, precision
+from cellsaw.similarity.measures import cosine, jaccard, precision, score
 import numpy as np
 from ubergauss import tools as ut
 import pandas as pd
