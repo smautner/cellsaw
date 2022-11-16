@@ -12,10 +12,17 @@ import logging
 
 
 
-def annotate_genescores(adatas, **kwargs):
-    return [annotate_genescores_single(adata,**kwargs) for adata in adatas]
+def annotate_genescore(adatas, **kwargs):
 
-def annotate_genescores_single(adata, selector='natto',
+    r = []
+    for i,adata in enumerate(adatas):
+        try:
+            r.append(annotate_genescore_single(adata,**kwargs))
+        except:
+            print (i,adata.X.shape)
+    return r
+
+def annotate_genescore_single(adata, selector='natto',
                         donormalize='auto',
                         nattoargs = {'mean':(0.015, 4),'bins':(.25, 1)},
                         mingenes = 200,

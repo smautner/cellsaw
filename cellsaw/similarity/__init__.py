@@ -1,7 +1,7 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 
 import cellsaw.draw
-from cellsaw.similarity.measures import cosine, jaccard, precision, score
+from cellsaw.similarity.measures import cosine, jaccard, precision
 import numpy as np
 from ubergauss import tools as ut
 import pandas as pd
@@ -89,7 +89,7 @@ ranked_datasets_list, similarity_df = rank_by_similarity(target = target_dataset
                                     return_similarity = True)
 '''
 
-from cellsaw.preprocess import annotate_genescores
+from cellsaw.preprocess import annotate_genescore_single
 
 def rank_by_similarity(target = False,
                         source = False,
@@ -104,8 +104,8 @@ def rank_by_similarity(target = False,
     '''
     starttime = time.time()
     #source = ut.xmap(lambda x: annotate_genescores(x,selector=method), source)
-    source = [annotate_genescores(s,selector = method) for s in source]
-    target = [annotate_genescores(t,selector = method) for t in target]
+    source = [annotate_genescore_single(s,selector = method) for s in source]
+    target = [annotate_genescore_single(t,selector = method) for t in target]
     print('got target')
     logging.info(f'obtained genescores {time.time()-starttime}')
     # source = Map(annotate_genescores, source)

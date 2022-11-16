@@ -1,6 +1,6 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 from cellsaw.io_utils.loadadata import get41names, get100names, load100
-from cellsaw.preprocess import annotate_genescores
+from cellsaw.preprocess import annotate_genescore_single
 from scipy.sparse import csr_matrix
 import pandas as pd
 
@@ -11,7 +11,7 @@ def easyLoad100(name, path = None, remove_unlabeled = False, mingenes= 200,subsa
                 plot=False, nattoargs=  {'mean': (0.015, 4), 'bins': (.25, 1)}):
     '''this would be the sane way to load data, but we dont use this anymore... '''
     adata = load100(name, path=path, remove_unlabeled=remove_unlabeled, subsample = subsample)
-    gs = annotate_genescores(adata, mingenes=mingenes, selector=preprocessingmethod,
+    gs = annotate_genescore_single(adata, mingenes=mingenes, selector=preprocessingmethod,
             donormalize= donormalize, nattoargs= nattoargs, plot=plot)
     return gs
 
@@ -29,6 +29,7 @@ def read(dir, suffix = '.gz',
          sampleseed = None,
         delimiter= '\t',
         sample_size = 0,
+         min_genes = 200,
         remove_cells = {}):
 
     # targets = list of files to load
@@ -50,6 +51,7 @@ def read(dir, suffix = '.gz',
     def openh5(fname):
         try:
             adata = anndata.read_h5ad(fname, backed = None)
+            sc.pp.filter_cells(adata, min_genes=min_genes, inplace=True)
         except:
             print('basic h5 loading failed:', fname)
             return 0
