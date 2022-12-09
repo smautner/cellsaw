@@ -29,11 +29,15 @@ class Merge(mergeutils):
             make_even = True, pca = 20, umaps = [2],
             joint_space = True,
             sortfield = 0,
+            genescoresid = '',
             titles = "ABCDEFGHIJKIJ"):
 
         shapesbevorepp= [a.X.shape for a in adatas]
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
-        self.genescores = [a.varm['scores'] for a in adatas]
+        #self.genescores = [a.varm['scores'] for a in adatas]
+
+        scorename = genescoresid or adatas[0].uns['lastscores']
+        self.genescores = [a.varm[scorename] for a in adatas]
         self.geneab = [a.varm['genes'] for a in adatas]
         self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
         self.sorted = False

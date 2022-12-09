@@ -93,10 +93,10 @@ from cellsaw.preprocess import annotate_genescore_single
 
 def rank_by_similarity(target = False,
                         source = False,
-                        numgenes = 500,
-                        similarity = 'cosine',
+                        numgenes = 2500,
+                        similarity = 'jaccard',
                         dataset_name_field ='tissue5id',
-                        return_similarity = True, method = 'natto'):
+                        return_similarity = True, method = 'seurat_v3'):
     '''
     target: the ones we want to annotate
     source: the database
@@ -106,15 +106,15 @@ def rank_by_similarity(target = False,
     #source = ut.xmap(lambda x: annotate_genescores(x,selector=method), source)
     source = [annotate_genescore_single(s,selector = method) for s in source]
     target = [annotate_genescore_single(t,selector = method) for t in target]
-    print('got target')
+    # print('got target')
     logging.info(f'obtained genescores {time.time()-starttime}')
     # source = Map(annotate_genescores, source)
     # target = Map(annotate_genescores, target)
 
     if similarity  == 'cosine':
-        ff = lambda a,b,c: cosine(a,b, numgenes=numgenes)
+        ff = lambda a,b,c: cosine(a,b, numgenes=numgenes, scores = method)
     elif similarity == 'jaccard':
-        ff = lambda a,b,c: jaccard(a,b, numgenes=numgenes)
+        ff = lambda a,b,c: jaccard(a,b, numgenes=numgenes, scores =method)
     else:
         raise('similarity should be either cosine or jaccard')
 

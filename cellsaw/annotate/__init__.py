@@ -1,4 +1,4 @@
-from cellsaw.merge import Merge, stringdiffuse
+from cellsaw.merge import Merge, stringdiffuse, accuracy_evaluation
 from collections import Counter
 import scanpy as sc
 from cellsaw.annotate.draw import plot_annopair
@@ -27,7 +27,7 @@ def predict_celltype(target,
 
     pid = (pca_dim>0)+ (umap_dim>0)
     #merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
-    if pp:
+    if pp and not premerged:
         def prep(x):
             x.X = np.expm1(x.X)
             x._uns.pop("log1p")

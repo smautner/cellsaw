@@ -65,11 +65,14 @@ def matrixmap(inst,inst2,meth, scorelabel, genecount):
     res = np.zeros((l,l2))
     f = jaccard if meth == 'jaccard' else cosine
     for i in range(l):
-        for j in range(i+1,l2):
+        for j in range(i,l2):
             a,b = inst[i], inst2[j]
             r= f(a,b,numgenes=genecount, scores= scorelabel)
+            if r==1.0:
+                r = -1
             res[i,j] = r
             res[j,i] = r
+    res[res < 0] = res.max()*1.05
     return res
 
 def adata_to_score(instances,genecount, preprocessing, cosjacc, labels):

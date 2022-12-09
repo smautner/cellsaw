@@ -53,14 +53,20 @@ def annotate_genescore_single(adata, selector='natto',
 
     adata2 = adata2[:,okgenes].copy()
     if selector == 'meanexpression':
-
-
         if isinstance(adata2.X, csr_matrix):
             arr = adata2.X.todense().A
         else:
             arr = np.array(adata2.X)
         #print(f"{type(arr)=}")
         scores = np.nanmean(arr,axis = 0)
+
+    elif selector == 'meanexpressionnolog':
+        if isinstance(adata2.X, csr_matrix):
+            arr = adata2.X.todense().A
+        else:
+            arr = np.array(adata2.X)
+        #print(f"{type(arr)=}")
+        scores = np.nanmean(np.expm1(arr),axis = 0)
 
     elif selector == 'preselected':
         self.preselected_genes = self.data[0].preselected_genes
