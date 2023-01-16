@@ -1,4 +1,4 @@
-
+import numpy as np
 import scanpy as sc
 from cellsaw.merge.mergehelpers import hungarian
 from sklearn.neighbors import KNeighborsClassifier as knn
@@ -7,6 +7,7 @@ from sklearn.semi_supervised import LabelSpreading as laspre
 from MarkerCount.marker_count import MarkerCount_Ref, MarkerCount
 import warnings
 from cellsaw.merge import Merge
+from cellsaw.merge.hungarianEM import linasEM
 
 def mergewrap(a,b,umap_dim,**kwargs):
     assert  isinstance(umap_dim, int), 'umap_dim must be an integer'
@@ -20,10 +21,11 @@ def linsum_copylabel(
         source_label = 'celltype',
         target_label= 'diffuseknn',
         premerged = False,
+        n_genes = 800,
         pca_dim = 20, umap_dim = 0):
 
     pid = (pca_dim>0)+ (umap_dim>0)
-    merged =   premerged or mergewrap(target,source,umap_dim,pca=pca_dim, sortfield = pid)
+    merged =   premerged or mergewrap(target,source,umap_dim,pca=pca_dim, sortfield = pid, selectgenes = n_genes)
     target.obs[target_label] = list(merged.data[1].obs[source_label])
     return target
 
@@ -31,12 +33,13 @@ def linsum_copylabel(
 def label_knn(target,source,
                        source_label = 'celltype',
                        target_label='knn',
+                        n_genes = 800,
                        premerged = False,
                        pca_dim = 20, umap_dim = 0, k = 5):
 
 
     pid = (pca_dim>0)+ (umap_dim>0)
-    merged = premerged or  mergewrap(target,source,umap_dim,pca=pca_dim)
+    merged = premerged or  mergewrap(target,source,umap_dim,pca=pca_dim, selectgenes = n_genes)
     a,b = merged.projections[pid]
     y = merged.data[1].obs['celltype']
     model = knn(n_neighbors=k).fit(a,y)
@@ -48,15 +51,41 @@ def raw_diffusion(target, source, source_label ='celltype',
                   target_label='raw_diffusion',
                   premerged = False,
                   n_neighbors = 5, gamma = 10,
+                  n_genes = 800,
                   pca_dim = 20, umap_dim = 0):
     pid = (pca_dim>0)+ (umap_dim>0)
-    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
+    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim,selectgenes=n_genes)
     a,b = merged.projections[pid]
     y = merged.data[1].obs[source_label]
     #diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
     diffusor = lapro( gamma = gamma, n_neighbors = n_neighbors).fit(b,y)
     target.obs[target_label] = diffusor.predict(a)
     return target
+
+
+
+def tunnelclust(target, source, source_label ='celltype',
+                  target_label='raw_diffusion',
+                  premerged = False,
+                  n_neighbors = 5,
+                  n_genes = 800,
+                  pca_dim = 20,
+                umap_neigh  = 10,
+                    umap_dim = 0):
+    '''
+    change params,
+    write multitunnelclust wrapper to work with strings
+    change the code in this function to call that wrapper
+    '''
+    pid = (pca_dim>0)+ (umap_dim>0)
+    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim,selectgenes=n_genes)
+    a,b = merged.projections[pid]
+    y = merged.data[1].obs[source_label]
+    # diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
+    # diffusor = lapro( gamma = gamma, n_neighbors = n_neighbors).fit(b,y)
+    target.obs[target_label] = linasEM([a,b],y)
+    return target
+
 
 
 def markercount(target, source, source_label ='celltype',
@@ -95,24 +124,38 @@ def raw_diffusion_combat(target, source, source_label ='celltype',
                   target_label='raw_diffusion',
                   premerged = False,
                   n_neighbors = 5, gamma = 10,
+                  n_genes = 800,
                   pca_dim = 20, umap_dim = 0):
     pid = (pca_dim>0)+ (umap_dim>0)
 
     target.obs['batch'] = [1]*target.X.shape[0]
     source.obs['batch'] = [2]*source.X.shape[0]
-    scr = [a.varm['scores'] for a in [target,source]]
+    scoresvariable  = target.uns['lastscores']
+    scr = [a.varm[scoresvariable] for a in [target,source]]
     z = ad.concat([target,source])
     z.obs_names_make_unique()
     sc.pp.combat(z,key= 'batch')
     target = z[z.obs['batch'] == 1]
     source = z[z.obs['batch'] == 2]
 
-    target.varm['scores']= scr[0]
-    source.varm['scores']= scr[1]
+    #target.varm[scoresvariable]= scr[0]
+    #source.varm[scoresvariable]= scr[1]
+    #merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim,selectgenes= n_genes)
+    #a,b = merged.projections[pid]
+    '''
+    todo dimension reduction pca
+    dimred umap
+    split a and b
+    '''
+    from sklearn.decomposition import PCA
+    import umap
+    x = PCA(n_components=pca_dim).fit_transform(z.X)
+    if umap_dim > 0:
+        x = umap.UMAP(n_components=umap_dim).fit_transform(x)
 
-    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
-    a,b = merged.projections[pid]
-    y = merged.data[1].obs[source_label]
+    a,b = x[z.obs['batch']==1], x[z.obs['batch']==2]
+
+    y = source.obs[source_label]
     #diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
     diffusor = lapro( gamma = gamma, n_neighbors = n_neighbors).fit(b,y)
     target.obs[target_label] = diffusor.predict(a)

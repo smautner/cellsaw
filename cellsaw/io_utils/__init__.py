@@ -5,7 +5,6 @@ from scipy.sparse import csr_matrix
 import pandas as pd
 
 
-
 def easyLoad100(name, path = None, remove_unlabeled = False, mingenes= 200,subsample = None,
                 preprocessingmethod = 'natto', donormalize= True,
                 plot=False, nattoargs=  {'mean': (0.015, 4), 'bins': (.25, 1)}):
@@ -85,7 +84,7 @@ def read(dir, suffix = '.gz',
 
 
 
-def readcsv(x,delimiter = '\t'):
+def readcsv(x,delimiter = '\t', saveas = ''):
     #adata = anndata.read_csv(x,delimiter=delimiter)
     things = pd.read_csv(x, sep='\t').T
     adata = anndata.AnnData(things)
@@ -103,7 +102,10 @@ def readcsv(x,delimiter = '\t'):
 
 
     adata.uns['fname'] = path_nosuffix
-    adata.write(str(path_nosuffix)+'.h5', compression='gzip')
+    if saveas:
+        adata.write(saveas, compression='gzip')
+    else:
+        adata.write(str(path_nosuffix)+'.h5', compression='gzip')
     adata.file.close()
     #os.remove(filename)
     return 0
@@ -149,5 +151,64 @@ def save(adatas, format = 'h5'):
     for adata in adatas:
         adata.write(adata.uns['fname']+'.h5', compression='gzip')
 
+
+
+
+def nuread(dir,
+        dataset,
+        sampleseed = None,
+        delimiter= '\t',
+        sample_size = 0,
+        min_genes = 200,
+        remove_cells = {}):
+    '''
+    the other read version is annoying, we need a version that is just better :D..
+
+    1. if there is no .h5:
+        - load, annotate, save
+
+    2. load .h5, filter, return
+    '''
+    expect = os.path.join(dir,'xmas',dataset+'.h5')
+    if not os.path.exists(expect):
+        csvpath = os.path.join(dir,dataset+'.counts.gz')
+        readcsv(csvpath, delimiter,saveas = expect)
+        adata = anndata.read_h5ad(expect, backed = None)
+
+        adata = annotate_from_barcode_csv(input_field='barcode',output_field='clusterid')(adata)
+        adata = annotate_celltypes(path = dir,input_field='clusterid',output_field='celltype')(adata)
+
+        adata.write(expect, compression='gzip')
+
+        adata.file.close()
+
+    try:
+        adata = anndata.read_h5ad(expect, backed = None)
+        sc.pp.filter_cells(adata, min_genes=min_genes, inplace=True)
+    except:
+        print('basic h5 loading failed:', expect)
+        return 0
+
+    # reduce cell count
+    for k,v in remove_cells.items():
+        try:
+            for delete_label in v:
+                adata = adata[adata.obs[k]!=delete_label]
+        except Exception as e:
+            print('deletelabel failed in:', expect, e )
+
+    if sample_size:
+        try:
+            sc.pp.subsample(adata, fraction=None, n_obs=sample_size,
+                    random_state=sampleseed,copy=False)
+        except Exception as e:
+            print(e)
+            print  (f"COULD NOT SUBSAMPLE {sample_size} items\
+                    from {adata.uns['fname']} cells(labeled)= {adata.X.shape}")
+            return adata
+
+    if 'celltype' not in adata.obs:
+        print(f'we should delete {expect}')
+    return adata
 
 

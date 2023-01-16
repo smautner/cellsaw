@@ -4,7 +4,7 @@ from sklearn.mixture import _gaussian_mixture as _gm
 import numpy as np
 from sklearn.metrics.pairwise import euclidean_distances as ed
 from sklearn.mixture import GaussianMixture as gmm
-
+from ubergauss import tools
 
 
 ###################
@@ -76,6 +76,16 @@ def HEM(merge, init = 0, pid =2):
         init = initialize(merge.projections[pid][0])
     return multitunnelclust(merge.projections[pid],init,method = 'full')
 
+
+
+def linasEM(nparrays, y):
+    '''
+        i assume a set of string labels are given
+    '''
+    sm  = tools.spacemap(np.unique(y))
+    intlabels = np.array(sm.encode(y))
+    predicted_intlabels,_,_,_ = multitunnelclust(nparrays,intlabels)
+    return sm.decode(predicted_intlabels)
 
 
 

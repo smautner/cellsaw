@@ -1,7 +1,7 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 
 import cellsaw.draw
-from cellsaw.similarity.measures import cosine, jaccard, precision
+from cellsaw.similarity.measures import cosine, jaccard, precision, mkshortnames
 import numpy as np
 from ubergauss import tools as ut
 import pandas as pd
@@ -91,6 +91,33 @@ ranked_datasets_list, similarity_df = rank_by_similarity(target = target_dataset
 
 from cellsaw.preprocess import annotate_genescore_single
 
+
+
+
+from collections import defaultdict
+
+def rank_by_sim_splitbyname(datasets, names, **kwargs):
+    sn = mkshortnames(names)
+    d = defaultdict(list)
+    for name,item in zip(sn,datasets):
+        d[name].append(item)
+
+
+    if kwargs.get('return_similarity', True):
+        print ('well just turn return_similarity off :)')
+        kwargs['return_similarity'] = False
+
+    flattened_results = [ line for data in d.values()
+             for line in rank_by_similarity(target=data,source=data,**kwargs)]
+
+    return flattened_results
+
+
+
+
+
+
+
 def rank_by_similarity(target = False,
                         source = False,
                         numgenes = 2500,
@@ -110,6 +137,9 @@ def rank_by_similarity(target = False,
     logging.info(f'obtained genescores {time.time()-starttime}')
     # source = Map(annotate_genescores, source)
     # target = Map(annotate_genescores, target)
+
+
+    #breakpoint()
 
     if similarity  == 'cosine':
         ff = lambda a,b,c: cosine(a,b, numgenes=numgenes, scores = method)
@@ -139,6 +169,10 @@ def rank_by_similarity(target = False,
         return ranklist, distances
     else:
         return ranklist
+
+
+
+
 
 
 def plot_dendrogram(similarity_df):

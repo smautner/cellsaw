@@ -2,7 +2,7 @@ from cellsaw.merge import Merge, stringdiffuse, accuracy_evaluation
 from collections import Counter
 import scanpy as sc
 from cellsaw.annotate.draw import plot_annopair
-from cellsaw.annotate.annotators import label_knn, linsum_copylabel, raw_diffusion, markercount, mergewrap, raw_diffusion_combat
+from cellsaw.annotate.annotators import label_knn, linsum_copylabel, raw_diffusion, markercount, mergewrap, raw_diffusion_combat, tunnelclust
 import cellsaw.preprocess as preprocess
 import numpy as np
 
@@ -29,11 +29,11 @@ def predict_celltype(target,
     #merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
     if pp and not premerged:
         def prep(x):
-            x.X = np.expm1(x.X)
-            x._uns.pop("log1p")
-            x.uns
-            target = preprocess.annotate_genescores(x,selector = pp)
-            sc.pp.log1p(x)
+            # x.X = np.expm1(x.X)
+            # x._uns.pop("log1p")
+            # x.uns
+            target = preprocess.annotate_genescore_single(x,selector = pp)
+            # sc.pp.log1p(x)
 
         prep(target)
         prep(source)
@@ -56,7 +56,7 @@ def multi_annotate(target,
                    annotator = lambda x:x,
                    source_label = 'celltype',
                    target_label='multisrc',
-                   **kwargs):
+                   annotatorargs = None):
 
     # we should not be loosing cells:
     sc.pp.subsample(target,
@@ -72,7 +72,7 @@ def multi_annotate(target,
         target_tmp = annotator(target.copy(),source.copy(),
                 source_label = source_label,
                 target_label = f'{target_label}_{i}',
-                **kwargs)
+                **annotatorargs)
         allobs.append(target_tmp.obs[f'{target_label}_{i}'])
 
     def calclabel(a):

@@ -62,9 +62,9 @@ def dimension_reduction(adatas, scale, zero_center, PCA, umaps, joint_space=True
     return res
 
 
-def umapify(dx, dimensions):
+def umapify(dx, dimensions,n_neighbors=10):
     mymap = umap.UMAP(n_components=dimensions,
-                      n_neighbors=10,
+                      n_neighbors=n_neighbors,
                       random_state=1337).fit(np.vstack(dx))
     return [mymap.transform(a) for a in dx]
 

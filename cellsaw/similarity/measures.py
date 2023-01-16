@@ -19,10 +19,11 @@ def cosine(a,b, numgenes = 500, scores= 'scores'):
 
 
 
-def jaccard(a,b ,numgenes= False,scores='scores'):
+def jaccard(adata1,adata2 ,numgenes= False,scores='scores'):
     # intersect/union
     assert numgenes > 3
-    asd = np.array([ ut.binarize(d.varm[scores],numgenes)  for d in [a,b]])
+
+    asd = np.array([ ut.binarize(d.varm[scores],numgenes)  for d in [adata1,adata2]])
     union = np.sum(np.any(asd, axis=0))
     intersect = np.sum(np.sum(asd, axis=0) ==2)
     return intersect/union
@@ -41,17 +42,13 @@ def precision(matrix,shortlabels, k):
 
 
 
+
+
 def mkshortnames(li):
     return [l[:5] for l in li]
 
 def precission_at(df,k):
     return precision(df.to_numpy(),mkshortnames(df.columns),k)
-
-
-
-
-
-
 
 
 
@@ -68,7 +65,7 @@ def matrixmap(inst,inst2,meth, scorelabel, genecount):
         for j in range(i,l2):
             a,b = inst[i], inst2[j]
             r= f(a,b,numgenes=genecount, scores= scorelabel)
-            if r==1.0:
+            if r==1.0: # it is 1 if inst and inst2 are the same -> genescore arrays are identical
                 r = -1
             res[i,j] = r
             res[j,i] = r

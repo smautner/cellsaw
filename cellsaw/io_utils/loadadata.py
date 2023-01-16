@@ -10,7 +10,7 @@ import random
 
 
 '''
-You can ignore this file :) 
+You can ignore this file :)
 '''
 
 
@@ -183,3 +183,5 @@ def annotatetruecelltype(dic, adata, name, f_out = 'truecelltype', f_in = 'clust
 def annotatepangalo(pangaloLabelPath, adatas, names):
     d = loadpangalolabels(pangaloLabelPath)
     return [ annotatetruecelltype(d,a,n) for a,n in zip(adatas,names) ]
+
+

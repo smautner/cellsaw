@@ -19,21 +19,32 @@ def annotate_genescore(adatas, **kwargs):
         try:
             r.append(annotate_genescore_single(adata,**kwargs))
         except:
-            print (i,adata.X.shape)
+            print ('annotate genescore faild: ',i,adata.X.shape)
     return r
+
+
+
+def normalize(adata):
+    if 'normlog' not in adata.uns:
+        sc.pp.normalize_total(adata, 1e4)
+        # if "log1p" not in adata.uns_keys():
+        sc.pp.log1p(adata)  # TODO look here, log1p is already set,, but its probably not transformed..
+        adata.uns['normlog'] = True
+
 
 def annotate_genescore_single(adata, selector='natto',
                         donormalize='auto',
                         nattoargs = {'mean':(0.015, 4),'bins':(.25, 1)},
                         mingenes = 200,
                         plot=False):
+    '''will normlize in the end'''
 
     if selector in adata.varm:
         return adata
 
 
     incommingshape= adata.X.shape
-    sc.pp.filter_cells(adata, min_genes=mingenes, inplace=True)
+    # sc.pp.filter_cells(adata, min_genes=mingenes, inplace=True)
     okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
 
     if isinstance(donormalize, str):
@@ -43,15 +54,10 @@ def annotate_genescore_single(adata, selector='natto',
             donormalize = True
 
     if donormalize:
-        if 'normlog' not in adata.uns:
-            sc.pp.normalize_total(adata, 1e4)
-            #if "log1p" not in adata.uns_keys():
-            sc.pp.log1p(adata) # TODO look here, log1p is already set,, but its probably not transformed..
-            adata.uns['normlog'] = True
+        normalize(adata)
 
-    adata2 = adata.copy()
-
-    adata2 = adata2[:,okgenes].copy()
+    #adata2 = adata.copy()
+    adata2 = adata[:,okgenes].copy()
     if selector == 'meanexpression':
         if isinstance(adata2.X, csr_matrix):
             arr = adata2.X.todense().A
@@ -88,13 +94,12 @@ def annotate_genescore_single(adata, selector='natto',
             scores = np.array(hvg_df['dispersions_norm'].fillna(0))
 
     fullscores = np.full(adata.X.shape[1],np.NINF,np.float)
-
     fullscores[okgenes==1] = scores
-
     adata.varm[selector]=  fullscores
     adata.uns['lastscores'] = selector
     adata.varm['genes'] = okgenes
     logging.info(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")
+    normalize(adata) # anyway in the end normalize
     return adata
 
 
