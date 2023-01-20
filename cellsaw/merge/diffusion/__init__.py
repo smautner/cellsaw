@@ -2,7 +2,7 @@
 import numpy as np
 from ubergauss import tools
 from sklearn.semi_supervised import LabelSpreading,LabelPropagation
-from cellsaw.merge.diffusion.kernel import linear_assignment_kernel
+from cellsaw.merge.diffusion.kernel import linear_assignment_kernel, linear_assignment_kernel_XXX
 
 def stringdiffuse(mergething, labels, pid = 1,
                                 sigmafac = 1,

@@ -137,7 +137,6 @@ def raw_diffusion_combat(target, source, source_label ='celltype',
     sc.pp.combat(z,key= 'batch')
     target = z[z.obs['batch'] == 1]
     source = z[z.obs['batch'] == 2]
-
     #target.varm[scoresvariable]= scr[0]
     #source.varm[scoresvariable]= scr[1]
     #merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim,selectgenes= n_genes)
@@ -160,3 +159,40 @@ def raw_diffusion_combat(target, source, source_label ='celltype',
     diffusor = lapro( gamma = gamma, n_neighbors = n_neighbors).fit(b,y)
     target.obs[target_label] = diffusor.predict(a)
     return target
+
+
+def scanorama_integrate_diffusion(target,source,
+                       source_label = 'celltype',
+                       target_label='scanorama',
+                       pca_dim = 20, umap_dim = 0, gamma = .75):
+
+
+    import scanorama
+    from sklearn.decomposition import PCA
+    import umap
+
+
+    # make names unique and integrate
+    target.obs['batch'] = [1]*target.X.shape[0]
+    source.obs['batch'] = [2]*source.X.shape[0]
+    z = ad.concat([target,source])
+    z.obs_names_make_unique()
+    a,b = z[z.obs['batch']==1], z[z.obs['batch']==2]
+    scanorama.integrate_scanpy([a,b])
+
+    # stack to do dimension reduction
+    z = ad.concat([a,b])
+    data = z.obsm['X_scanorama']
+    x = PCA(n_components=pca_dim).fit_transform(data)
+    if umap_dim > 0:
+        x = umap.UMAP(n_components=umap_dim).fit_transform(x)
+
+    # un-stack to do label transfer
+    a,b = x[z.obs['batch']==1], x[z.obs['batch']==2]
+    y = source.obs[source_label]
+    #diffusor = laspre( gamma = .1, n_neighbors = 5, alpha = .4).fit(b,y)
+    diffusor = lapro( gamma = gamma).fit(b,y)
+    target.obs[target_label] = diffusor.predict(a)
+    return target
+
+

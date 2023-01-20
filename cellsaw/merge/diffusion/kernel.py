@@ -110,4 +110,56 @@ def linear_assignment_kernel(x1,x2, neighbors = 3,
 
     return  similarity_matrix
 
+def linear_assignment_kernel_XXX(x1,x2, neighbors = 3,
+        neighbors_inter= 1, sigmafac = 1, linear_assignment_factor = 1, tsizes = None):
+
+
+    '''
+    now we have multiple target datasets:
+        i guess we build the target line by line
+    '''
+
+    # rist we split x2:
+
+    print(x2.shape)
+    dslist = [x1]+np.split(x2,np.add.accumulate(tsizes))
+
+    if dslist[2].shape[0] == 0:
+        dslist = dslist[:2]
+
+    if dslist[-1].shape[0] == 0:
+        dslist = dslist[:-1]
+
+    # then we built a row:
+    print(x2.shape,[x.shape for x in dslist], tsizes)
+    diaglist = []
+    row = []
+    for i in range(len(dslist)):
+        col = []
+        for j in range(len(dslist)):
+            if i == j:
+                block = neighborgraph(dslist[i],neighbors).todense()
+                diaglist.append(block)
+            if (i+1) == j:
+                block,_ = linear_sum_assignment_matrices(dslist[i],dslist[j], neighbors_inter, dist = True, dense = True)
+                block*=linear_assignment_factor
+            if (j+1) == i:
+                _,block = linear_sum_assignment_matrices(dslist[i],dslist[j], neighbors_inter, dist = True, dense = True)
+                block*=linear_assignment_factor
+            else:
+                np.zeros((dslist[i].shape[0],dslist[j].shape[0]))
+            col.append(block)
+        row.append(np.hstack(col))
+    distance_matrix = np.vstack(row)
+    distance_matrix = dijkstra(distance_matrix, directed = False)
+    dijkstraQ1 = distance_matrix[:x1.shape[0],x1.shape[0]:]
+    sigma = avg1nndistance(diaglist)*sigmafac
+    similarity_matrix = np.exp(-dijkstraQ1/sigma)
+
+    # print('dijkstra zoom');sns.heatmap(dijkstraQ1); plt.xlabel('target'); plt.show()
+    # print(f'gaussed  sigme:{sigma}')
+    # sns.heatmap(similarity_matrix); plt.show()
+
+    return  similarity_matrix
+
 
