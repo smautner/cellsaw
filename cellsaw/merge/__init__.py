@@ -38,7 +38,7 @@ class Merge(mergeutils):
 
         scorename = genescoresid or adatas[0].uns['lastscores']
         self.genescores = [a.varm[scorename] for a in adatas]
-        self.geneab = [a.varm['genes'] for a in adatas]
+        #self.geneab = [a.varm['genes'] for a in adatas]
         self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
         self.sorted = False
         self.jointSpace = joint_space

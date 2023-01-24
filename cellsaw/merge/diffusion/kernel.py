@@ -65,7 +65,7 @@ def neighborgraph(x, neighbors):
 
 from matplotlib import pyplot as plt
 def linear_assignment_kernel(x1,x2, neighbors = 3,
-        neighbors_inter= 1, sigmafac = 1, linear_assignment_factor = 1):
+        neighbors_inter= 1, sigmafac = 1, linear_assignment_factor = 1, return_dm = False):
 
 
     '''
@@ -99,6 +99,9 @@ def linear_assignment_kernel(x1,x2, neighbors = 3,
 
     distance_matrix = dijkstra(distance_matrix, directed = False)
 
+    if return_dm:
+        return distance_matrix
+
     dijkstraQ1 = distance_matrix[:x1.shape[0],x1.shape[0]:]
 
     sigma = avg1nndistance([q2,q4])*sigmafac
@@ -121,17 +124,14 @@ def linear_assignment_kernel_XXX(x1,x2, neighbors = 3,
 
     # rist we split x2:
 
-    print(x2.shape)
     dslist = [x1]+np.split(x2,np.add.accumulate(tsizes))
 
-    if dslist[2].shape[0] == 0:
+    if dslist[2].shape[0] == 0: # happens on self similarity
         dslist = dslist[:2]
-
-    if dslist[-1].shape[0] == 0:
+    if dslist[-1].shape[0] == 0: # np splitting likes to add 0-frames when things fit perfectly :(
         dslist = dslist[:-1]
 
     # then we built a row:
-    print(x2.shape,[x.shape for x in dslist], tsizes)
     diaglist = []
     row = []
     for i in range(len(dslist)):

@@ -32,9 +32,8 @@ def predict_celltype(target,
             # x.X = np.expm1(x.X)
             # x._uns.pop("log1p")
             # x.uns
-            target = preprocess.annotate_genescore_single(x,selector = pp)
+            preprocess.annotate_genescore_single(x,selector = pp)
             # sc.pp.log1p(x)
-
         prep(target)
         prep(source)
     merged = premerged or mergewrap(target,
@@ -48,7 +47,8 @@ def predict_celltype(target,
             neighbors_inter=n_inter_neighbors,
             neighbors_intra=n_intra_neighbors, linear_assignment_factor=linear_assignment_factor)
     target.obs[target_label] = newlabels
-    return target
+    return merged
+    #return target
 
 
 def multi_annotate(target,
@@ -88,4 +88,69 @@ def multi_annotate(target,
 
     target.obs[target_label] = [ calclabel(a) for a in zip(*allobs)  ]
     return target
+
+
+def EXPERIMENTAL(target,
+                   source,
+                   source_label = 'celltype',
+                   target_label='predicted_celltype',
+                   pca_dim = 20,
+                   umap_dim = 0,
+                   make_even = True,
+                   sigmafac = 1,
+                   n_intra_neighbors = 7,
+                   n_inter_neighbors = 2,
+                   premerged = False,
+                   n_genes = 800,
+                   pp = False,
+                   linear_assignment_factor= 1,
+                   similarity_scale_factor = 1.0):
+    import anndata as ad
+    '''
+    # i am experimenting with how the genes are selected..
+    '''
+    assert similarity_scale_factor == 1.0, 'not implemented'
+    pid = (pca_dim>0)+ (umap_dim>0)
+    #merged =premerged or  mergewrap(target,source,umap_dim,pca = pca_dim, make_even=make_even)
+
+
+    #zz = ad.concat([target,source], join = 'outer')
+
+    if False:
+        from scipy.sparse import vstack
+        zz = vstack([target.X,source.X])
+        zz = ad.AnnData(X = zz)
+        preprocess.annotate_genescore_single(zz,selector = pp)
+        target.uns['lastscores']='hack'
+        source.uns['lastscores']='hack'
+        target.varm['hack'] = zz.varm[pp]
+        source.varm['hack'] = zz.varm[pp]
+    else:
+
+        preprocess.annotate_genescore_single(target,selector = pp)
+        preprocess.annotate_genescore_single(source,selector = pp)
+        asd = np.vstack([target.varm[pp], source.varm[pp]])
+        nuvalues = np.max(asd, axis = 0)
+
+        #print(f"{ nuvalues.shape=} {asd.shape=}")
+        target.uns['lastscores']='hack'
+        source.uns['lastscores']='hack'
+        target.varm['hack'] = nuvalues
+        source.varm['hack'] = nuvalues
+
+
+
+    merged =  mergewrap(target, source,
+                                   umap_dim,
+                                   pca = pca_dim,
+                                    selectgenes = n_genes,
+                                   make_even=make_even, sortfield = -1)
+
+    newlabels = stringdiffuse(merged,merged.data[1].obs[source_label],sigmafac=sigmafac,
+            pid = pid,
+            neighbors_inter=n_inter_neighbors,
+            neighbors_intra=n_intra_neighbors, linear_assignment_factor=linear_assignment_factor)
+    target.obs[target_label] = newlabels
+    return target
+
 

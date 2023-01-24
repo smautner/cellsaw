@@ -94,11 +94,16 @@ def markercount(target, source, source_label ='celltype',
 
 
     pid = (pca_dim>0)+ (umap_dim>0)
-    merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
 
-    X_ref=merged.data[1].to_df()
-    X_test=merged.data[0].to_df()
-    reflabels = merged.data[1].obs[source_label]
+    # merged = premerged or mergewrap(target,source,umap_dim,pca=pca_dim)
+    # X_ref=merged.data[1].to_df()
+    # X_test=merged.data[0].to_df()
+    # reflabels = merged.data[1].obs[source_label]
+
+    X_ref=source.to_df()
+    X_test=target.to_df()
+    reflabels = source.obs[source_label]
+
     #print(f"{X_ref.shape=}{X_test.shape=}{reflabels=}")
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')

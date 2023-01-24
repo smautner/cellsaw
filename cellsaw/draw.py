@@ -23,15 +23,17 @@ col = col + col + col + ((0, 0, 0),)
 # col = col+[(0,0,0)]
 
 
-def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False):
+def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False):
     '''scatterplots for merge.d2'''
 
     # make a tinyumap with the right dimensions
 
     X = merge.d2
 
-    rows = ((len(X) - 1) // plotsperline) + 1
-    columns = plotsperline if len(X) > plotsperline else len(X)
+    itemstodraw = len(X) + mkmix
+    rows = ((itemstodraw - 1) // plotsperline) + 1
+    columns = plotsperline if itemstodraw > plotsperline else itemstodraw
+
     d = tinyUmap(dim=(rows, columns), size=size)  # default is a row
 
     # set same limit for all the plots
@@ -63,6 +65,11 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False
             plug.draw(themap)
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
+    if mkmix:
+        labels = [i for i,stack in enumerate(X) for item in stack]
+        d.draw(np.vstack(merge.d2),labels)
+        plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
+
     plt.show()
 
 
