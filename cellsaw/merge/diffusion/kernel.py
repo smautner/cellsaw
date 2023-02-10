@@ -36,8 +36,6 @@ def linear_sum_assignment_matrices(x1, x2, repeats,
         # print(f"{a.shape=} {b.shape=} {distances.shape=}]")
         # print(f"{a=} {b=} {distances=}]")
         r[a,b] = (distances + 0.0001) if dist else 1
-
-
         return r,r.T
 
 #######
@@ -161,5 +159,131 @@ def linear_assignment_kernel_XXX(x1,x2, neighbors = 3,
     # sns.heatmap(similarity_matrix); plt.show()
 
     return  similarity_matrix
+
+
+
+
+
+
+
+
+from sklearn.neighbors import NearestNeighbors
+from cellsaw.merge import mergehelpers
+def avgdist(a,numneigh = 2):
+        nbrs = NearestNeighbors(n_neighbors=1+numneigh).fit(a)
+        distances, indices = nbrs.kneighbors(a)
+        return np.mean(distances[:,1:], axis = 1)
+
+def average_knn_distance(I,J,i_ids,j_ids,numneigh):
+    d1  = avgdist(I,numneigh)[i_ids]
+    d2  = avgdist(J,numneigh)[j_ids]
+    stack = np.vstack((d1,d2))
+    return np.mean(stack, axis=0).T
+
+def linear_assignment_integrate(Xlist,
+                                intra_neigh=5,
+                                inter_neigh = 1,scaling_num_neighbors = 2, outlier_threshold = .75, scaling_threshold=.25):
+
+
+    def make_distance_matrix(i,j):
+            if i == j:
+                return neighborgraph(Xlist[i],intra_neigh).todense()
+            else:
+                '''
+                based = hungdists/= .25
+                dm = avg 1nn dist in both
+                based*=dm
+                '''
+                # hungarian
+                ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
+                res = np.zeros_like(ij_euclidian_distances)
+                if inter_neigh==0:
+                    return res
+                i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
+
+                # remove worst 25% hits
+                sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
+                lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
+                outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
+                ij_lsa_distances[outlier_ids] = 0
+
+                # normalize
+                lsa_normalisation_factor = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*scaling_threshold)]
+                ij_lsa_distances /= lsa_normalisation_factor
+                #
+                #dm = (avgdist(Xlist[i], hoodsize)+avgdist(Xlist[j],hoodsize))/2
+                #dab *=dm
+                average_knn_distance_factors = average_knn_distance(Xlist[i],Xlist[j], i_ids , j_ids, scaling_num_neighbors)
+                ij_lsa_distances *= average_knn_distance_factors
+
+
+                # make a matrix
+                res[i_ids,j_ids] = ij_lsa_distances
+                return res
+
+    # then we built a row:
+    row = []
+    for i in range(len(Xlist)):
+        col = []
+        for j in range(len(Xlist)):
+            distance_matrix = make_distance_matrix(i,j)
+            col.append(distance_matrix)
+        row.append(np.hstack(col))
+    distance_matrix = np.vstack(row)
+
+    return  distance_matrix
+
+
+
+
+
+def KNNFormater(Data, precomputedKNNIndices, precomputedKNNDistances):
+        from pynndescent import NNDescent
+        pyNNDobject = NNDescent(np.vstack(Data), metric='euclidean', random_state=1337)
+        pyNNDobject._neighbor_graph = (precomputedKNNIndices.copy(), precomputedKNNDistances.copy())
+        precomputedKNN = (precomputedKNNIndices, precomputedKNNDistances, pyNNDobject)
+        return precomputedKNN
+
+def stack_n_fill(a,val):
+    '''
+    reformats the data
+    '''
+    maxlen = max(Map(len,a))
+    res = np.full((len(a),maxlen),val)
+    for i,val in enumerate(a):
+        res[i,:len(val)] = val
+    return res
+
+
+
+from umap import UMAP
+def distmatrixumap(dataXlist,dm,components = 10):
+    sparseMatrix = sparse.csr_matrix(dm)
+
+    precomputedKNNIndices = []
+    precomputedKNNDistances = []
+    # for ip in range(len(sparseMatrix.indptr)-1):
+    #         start = sparseMatrix.indptr[ip]
+    #         end = sparseMatrix.indptr[ip+1]
+    #         precomputedKNNIndices.append(sparseMatrix.indices[start:end])
+    #         precomputedKNNDistances.append(sparseMatrix.data[start:end])
+    for row in sparseMatrix:
+            precomputedKNNIndices.append(row.indices)
+            precomputedKNNDistances.append(row.data)
+    umapknn = stack_n_fill(precomputedKNNIndices,-1), stack_n_fill( precomputedKNNDistances,np.inf)
+
+
+    precomputedKNN = KNNFormater(dataXlist, *umapknn)
+    n_neighbors = precomputedKNN[0].shape[1]
+
+    mymap = UMAP(n_components=components, #Dimensions to reduce to
+            n_neighbors=n_neighbors,
+            random_state=1337,
+            metric='euclidean',
+            precomputed_knn=precomputedKNN,
+            force_approximation_algorithm=True)
+    return mymap.fit_transform(np.vstack(dataXlist))
+
+
 
 

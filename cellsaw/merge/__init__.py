@@ -29,6 +29,7 @@ class Merge(mergeutils):
             make_even = True, pca = 20, umaps = [2],
             joint_space = True,
             sortfield = 0,
+            oldcut = True,
             genescoresid = '',
             titles = "ABCDEFGHIJKIJ"):
 
@@ -39,7 +40,10 @@ class Merge(mergeutils):
         scorename = genescoresid or adatas[0].uns['lastscores']
         self.genescores = [a.varm[scorename] for a in adatas]
         #self.geneab = [a.varm['genes'] for a in adatas]
-        self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
+        if oldcut:
+            self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
+        else:
+            self.data  = mergehelpers.communecut(self.genescores, selectgenes, adatas)
         self.sorted = False
         self.jointSpace = joint_space
 
@@ -108,7 +112,5 @@ def accuracy_evaluation(target, true = '', predicted = ''):
     p=list(p)
     #for a in zip(t,p): print (a)
     return acc(t,p)
-
-
 
 

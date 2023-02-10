@@ -13,7 +13,6 @@ import logging
 
 
 def annotate_genescore(adatas, **kwargs):
-
     r = []
     for i,adata in enumerate(adatas):
         try:
@@ -41,7 +40,6 @@ def annotate_genescore_single(adata, selector='natto',
 
     if selector in adata.varm:
         return adata
-
 
     incommingshape= adata.X.shape
     # sc.pp.filter_cells(adata, min_genes=mingenes, inplace=True)
@@ -105,7 +103,78 @@ def annotate_genescore_single(adata, selector='natto',
 
 
 
+def annotate_genescore2(adatas, **kwargs):
+    r = []
+    for i,adata in enumerate(adatas):
+        try:
+            r.append(annotate_genescore_single2(adata,**kwargs))
+        except:
+            print ('annotate genescore faild: ',i,adata.X.shape)
+    return r
+def annotate_genescore_single2(adata,
+                        selector='natto',
+                        nattoargs = {'mean':(0.015, 4),'bins':(.25, 1)},
+                        mingenes = 200,
+                        normrow= True,
+                        log = True,
+                        plot=False):
+    '''
+    trying to rewrite as i think i try to be too smart
+    '''
 
+
+    if selector in adata.varm:
+        return adata
+
+    incommingshape= adata.X.shape
+    okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
+
+
+
+    adata2 = adata[:,okgenes].copy()
+
+    if normrow:
+        sc.pp.normalize_total(adata2, 1e4)
+    if log:
+        sc.pp.log1p(adata2)
+
+
+    if selector == 'meanexpression':
+        if isinstance(adata2.X, csr_matrix):
+            arr = adata2.X.todense().A
+        else:
+            arr = np.array(adata2.X)
+        #print(f"{type(arr)=}")
+        scores = np.nanmean(arr,axis = 0)
+
+    elif selector == 'meanexpressionnolog':
+        if isinstance(adata2.X, csr_matrix):
+            arr = adata2.X.todense().A
+        else:
+            arr = np.array(adata2.X)
+        #print(f"{type(arr)=}")
+        scores = np.nanmean(np.expm1(arr),axis = 0)
+
+    elif selector == 'natto':
+        genes, scores = getgenes_natto(adata2, 1000, plot=plot, **nattoargs)
+
+    else:
+        hvg_df = sc.pp.highly_variable_genes(adata2, n_top_genes=5000, flavor=selector, inplace=False)
+        genes = np.array(hvg_df['highly_variable'])
+        if selector == 'seurat_v3':
+            ### Best used for raw_count data
+            scores = np.array(hvg_df['variances_norm'].fillna(0))
+        else:
+            scores = np.array(hvg_df['dispersions_norm'].fillna(0))
+
+    fullscores = np.full(adata.X.shape[1],np.NINF,np.float)
+    fullscores[okgenes==1] = scores
+    adata.varm[selector]=  fullscores
+    adata.uns['lastscores'] = selector
+    adata.varm['genes'] = okgenes
+    logging.info(f"transforming anndata (cells, genes): {incommingshape}  => {adata2.X.shape}")
+    # normalize(adata) # anyway in the end normalize
+    return adata
 
 
 ####

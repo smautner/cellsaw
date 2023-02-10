@@ -23,7 +23,7 @@ col = col + col + col + ((0, 0, 0),)
 # col = col+[(0,0,0)]
 
 
-def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False):
+def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False, mixlabels = []):
     '''scatterplots for merge.d2'''
 
     # make a tinyumap with the right dimensions
@@ -65,9 +65,14 @@ def plot_merge(merge, labels, plotsperline=3, grad=False, size=3.5, plug = False
             plug.draw(themap)
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
+
+
     if mkmix:
-        labels = [i for i,stack in enumerate(X) for item in stack]
-        d.draw(np.vstack(merge.d2),labels)
+        if not mixlabels:
+            mixlabelslabels = [i*2 for i,stack in enumerate(X) for item in stack]
+        else:
+            mixlabels = themap.encode(mixlabels)
+        d.draw(np.vstack(merge.d2),mixlabels)
         plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
 
     plt.show()

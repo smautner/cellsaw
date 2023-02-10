@@ -34,6 +34,29 @@ def unioncut(scores, numGenes, data):
     #return [d[:,indices].copy() for d in data]
 
 
+def communecut(scores,numgenes,data):
+    ar = np.array(scores)
+    ind = np.argsort(ar)
+
+    def calcoverlap(scores,number):
+        indices = scores[:,-number:]
+        indices = np.unique(indices.flatten())
+        return indices
+
+    def findcutoff(low,high, lp = -1):
+        probe = int((low+high)/2)
+        y = calcoverlap(ind,probe)
+        if probe == lp:
+            return y
+        if len(y) > numgenes:
+            return findcutoff(low,probe,probe)
+        else:
+            return findcutoff(probe,high,probe)
+
+    indices = findcutoff(0,numgenes)
+    [d._inplace_subset_var(indices) for d in data]
+    return data
+
 def dimension_reduction(adatas, scale, zero_center, PCA, umaps, joint_space=True):
 
 
