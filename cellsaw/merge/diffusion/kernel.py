@@ -1,6 +1,6 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 from pprint import pprint
-
+import time
 from scipy.optimize import linear_sum_assignment
 from sklearn import neighbors as nbrs, metrics
 import numpy as np
@@ -9,6 +9,7 @@ from scipy.sparse.csgraph import dijkstra
 from ubergauss import tools
 import seaborn as sns
 from matplotlib import pyplot as plt
+from sklearn.utils import check_symmetric
 
 
 ####################
@@ -58,6 +59,7 @@ def neighborgraph(x, neighbors):
     diff = z-z.T
     diff[diff > 0 ] = 0
     z-= diff
+    check_symmetric(z,raise_exception=True)
     return z
 
 
@@ -169,6 +171,8 @@ def linear_assignment_kernel_XXX(x1,x2, neighbors = 3,
 
 from sklearn.neighbors import NearestNeighbors
 from cellsaw.merge import mergehelpers
+
+
 def avgdist(a,numneigh = 2):
         nbrs = NearestNeighbors(n_neighbors=1+numneigh).fit(a)
         distances, indices = nbrs.kneighbors(a)
@@ -181,13 +185,19 @@ def average_knn_distance(I,J,i_ids,j_ids,numneigh):
     return np.mean(stack, axis=0).T
 
 def linear_assignment_integrate(Xlist,
-                                intra_neigh=5,
-                                inter_neigh = 1,scaling_num_neighbors = 2, outlier_threshold = .75, scaling_threshold=.25):
+                                intra_neigh=10,
+                                inter_neigh = 2,
+                                scaling_num_neighbors = 2,
+                                outlier_threshold = .85,
+                                scaling_threshold=.5,
+                                showtime = False):
 
+    lsatime = 0.0
+    eutime = 0.0
 
     def make_distance_matrix(i,j):
             if i == j:
-                return neighborgraph(Xlist[i],intra_neigh).todense()
+                return sparse.lil_matrix(neighborgraph(Xlist[i],intra_neigh)), 0,0
             else:
                 '''
                 based = hungdists/= .25
@@ -195,11 +205,16 @@ def linear_assignment_integrate(Xlist,
                 based*=dm
                 '''
                 # hungarian
+                eustart=time.time()
                 ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
-                res = np.zeros_like(ij_euclidian_distances)
+                eutime = time.time() - eustart
+                res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
                 if inter_neigh==0:
                     return res
+
+                lsastart=time.time()
                 i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
+                lsatime=(time.time()-lsastart)
 
                 # remove worst 25% hits
                 sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
@@ -219,18 +234,30 @@ def linear_assignment_integrate(Xlist,
 
                 # make a matrix
                 res[i_ids,j_ids] = ij_lsa_distances
-                return res
+                return res, lsatime, eutime
+
 
     # then we built a row:
     row = []
     for i in range(len(Xlist)):
         col = []
         for j in range(len(Xlist)):
-            distance_matrix = make_distance_matrix(i,j)
-            col.append(distance_matrix)
-        row.append(np.hstack(col))
-    distance_matrix = np.vstack(row)
+            if i <= j:
+                distance_matrix,a,b = make_distance_matrix(i,j)
+                lsatime+=a
+                eutime += b
+            else:
+                distance_matrix = row[j][i].T
 
+            col.append(distance_matrix)
+        row.append(col)
+
+
+    distance_matrix = sparse.vstack([sparse.hstack(col) for col in row])
+
+    if showtime:
+        print(f"{eutime=}")
+        print(f"{lsatime=}")
     return  distance_matrix
 
 

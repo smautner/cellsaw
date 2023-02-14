@@ -25,14 +25,13 @@ class mergeutils:
 
 
 class Merge(mergeutils):
-    def __init__(self, adatas, selectgenes = 800,
+    def __init__(self, adatas, selectgenes = 2000,
             make_even = True, pca = 20, umaps = [2],
             joint_space = True,
             sortfield = 0,
-            oldcut = True,
+            oldcut = False,
             genescoresid = '',
             titles = "ABCDEFGHIJKIJ"):
-
         shapesbevorepp= [a.X.shape for a in adatas]
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
         #self.genescores = [a.varm['scores'] for a in adatas]
@@ -43,7 +42,7 @@ class Merge(mergeutils):
         if oldcut:
             self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
         else:
-            self.data  = mergehelpers.communecut(self.genescores, selectgenes, adatas)
+            self.data  = mergehelpers.equal_contrib_gene_cut(self.genescores, selectgenes, adatas)
         self.sorted = False
         self.jointSpace = joint_space
 

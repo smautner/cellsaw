@@ -34,7 +34,7 @@ def unioncut(scores, numGenes, data):
     #return [d[:,indices].copy() for d in data]
 
 
-def communecut(scores,numgenes,data):
+def equal_contrib_gene_cut(scores,numgenes,data):
     ar = np.array(scores)
     ind = np.argsort(ar)
 
