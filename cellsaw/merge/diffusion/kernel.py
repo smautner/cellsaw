@@ -185,11 +185,11 @@ def average_knn_distance(I,J,i_ids,j_ids,numneigh):
     return np.mean(stack, axis=0).T
 
 def linear_assignment_integrate(Xlist,
-                                intra_neigh=10,
-                                inter_neigh = 2,
+                                intra_neigh=15,
+                                inter_neigh = 1,
                                 scaling_num_neighbors = 2,
-                                outlier_threshold = .85,
-                                scaling_threshold=.5,
+                                outlier_threshold = .8,
+                                scaling_threshold=.9,
                                 showtime = False):
 
     lsatime = 0.0

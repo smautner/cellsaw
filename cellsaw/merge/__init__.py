@@ -26,12 +26,13 @@ class mergeutils:
 
 class Merge(mergeutils):
     def __init__(self, adatas, selectgenes = 2000,
-            make_even = True, pca = 20, umaps = [2],
+            make_even = True, pca = 40, umaps = [2],
             joint_space = True,
             sortfield = 0,
             oldcut = False,
             genescoresid = '',
             titles = "ABCDEFGHIJKIJ"):
+        assert isinstance(adatas, list), f'merge wants a list, not {type(adatas)}'
         shapesbevorepp= [a.X.shape for a in adatas]
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
         #self.genescores = [a.varm['scores'] for a in adatas]

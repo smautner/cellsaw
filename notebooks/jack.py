@@ -106,7 +106,6 @@ def loadwater(subsample=1000,seed = 0, min_genes = 0):
 
 def loads5(subsample=1000,seed = 0, min_genes =0):
     d = sc.read(f's5.h5')# pancreatic
-
     if min_genes: sc.pp.filter_cells(d, min_genes=min_genes, inplace=True)
     def choose(item):
         z = d[d.obs['CellWeek']==item]
@@ -115,9 +114,7 @@ def loads5(subsample=1000,seed = 0, min_genes =0):
             sc.pp.subsample(z,n_obs= subsample,random_state=seed)
         z.uns[dataset_name_field] = item
         return z
-
     names = np.unique(d.obs['CellWeek'])
-
     r= [ choose(item) for item in names] #, names
     return  r
 
