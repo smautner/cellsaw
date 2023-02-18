@@ -139,7 +139,6 @@ def load509(subsample=1000,seed = 0, min_genes=0):
 
 def load1290(subsample=1000,seed = 0, min_genes =0):
     d = sc.read(f'scp1290.h5')
-
     if min_genes: sc.pp.filter_cells(d, min_genes=min_genes, inplace=True)
     def choose(item):
         z = d[d.obs['orig_ident']==item]
@@ -153,8 +152,6 @@ def load1290(subsample=1000,seed = 0, min_genes =0):
 
     r= [ choose(item) for item in names] #, names
     return  r
-
-
 
 
 
