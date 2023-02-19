@@ -58,8 +58,6 @@ def equal_contrib_gene_cut(scores,numgenes,data):
     return data
 
 def dimension_reduction(adatas, scale, zero_center, PCA, umaps, joint_space=True):
-
-
     # get a (scaled) dx
     if scale or PCA:
         adatas= [sc.pp.scale(adata, zero_center=False, copy=True,max_value=10) for adata in adatas]
@@ -67,10 +65,7 @@ def dimension_reduction(adatas, scale, zero_center, PCA, umaps, joint_space=True
     if joint_space == False:
         return disjoint_dimension_reduction(dx, PCA, umaps)
 
-
     res = []
-
-
     if PCA:
         pca = decomposition.PCA(n_components=PCA)
         pca.fit(np.vstack(dx))
@@ -101,12 +96,9 @@ def disjoint_dimension_reduction(dx, PCA, umaps):
         #print('printing explained_variance\n',list(pca.explained_variance_ratio_))# rm this:)
         dx = [ pca.transform(e) for pca, e in zip(pcaList,dx)  ]
         res.append(dx)
-
     for dim in umaps:
         assert 0 < dim < PCA
         res.append(umapify(dx,dim))
-
-
     return res
 
 def hungarian(X1, X2, debug = False,metric='euclidean'):
