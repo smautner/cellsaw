@@ -301,6 +301,8 @@ def distmatrixumap(dataXlist,dm,components = 10):
 
 
     precomputedKNN = KNNFormater(dataXlist, *umapknn)
+
+    # i tested this, its best to just use all the neighbors
     n_neighbors = precomputedKNN[0].shape[1]
 
     mymap = UMAP(n_components=components, #Dimensions to reduce to

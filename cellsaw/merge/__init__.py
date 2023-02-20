@@ -39,6 +39,7 @@ class Merge(mergeutils):
 
         scorename = genescoresid or adatas[0].uns['lastscores']
         self.genescores = [a.varm[scorename] for a in adatas]
+        self.similarity = calc_similarity(self.genescores)
         #self.geneab = [a.varm['genes'] for a in adatas]
         if oldcut:
             self.data  = mergehelpers.unioncut(self.genescores, selectgenes, adatas)
@@ -53,6 +54,7 @@ class Merge(mergeutils):
 
         if make_even:
             self.data = mergehelpers.make_even(self.data)
+
 
 
         logging.info("preprocess:")
@@ -114,3 +116,13 @@ def accuracy_evaluation(target, true = '', predicted = ''):
     return acc(t,p)
 
 
+
+import ubergauss.tools as ut
+def calc_similarity(scorelist):
+    def dist(a,b):
+        asd = np.array([ ut.binarize(d,2000)  for d in [a,b] ])
+        union = np.sum(np.any(asd, axis=-2))
+        intersect = np.sum(np.sum(asd, axis=-2) ==2)
+        return intersect/union
+    res = [[ dist(a,b) for a in scorelist] for b in scorelist]
+    return np.array(res)
