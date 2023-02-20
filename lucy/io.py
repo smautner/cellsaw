@@ -10,11 +10,11 @@ def samplecopy(data,num, seed):
 
 
 def rename_obs(datasets, batch, typ):
-    for ds, bat, typ in zip(datasets, batch, typ):
+    for ds, bat, lab in zip(datasets, batch, typ):
         if batch != 'batch':
-            ds.obs['batch'] = ds.obs[batch]
+            ds.obs['batch'] = ds.obs[bat]
         if typ != 'label':
-            ds.obs['label'] = ds.obs[label]
+            ds.obs['label'] = ds.obs[lab]
 
 
 
@@ -24,14 +24,16 @@ def load_scib(path = '/home/ubuntu/benchdata/'):
     # rename fields
     rename_obs(datasets,batch, typ)
     # split by batch
-    datasets =  [[z[z.obs[b]==i] for i in z.obs[b].unique()] for z,b in zip(dataset, batch)]
+    datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()] for z
+                 in datasets]
     return datasets
 
 
 
 def load_timeseries(path = './'):
-    datasets = [sc.read(path+data) for data in
+    datasets = [sc.read(path+data+".h5ad") for data in
                 "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
-    datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()] for z in dataset]
+    datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()]
+                 for z in datasets]
     return datasets
 

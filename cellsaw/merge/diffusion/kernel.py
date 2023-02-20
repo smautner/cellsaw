@@ -212,7 +212,7 @@ def linear_assignment_integrate(Xlist,
 
     if dataset_similarity[1] < 100:
         simm = neighborgraph_p_weird if dataset_similarity[2] else neighborgraph_p_real
-        dataset_similarity = simm(*dataset_similarity), 101
+        dataset_similarity = simm(*dataset_similarity[:2]), 101
 
     def dscheck(i,j):
         if dataset_similarity[1]==101:
