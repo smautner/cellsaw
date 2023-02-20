@@ -155,16 +155,10 @@ def linear_assignment_kernel_XXX(x1,x2, neighbors = 3,
     dijkstraQ1 = distance_matrix[:x1.shape[0],x1.shape[0]:]
     sigma = avg1nndistance(diaglist)*sigmafac
     similarity_matrix = np.exp(-dijkstraQ1/sigma)
-
     # print('dijkstra zoom');sns.heatmap(dijkstraQ1); plt.xlabel('target'); plt.show()
     # print(f'gaussed  sigme:{sigma}')
     # sns.heatmap(similarity_matrix); plt.show()
-
     return  similarity_matrix
-
-
-
-
 
 
 
@@ -184,19 +178,49 @@ def average_knn_distance(I,J,i_ids,j_ids,numneigh):
     stack = np.vstack((d1,d2))
     return np.mean(stack, axis=0).T
 
+def neighborgraph_p_weird(x, neighbors_perc):
+    neighbors = max(1, int(x.shape[0]*(neighbors_perc/100)))
+    z= nbrs.kneighbors_graph(x,neighbors)
+    diff = z-z.T
+    diff[diff > 0 ] = 0
+    z-= diff
+    return z
+
+def neighborgraph_p_real(x, neighbors_perc):
+    neighbors = max(1, int(x.shape[0]*(neighbors_perc/100)))
+    z = np.zeros_like(x)
+    np.fill_diagonal(x,np.NINF)
+    for i,row in enumerate(x):
+        sr = np.argsort(row)
+        z[i][sr[-neighbors:]]  = 1
+    diff = z-z.T
+    diff[diff > 0 ] = 0
+    z-= diff
+    return z
+
 def linear_assignment_integrate(Xlist,
                                 intra_neigh=15,
                                 inter_neigh = 1,
                                 scaling_num_neighbors = 2,
                                 outlier_threshold = .8,
                                 scaling_threshold=.9,
+                                dataset_similarity = (0,100,0), # 50% is good
                                 showtime = False):
 
     lsatime = 0.0
     eutime = 0.0
 
+    if dataset_similarity[1] < 100:
+        simm = neighborgraph_p_weird if dataset_similarity[2] else neighborgraph_p_real
+        dataset_similarity = simm(*dataset_similarity), 101
+
+    def dscheck(i,j):
+        if dataset_similarity[1]==101:
+            return dataset_similarity[0][i,j] == 1
+        return True
+
     def make_distance_matrix(i,j):
-            if i == j:
+            if i == j or dscheck(i,j):
                 return sparse.lil_matrix(neighborgraph(Xlist[i],intra_neigh)), 0,0
             else:
                 '''
@@ -262,8 +286,6 @@ def linear_assignment_integrate(Xlist,
 
 
 
-
-
 def KNNFormater(Data, precomputedKNNIndices, precomputedKNNDistances):
         from pynndescent import NNDescent
         pyNNDobject = NNDescent(np.vstack(Data), metric='euclidean', random_state=1337)
@@ -280,7 +302,6 @@ def stack_n_fill(a,val):
     for i,val in enumerate(a):
         res[i,:len(val)] = val
     return res
-
 
 
 from umap import UMAP
