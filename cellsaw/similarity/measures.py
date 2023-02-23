@@ -22,7 +22,6 @@ def cosine(a,b, numgenes = 500, scores= 'scores'):
 def jaccard(adata1,adata2 ,numgenes= False,scores='scores'):
     # intersect/union
     assert numgenes > 3
-
     asd = np.array([ ut.binarize(d.varm[scores],numgenes)  for d in [adata1,adata2]])
     union = np.sum(np.any(asd, axis=0))
     intersect = np.sum(np.sum(asd, axis=0) ==2)

@@ -30,9 +30,13 @@ def load_scib(path = '/home/ubuntu/benchdata/'):
 
 
 
-def load_timeseries(path = './'):
+def load_timeseries(path = './',remove_unassigned = True):
     datasets = [sc.read(path+data+".h5ad") for data in
                 "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
+    if remove_unassigned:
+        okcells =  lambda ds: [ l not in ['-1','Unassigned','nan'] for l in ds.obs['label']]
+        datasets = [ds[okcells(ds)] for ds in datasets]
+
     datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()]
                  for z in datasets]
     return datasets
