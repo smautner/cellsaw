@@ -1,5 +1,6 @@
 from lmz import *
 import scanpy as sc
+import numpy as np
 
 def samplecopy(data,num, seed):
     np.random.seed(seed)
@@ -40,4 +41,15 @@ def load_timeseries(path = './',remove_unassigned = True):
     datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()]
                  for z in datasets]
     return datasets
+
+
+def test_ts():
+    ds = load_timeseries()
+    for i,adata in enumerate(ds):
+        print(i)
+        print(adata)
+        for a in adata:
+            print(np.unique(a.obs['label']))
+
+
 

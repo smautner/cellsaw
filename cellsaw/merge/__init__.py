@@ -121,8 +121,8 @@ import ubergauss.tools as ut
 def calc_similarity(scorelist):
     def dist(a,b):
         asd = np.array([ ut.binarize(d,2000)  for d in [a,b] ])
-        union = np.sum(np.any(asd, axis=-2))
-        intersect = np.sum(np.sum(asd, axis=-2) ==2)
+        union = np.sum(np.any(asd, axis=0))
+        intersect = np.sum(np.sum(asd, axis=0) ==2)
         return intersect/union
     res = [[ dist(a,b) for a in scorelist] for b in scorelist]
     return np.array(res)
