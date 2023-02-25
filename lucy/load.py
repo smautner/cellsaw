@@ -52,4 +52,4 @@ def test_ts():
             print(np.unique(a.obs['label']))
 
 
-
+# TODO i think we should put the preprocessing here...
