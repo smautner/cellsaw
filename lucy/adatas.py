@@ -1,19 +1,19 @@
 import cellsaw.merge.mergehelpers  as mergehelpers
 import numpy as np
-from cellsaw.merge.diffusion import Diffusion, stringdiffuse
 from cellsaw.draw import plot_merge, confuse2
-import logging
 import ubergauss.tools as ut
 
-class mergeutils:
-    def confuse2(self, labels):
-        assert self.sorted
-        assert len(self.data) == 2, 'i could just assume that you mean the first 2 datasets, but i refuse :D'
-        assert len(labels[0])== self.data[0].shape[0]
-        assert len(labels[1])== self.data[1].shape[0]
-        confuse2(labels)
-    def plot(self, labels, **kwargs):
-        plot_merge(self, labels,**kwargs)
+from lucy import draw
+
+def confuse2(adatas, label = 'label', alignmentbase = 'pca40'):
+    assert len(adatas) == 2
+    adatas = align_adatas(adatas, base= alignmentbase)
+    confuse2(*[x.obs['label'] for x in adatas])
+
+def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
+    X= [a.obsm[projection] for a in adatas]
+    labels = [a.obs[label] for a in adatas]
+    draw.plot_X(X, labels,**kwargs)
 
 
 default_hvg_name = 'cell_ranger'
