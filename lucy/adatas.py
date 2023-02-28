@@ -1,14 +1,13 @@
-import cellsaw.merge.mergehelpers  as mergehelpers
 import numpy as np
-from cellsaw.draw import plot_merge, confuse2
+from scipy.optimize import linear_sum_assignment
 import ubergauss.tools as ut
-
 from lucy import draw
+from sklearn.metrics import pairwise_distances
 
 def confuse2(adatas, label = 'label', alignmentbase = 'pca40'):
     assert len(adatas) == 2
-    adatas = align_adatas(adatas, base= alignmentbase)
-    confuse2(*[x.obs['label'] for x in adatas])
+    adatas = align(adatas, base= alignmentbase)
+    draw.confuse2(*[x.obs['label'] for x in adatas])
 
 def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
     X= [a.obsm[projection] for a in adatas]
@@ -161,24 +160,25 @@ def add_umap(adatas, dim, label = '', start = 'pca40'):
 
 
 
-def sort_cells(adatas, ):
-    # TODO which projection etc?
-    # loop over data sets
-    for i in range(len(self.data)-1):
-        hung, dist = self.hungarian(projection_id,i,i+1)
-        #self.data[i+1] = self.data[i+1][hung[1]]
-        #self.data[i+1].X = self.data[i+1].X[hung[1]]
-        for x in range(len(self.projections)):
-            self.projections[x][i+1] = self.projections[x][i+1][hung[1]]
-            if x == 0:
-                self.data[i+1]= self.data[i+1][hung[1]]
-
-    self.sorted = True
+def align(adatas, base = 'pca40' ):
+    for i in range(len(adatas)-1):
+        hung, _ = hung_adatas(adatas[i], adatas[i+1], base= base)
+        adatas[i+1]= adatas[i+1][hung[1]]
 
 def hungarian(self,data_fld,data_id, data_id2):
-        hung, dist = mergehelpers.hungarian(self.projections[data_fld][data_id],self.projections[data_fld][data_id2])
+        hung, dist = hung_nparray()
         return hung, dist[hung]
 
+def hung_nparray(X1, X2, debug = False,metric='euclidean'):
+    distances = pairwise_distances(X1,X2, metric=metric)
+    row_ind, col_ind = linear_sum_assignment(distances)
+    if debug:
+        x = distances[row_ind, col_ind]
+        num_bins = 100
+        print("hungarian: debug hist")
+        plt.hist(x, num_bins, facecolor='blue', alpha=0.5)
+        plt.show()
+    return (row_ind, col_ind), distances
 
 
 
