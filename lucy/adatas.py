@@ -10,7 +10,7 @@ def confuse2(adatas, label = 'label', alignmentbase = 'pca40'):
     draw.confuse2(*[x.obs['label'] for x in adatas])
 
 def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
-    X= [a.obsm[projection] for a in adatas]
+    X = to_arrays(adatas, base=base)
     labels = [a.obs[label] for a in adatas]
     draw.plot_X(X, labels,**kwargs)
 
@@ -47,47 +47,17 @@ def unstack(adata, key= 'batch'):
 
 
 
-class Merge(mergeutils):
-    def __init__(self, adatas, selectgenes = 2000,
-            make_even = True, pca = 40, umaps = [2],
-            joint_space = True,
-            sortfield = 0,
-            oldcut = False,
-            genescoresid = 'lastscores',
-            titles = "ABCDEFGHIJKIJ"):
-
-        check_adatas(adatas)
-        #self.genescores = [a.varm['scores'] for a in adatas]
-        self.similarity = similarity(adatas,genescoresid,2000)
-
-        selector = hvg_ids_from_union if oldcut else hvg_ids_from_union_limit
-        self.data = hvg_cut(adatas, selector(adatas,selectgenes,hvg_name=genescoresid))
-
-
-        # geneab = np.all(np.array(self.geneab), axis=0)
-        # for i, d in enumerate(self.data):
-        #     data[i] = d[:, geneab]
-
-        if make_even:
-            self.data = subsample_to_min_cellcount(self.data)
-
-        ######################
-
-        if pca:
-            self.PCA = self.projections[1]
-
-        if sortfield >=0:
-            assert make_even==True, 'sorting uneven datasets will result in an even dataset :)'
-            self.sort_cells(sortfield)
-
-        if umaps:
-            for x,d in zip(umaps,self.projections[int(pca>0)+1:]):
-                self.__dict__[f"d{x}"] = d
-
-
-
-
-
+def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger'):
+    check_adatas(adatas)
+    if hvg == 'cell_ranger':
+        adatas = cell_ranger(adatas)
+    else:
+        assert False
+    selector = hvg_ids_from_union if cut_old else hvg_ids_from_union_limit
+    adatas = hvg_cut(adatas, selector(adatas,cut_ngenes,hvg_name=hvg))
+    if make_even:
+        adatas = subsample_to_min_cellcount(adatas)
+    return adatas
 
 def hvg_cut(adatas,hvg_ids):
     [d._inplace_subset_var(hvg_ids) for d in adatas]
@@ -132,7 +102,7 @@ def subsample_to_min_cellcount(adatas):
         return adatas
 
 
-def add_pca(adatas, dim, label = 'pca'):
+def pca(adatas, dim, label = 'pca'):
 
     if not label:
         label = 'pca'+str(dim)
@@ -146,13 +116,11 @@ def add_pca(adatas, dim, label = 'pca'):
     return unstack(data)
 
 
-def add_umap(adatas, dim, label = '', start = 'pca40'):
-
+def umap(adatas, dim, label = '', start = 'pca40'):
     if not label:
         label = 'umap'+str(dim)
     if label in adatas[0].obsm:
         return adatas
-
     X = data.obsm.get(start,data.X)
     res = umap.UMAP(n_components = dim).fit_transform(X)
     data.obsm[label] = res
@@ -165,8 +133,15 @@ def align(adatas, base = 'pca40' ):
         hung, _ = hung_adatas(adatas[i], adatas[i+1], base= base)
         adatas[i+1]= adatas[i+1][hung[1]]
 
-def hungarian(self,data_fld,data_id, data_id2):
-        hung, dist = hung_nparray()
+def to_array(ad,base):
+    return ad.X if not base else ad.obsm[base]
+
+def to_arrays(adatas,base):
+    return PMap(to_array, adatas, base=base)
+
+def hungarian(adata, adata2, base):
+        X = to_arrays([adata, adata2], base=base)
+        hung, dist = hung_nparray(*X)
         return hung, dist[hung]
 
 def hung_nparray(X1, X2, debug = False,metric='euclidean'):
