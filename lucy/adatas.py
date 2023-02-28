@@ -25,8 +25,8 @@ def jaccard_distance(a,b, num_genes):
 
 
 def similarity(adatas, hvg_name = default_hvg_name, num_genes = 2000):
-    assert hvg_name in adatas[0].varm, 'not annotated..'
-    genescores = [a.varm[hvg_name] for a in adatas]
+    assert hvg_name in adatas[0].var, 'not annotated..'
+    genescores = [a.var[hvg_name] for a in adatas]
     res = [[ jaccard_distance(a,b, num_genes = num_genes) for a in scorelist] for b in scorelist]
     return np.array(res)
 
@@ -40,6 +40,7 @@ from anndata._core.merge import concat
 
 def stack(adatas):
     # TODO we need to say that batch keeps them seperate
+    assert 'batch' in adatas.obs
     return concat(adatas)
 
 def unstack(adata, key= 'batch'):
@@ -47,7 +48,7 @@ def unstack(adata, key= 'batch'):
 
 
 
-def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger'):
+def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', make_even = True):
     check_adatas(adatas)
     if hvg == 'cell_ranger':
         adatas = cell_ranger(adatas)
@@ -64,7 +65,7 @@ def hvg_cut(adatas,hvg_ids):
     return adatas
 
 def hvg_ids_from_union(adatas, numGenes, hvg_name= default_hvg_name):
-    scores = [a.varm[hvg_name] for a in adatas]
+    scores = [a.var[hvg_name] for a in adatas]
     hvg_ids_per_adata = np.argpartition(scores, -numGenes)[:,-numGenes:]
     hvg_ids = np.unique(hvg_ids_per_adata.flatten())
     return hvg_ids
@@ -160,7 +161,7 @@ def hung_nparray(X1, X2, debug = False,metric='euclidean'):
 def cell_ranger(adatas, mingenes = 200,
                         normrow= True,
                         log = True):
-    if 'cell_ranger' in adatas[0].varm:
+    if 'cell_ranger' in adatas[0].var:
         return adatas
 
     return Map( lambda x:cell_ranger_single(x, mingenes=mingenes, normrow= normrow,  log= log), adatas)
@@ -175,7 +176,7 @@ def cell_ranger_single(adata,
     sc.pp.highly_variable_genes(adata, n_top_genes=5000,
                                          flavor='cell_ranger',
                                         inplace=True)
-    adata.varm['cell_ranger']=  data.var['dispersions_norm']
+    adata.var['cell_ranger']=  data.var['dispersions_norm']
     return adata
 
 
