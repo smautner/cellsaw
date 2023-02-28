@@ -1,8 +1,13 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose
+from sklearn import decomposition
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 import ubergauss.tools as ut
 from lucy import draw
 from sklearn.metrics import pairwise_distances
+from anndata._core.merge import concat
+import scanpy as sc
+import umap as uumap
 
 def confuse2(adatas, label = 'label', alignmentbase = 'pca40'):
     assert len(adatas) == 2
@@ -10,7 +15,7 @@ def confuse2(adatas, label = 'label', alignmentbase = 'pca40'):
     draw.confuse2(*[x.obs['label'] for x in adatas])
 
 def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
-    X = to_arrays(adatas, base=base)
+    X = to_arrays(adatas, base=projection)
     labels = [a.obs[label] for a in adatas]
     draw.plot_X(X, labels,**kwargs)
 
@@ -36,15 +41,14 @@ def check_adatas(adatas):
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
 
 
-from anndata._core.merge import concat
 
 def stack(adatas):
     # TODO we need to say that batch keeps them seperate
-    assert 'batch' in adatas.obs
+    assert 'batch' in adatas[0].obs
     return concat(adatas)
 
 def unstack(adata, key= 'batch'):
-   return  [z[z.obs['batch']==i] for i in z.obs[key].unique()]
+   return  [adata[adata.obs['batch']==i] for i in adata.obs[key].unique()]
 
 
 
@@ -71,7 +75,9 @@ def hvg_ids_from_union(adatas, numGenes, hvg_name= default_hvg_name):
     return hvg_ids
 
 
-def hvg_ids_from_union_limit(adadas,numgenes,hvg_name = default_hvg_name):
+def hvg_ids_from_union_limit(adatas,numgenes,hvg_name = default_hvg_name):
+
+    scores = [a.var[hvg_name] for a in adatas]
     ar = np.array(scores)
     ind = np.argsort(ar)
 
@@ -103,7 +109,8 @@ def subsample_to_min_cellcount(adatas):
         return adatas
 
 
-def pca(adatas, dim, label = 'pca'):
+from scipy.sparse import issparse
+def pca(adatas, dim=40, label = 'pca40'):
 
     if not label:
         label = 'pca'+str(dim)
@@ -112,18 +119,23 @@ def pca(adatas, dim, label = 'pca'):
 
     data = stack(adatas)
     scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
-    res = decomposition.PCA(n_components  = dim).fit_transform(scaled)
+    if  not issparse(scaled):
+        res = decomposition.PCA(n_components  = dim).fit_transform(scaled)
+    else:
+        res = sc.pp._pca._pca_with_sparse(scaled,dim)['X_pca']
     data.obsm[label] = res
     return unstack(data)
 
 
-def umap(adatas, dim, label = '', start = 'pca40'):
+def umap(adatas, dim = 10, label = '', start = 'pca40'):
     if not label:
         label = 'umap'+str(dim)
     if label in adatas[0].obsm:
         return adatas
+
+    data = stack(adatas)
     X = data.obsm.get(start,data.X)
-    res = umap.UMAP(n_components = dim).fit_transform(X)
+    res = uumap.UMAP(n_components = dim).fit_transform(X)
     data.obsm[label] = res
     return unstack(data)
 
@@ -138,7 +150,7 @@ def to_array(ad,base):
     return ad.X if not base else ad.obsm[base]
 
 def to_arrays(adatas,base):
-    return PMap(to_array, adatas, base=base)
+    return Map(to_array, adatas, base=base)
 
 def hungarian(adata, adata2, base):
         X = to_arrays([adata, adata2], base=base)
@@ -171,13 +183,39 @@ def cell_ranger_single(adata,
                         normrow= True,
                         log = True):
 
+    okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
+
     sc.pp.normalize_total(adata, 1e4)
     sc.pp.log1p(adata)
+
+    adata2 = adata[:,okgenes].copy()
+
+    sc.pp.highly_variable_genes(adata2, n_top_genes=5000,
+                                         flavor='cell_ranger',
+                                        inplace=True)
+
+    fullscores = np.full(adata.X.shape[1],np.NINF,np.float)
+    fullscores[okgenes]  = adata2.var['dispersions_norm']
+    adata.var['cell_ranger']=  fullscores
+    return adata
+
+
+def cell_ranger_single_normal(adata,
+                        mingenes = 200,
+                        normrow= True,
+                        log = True):
+
+    sc.pp.normalize_total(adata, 1e4)
+    sc.pp.log1p(adata)
+    print('asdasd',adata.X.shape)
     sc.pp.highly_variable_genes(adata, n_top_genes=5000,
                                          flavor='cell_ranger',
                                         inplace=True)
-    adata.var['cell_ranger']=  data.var['dispersions_norm']
+
+    adata.var['cell_ranger']=  adata.var['dispersions_norm']
+
     return adata
+
 
 
 

@@ -2,10 +2,12 @@ from lmz import *
 import scanpy as sc
 import numpy as np
 
-def samplecopy(data,num, seed):
+def subsample(data,num=1000, seed=None, copy = False):
     np.random.seed(seed)
     obs_indices = np.random.choice(data.n_obs, size=num, replace=True)
-    r=  data[obs_indices].copy()
+    r=  data[obs_indices]
+    if copy:
+        r = r.copy()
     r.obs_names_make_unique()
     return r
 
@@ -16,8 +18,6 @@ def rename_obs(datasets, batch, typ):
             ds.obs['batch'] = ds.obs[bat]
         if typ != 'label':
             ds.obs['label'] = ds.obs[lab]
-
-
 
 def load_scib(path = '/home/ubuntu/benchdata/'):
     datasets = [sc.read(path+data) for data in "Immune_ALL_hum_mou.h5ad  Immune_ALL_human.h5ad  Lung_atlas_public.h5ad  human_pancreas_norm_complexBatch.h5ad".split()]
@@ -52,4 +52,3 @@ def test_ts():
             print(np.unique(a.obs['label']))
 
 
-# TODO i think we should put the preprocessing here...

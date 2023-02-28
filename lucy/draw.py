@@ -29,14 +29,14 @@ def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mk
     # make a tinyumap with the right dimensions
 
 
-    itemstodraw = len(X) + mkmix
+    itemstodraw = len(Xlist) + mkmix
     rows = ((itemstodraw - 1) // plotsperline) + 1
     columns = plotsperline if itemstodraw > plotsperline else itemstodraw
 
     d = tinyUmap(dim=(rows, columns), size=size)  # default is a row
 
     # set same limit for all the plots
-    concatX = np.vstack(X)
+    concatX = np.vstack(Xlist)
     xmin, ymin = concatX.min(axis=0)
     xmax, ymax = concatX.max(axis=0)
 
@@ -45,7 +45,7 @@ def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mk
     # plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
     # plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
     themap = tools.spacemap(np.unique(np.concatenate(labels)))
-    for x, y in zip(X, labels):
+    for x, y in zip(Xlist, labels):
         #y,sm = tools.labelsToIntList(y)
         y = themap.encode(y)
         if not grad:
@@ -68,7 +68,7 @@ def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mk
 
     if mkmix:
         if not mixlabels:
-            mixlabelslabels = [i*2 for i,stack in enumerate(X) for item in stack]
+            mixlabelslabels = [i*2 for i,stack in enumerate(Xlist) for item in stack]
         else:
             mixlabels = themap.encode(mixlabels)
         d.draw(np.vstack(merge.d2),mixlabels)
