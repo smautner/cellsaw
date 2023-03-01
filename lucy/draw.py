@@ -23,23 +23,119 @@ col = col + col + col + ((0, 0, 0),)
 # col = col+[(0,0,0)]
 
 
+def scatter(X, Y,
+             title="No title",
+             title_size=10,
+             acc: "y:str_description" = {},
+             markerscale=4,
+             getmarker=lambda cla: {"marker": 'o'},
+             col=col,
+             label=None,
+             alpha=None,
+             legend=False,
+             labeldict={},
+             size=None):
+    plt.title(title, size=title_size)
+    Y = np.array(Y)
+    size = max(int(4000 / len(Y)), 1) if not size else size
+    plt.gca().axes.yaxis.set_ticklabels([])
+    plt.gca().axes.xaxis.set_ticklabels([])
+    plt.tick_params(left=False)
+    plt.tick_params(bottom=False)
+
+    if labeldict:
+        for cla in np.unique(Y):
+            plt.scatter(X[Y == cla, 0],
+                        X[Y == cla, 1],
+                        color=col[cla],
+                        s=size,
+                        marker=f"${cla}$",
+                        edgecolors='none',
+                        alpha=alpha,
+                        label=labeldict.get(cla, str(cla)))  # str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
+    else:
+            plt.scatter(X[:, 0], X[:, 1], c=Y, s=size)
+    # plt.axis('off')
+    # plt.xlabel('UMAP 2')
+    # plt.ylabel('UMAP 1')
+    if legend:
+        # plt.legend(markerscale=2, ncol=2, bbox_to_anchor=(1, -.12))
+        plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
+
+
+class tinyUmap():
+    def __init__(self, dim=(3, 3), size=2, lim=False):
+        figs = (size * dim[1], size * dim[0])
+        plt.figure(figsize=figs, dpi=300)
+        self.i = 0
+        self.dim = dim
+        if lim:
+            concatX = np.vstack(lim)
+            xmin, ymin = concatX.min(axis=0)
+            xmax, ymax = concatX.max(axis=0)
+
+            def setlim():
+                plt.xlim(xmin, xmax)
+                plt.ylim(ymin, ymax)
+            lim = setlim()
+        #self.lim = lim if lim else lambda: 0
+        self.lim = setlim if lim else lambda: 0
+
+    def next(self):
+        self.i = self.i + 1
+        plt.subplot(*self.dim, self.i)
+
+    def draw(self, *a, **b):
+        self.next()
+        self.lim()
+        scatter(*a, **b)
+
+
+
+
 def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False, mixlabels = []):
-    '''scatterplots for merge.d2'''
-
     # make a tinyumap with the right dimensions
-
-
     itemstodraw = len(Xlist) + mkmix
     rows = ((itemstodraw - 1) // plotsperline) + 1
     columns = plotsperline if itemstodraw > plotsperline else itemstodraw
+    d = tinyUmap(dim=(rows, columns), size=size, lim = Xlist)  # default is a row
 
-    d = tinyUmap(dim=(rows, columns), size=size)  # default is a row
+    alllabels = np.concatenate(labels)
+    themap = tools.spacemap(np.unique(alllabels)) if not grad else {}
 
+    for x, y in zip(Xlist, labels):
+        y = themap.encode(y)
+        d.draw(x, y, title=None, labeldict=themap.getitem, legend = True)
+
+
+    if mkmix:
+        #mixlabels = [i*2 for i,stack in enumerate(Xlist) for item in stack]
+        d.draw(np.vstack(Xlist),themap.encode(alllabels), labeldict= themap.getitem, legend = True)
+
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+def plot_XX(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False, mixlabels = []):
+    # make a tinyumap with the right dimensions
+    itemstodraw = len(Xlist) + mkmix
+    rows = ((itemstodraw - 1) // plotsperline) + 1
+    columns = plotsperline if itemstodraw > plotsperline else itemstodraw
+    d = tinyUmap(dim=(rows, columns), size=size, lim = Xlist)  # default is a row
     # set same limit for all the plots
     concatX = np.vstack(Xlist)
     xmin, ymin = concatX.min(axis=0)
     xmax, ymax = concatX.max(axis=0)
-
     # xdiff = np.abs(xmax - xmin)
     # ydiff = np.abs(ymax - ymin)
     # plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
@@ -64,83 +160,22 @@ def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mk
             plug.draw(themap)
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
-
-
     if mkmix:
         if not mixlabels:
             mixlabelslabels = [i*2 for i,stack in enumerate(Xlist) for item in stack]
         else:
             mixlabels = themap.encode(mixlabels)
-        d.draw(np.vstack(merge.d2),mixlabels)
+        d.draw(np.vstack(Xlist),mixlabels)
         plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
-
     plt.show()
 
 
-def tinyumap(X, Y,
-             title="No title",
-             title_size=10,
-             acc: "y:str_description" = {},
-             markerscale=4,
-             getmarker=lambda cla: {"marker": 'o'},
-             col=col,
-             label=None,
-             alpha=None,
-             legend=False,
-             labeldict={},
-             size=None):
-    plt.title(title, size=title_size)
-    Y = np.array(Y)
-    size = max(int(4000 / Y.shape[0]), 1) if not size else size
-    embed = X
-    plt.gca().axes.yaxis.set_ticklabels([])
-    plt.gca().axes.xaxis.set_ticklabels([])
-    plt.tick_params(left=False)
-    plt.tick_params(bottom=False)
-    for cla in np.unique(Y):
-        plt.scatter(embed[Y == cla, 0],
-                    embed[Y == cla, 1],
-                    color=col[cla],
-                    s=size,
-                    marker=f"${cla}$",
-                    edgecolors='none',
-                    alpha=alpha,
-                    # label= labeldict.get(cla,str(cla)), **getmarker(cla)) #str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
-                    label=labeldict.get(cla, str(cla)))  # str(cla)+" "+acc.get(cla,''),**getmarker(col[cla]))
-    # plt.axis('off')
-    # plt.xlabel('UMAP 2')
-    # plt.ylabel('UMAP 1')
-    if legend:
-        plt.legend(markerscale=2, ncol=2, bbox_to_anchor=(1, -.12))
 
 
-class tinyUmap():
 
-    def __init__(self, dim=(3, 3), size=2, lim=False):
-        figs = (size * dim[1], size * dim[0])
-        plt.figure(figsize=figs, dpi=300)
-        self.i = 0
-        self.dim = dim
-        if lim:
-            concatX = np.vstack(lim)
-            xmin, ymin = concatX.min(axis=0)
-            xmax, ymax = concatX.max(axis=0)
 
-            def setlim():
-                plt.xlim(xmin, xmax)
-                plt.ylim(ymin, ymax)
 
-            lim = setlim()
-        self.lim = lim if lim else lambda: 0
 
-    def next(self):
-        self.i = self.i + 1
-        plt.subplot(*self.dim, self.i)
-
-    def draw(self, *a, **b):
-        self.next()
-        self.lim()
-        tinyumap(*a, **b)
 
 
 class drawMovingCenters:

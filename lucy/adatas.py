@@ -110,6 +110,7 @@ def subsample_to_min_cellcount(adatas):
 
 
 from scipy.sparse import issparse
+
 def pca(adatas, dim=40, label = 'pca40'):
 
     if not label:
@@ -118,11 +119,13 @@ def pca(adatas, dim=40, label = 'pca40'):
         return adatas
 
     data = stack(adatas)
+
     scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
     if  not issparse(scaled):
         res = decomposition.PCA(n_components  = dim).fit_transform(scaled)
     else:
         res = sc.pp._pca._pca_with_sparse(scaled,dim)['X_pca']
+
     data.obsm[label] = res
     return unstack(data)
 
@@ -184,12 +187,9 @@ def cell_ranger_single(adata,
                         log = True):
 
     okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
-
     sc.pp.normalize_total(adata, 1e4)
     sc.pp.log1p(adata)
-
     adata2 = adata[:,okgenes].copy()
-
     sc.pp.highly_variable_genes(adata2, n_top_genes=5000,
                                          flavor='cell_ranger',
                                         inplace=True)
@@ -200,24 +200,43 @@ def cell_ranger_single(adata,
     return adata
 
 
-def cell_ranger_single_normal(adata,
-                        mingenes = 200,
-                        normrow= True,
-                        log = True):
-
-    sc.pp.normalize_total(adata, 1e4)
-    sc.pp.log1p(adata)
-    print('asdasd',adata.X.shape)
-    sc.pp.highly_variable_genes(adata, n_top_genes=5000,
-                                         flavor='cell_ranger',
-                                        inplace=True)
-
-    adata.var['cell_ranger']=  adata.var['dispersions_norm']
-
-    return adata
 
 
 
 
 
+from lucy import embed
+
+def to_lsagraph(adatas,base = 'pca40', intra_neigh = 15, inter_neigh = 1,
+              scaling_num_neighbors = 2, outlier_threshold = .8,
+              scaling_threshold = .9, recalculate = False):
+
+    X = to_arrays(adatas, base)
+    lsagraph =  embed.linear_assignment_integrate(X,
+                            intra_neigh=intra_neigh,
+                            inter_neigh = inter_neigh,
+                            scaling_num_neighbors = scaling_num_neighbors,
+                            outlier_threshold = outlier_threshold,
+                            scaling_threshold=scaling_threshold)
+
+    return (lsagraph, base)
+
+
+
+def graph_embed(adatas, lsagraph, n_components):
+
+    # do the embedding
+    graph, base = lsagraph
+    X = to_arrays(adatas, base)
+
+    projection = embed.distmatrixumap(X,graph, components = n_components)
+
+    # unstack
+    asd = np.hstack([ a.obs['batch'] for a in adatas])
+    split = [ projection[asd == i] for i in np.unique( asd)]
+
+    # add embedding to anndatas
+    for a,s in zip(adatas,split):
+        a.obsm[f'lsa{n_components}'] = s
+    return adatas
 
