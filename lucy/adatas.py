@@ -1,4 +1,5 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
+from scipy.sparse import issparse
 from sklearn import decomposition
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -9,19 +10,22 @@ from anndata._core.merge import concat
 import scanpy as sc
 import umap as uumap
 
-def confuse2(adatas, label = 'label', alignmentbase = 'pca40'):
+
+# plotting
+def plot_confusion_matrix_normalized_raw(adatas, label = 'label', alignmentbase = 'pca40'):
     assert len(adatas) == 2
     adatas = align(adatas, base= alignmentbase)
-    draw.confuse2(*[x.obs['label'] for x in adatas])
+    draw.plot_confusion_matrix_twice(*[x.obs['label'] for x in adatas])
 
 def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
     X = to_arrays(adatas, base=projection)
     labels = [a.obs[label] for a in adatas]
-    draw.plot_X(X, labels,**kwargs)
+    batch_labels = [a.obs['batch'][0] for a in adatas]
+    draw.plot_X(X, labels,titles = batch_labels,**kwargs)
 
 
-default_hvg_name = 'cell_ranger'
 
+# similarity
 def jaccard_distance(a,b, num_genes):
     binarized_hvg = np.array([ ut.binarize(d,num_genes) for d in [a,b] ])
     union = np.sum(np.any(binarized_hvg, axis=0))
@@ -29,26 +33,53 @@ def jaccard_distance(a,b, num_genes):
     return intersect/union
 
 
-def similarity(adatas, hvg_name = default_hvg_name, num_genes = 2000):
+def similarity(adatas, hvg_name = 'cell_ranger', num_genes = 2000):
     assert hvg_name in adatas[0].var, 'not annotated..'
-    genescores = [a.var[hvg_name] for a in adatas]
-    res = [[ jaccard_distance(a,b, num_genes = num_genes) for a in scorelist] for b in scorelist]
+    #genescores = [a.var[hvg_name] for a in adatas]
+    genescores = [a.uns[hvg_name] for a in adatas]
+    res = [[ jaccard_distance(a,b, num_genes = num_genes) for a in genescores] for b in genescores]
     return np.array(res)
 
 
+
+# checking data
 def check_adatas(adatas):
         assert isinstance(adatas, list), f'merge wants a list, not {type(adatas)}'
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
 
 
 
+# sometimes we need to stack the adatas to work on the concatenated values...
+
+
+# def to_arraylist(adatas):
+#    # make a list of tupples for use in sklearn
+#     return X,cell_name, genename
+
 def stack(adatas):
-    # TODO we need to say that batch keeps them seperate
     assert 'batch' in adatas[0].obs
     return concat(adatas)
 
-def unstack(adata, key= 'batch'):
-   return  [adata[adata.obs['batch']==i] for i in adata.obs[key].unique()]
+def stack_single_attribute(adatas, attr = ""):
+    if not attr:
+        data = [a.X for a in adatas]
+    else:
+        data = [a.obsm[attr] for a in adatas]
+    return ut.vstack(data)
+
+def split_by_adatas(adatas, stack):
+    batch_ids = np.hstack([ a.obs['batch'] for a in adatas])
+    return [ stack [batch_ids == batch] for batch in np.unique(batch_ids)]
+
+def attach_stack(adatas, stack, label):
+    '''
+    if we generate data for all cells on the stacked-adatas,
+    this function can split the data and assign it to the adatas
+    '''
+    stack_split = split_by_adatas(adatas,stack)
+    for a,s in zip(adatas,stack_split):
+        a.obsm[label] = s
+    return adatas
 
 
 
@@ -58,7 +89,12 @@ def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', m
         adatas = cell_ranger(adatas)
     else:
         assert False
+
     selector = hvg_ids_from_union if cut_old else hvg_ids_from_union_limit
+
+    for a in adatas: # saving this info to be able to calculate similarity
+        a.uns[hvg] = a.var[hvg]
+
     adatas = hvg_cut(adatas, selector(adatas,cut_ngenes,hvg_name=hvg))
     if make_even:
         adatas = subsample_to_min_cellcount(adatas)
@@ -68,14 +104,14 @@ def hvg_cut(adatas,hvg_ids):
     [d._inplace_subset_var(hvg_ids) for d in adatas]
     return adatas
 
-def hvg_ids_from_union(adatas, numGenes, hvg_name= default_hvg_name):
+def hvg_ids_from_union(adatas, numGenes, hvg_name= 'cell_ranger'):
     scores = [a.var[hvg_name] for a in adatas]
     hvg_ids_per_adata = np.argpartition(scores, -numGenes)[:,-numGenes:]
     hvg_ids = np.unique(hvg_ids_per_adata.flatten())
     return hvg_ids
 
 
-def hvg_ids_from_union_limit(adatas,numgenes,hvg_name = default_hvg_name):
+def hvg_ids_from_union_limit(adatas,numgenes,hvg_name = 'cell_ranger'):
 
     scores = [a.var[hvg_name] for a in adatas]
     ar = np.array(scores)
@@ -108,39 +144,18 @@ def subsample_to_min_cellcount(adatas):
                                 copy=False)
         return adatas
 
+def subsample(data,num=1000, seed=None, copy = False):
+    np.random.seed(seed)
+    obs_indices = np.random.choice(data.n_obs, size=num, replace=True)
+    r=  data[obs_indices]
+    if copy:
+        r = r.copy()
+    r.obs_names_make_unique()
+    return r
 
-from scipy.sparse import issparse
-
-def pca(adatas, dim=40, label = 'pca40'):
-
-    if not label:
-        label = 'pca'+str(dim)
-    if label in adatas[0].obsm:
-        return adatas
-
-    data = stack(adatas)
-
-    scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
-    if  not issparse(scaled):
-        res = decomposition.PCA(n_components  = dim).fit_transform(scaled)
-    else:
-        res = sc.pp._pca._pca_with_sparse(scaled,dim)['X_pca']
-
-    data.obsm[label] = res
-    return unstack(data)
-
-
-def umap(adatas, dim = 10, label = '', start = 'pca40'):
-    if not label:
-        label = 'umap'+str(dim)
-    if label in adatas[0].obsm:
-        return adatas
-
-    data = stack(adatas)
-    X = data.obsm.get(start,data.X)
-    res = uumap.UMAP(n_components = dim).fit_transform(X)
-    data.obsm[label] = res
-    return unstack(data)
+def subsample_preprocess(adatas,num = 1000 ,copy = False, **preprocessargs):
+    data = Map(subsample,adatas,num=num, copy=copy)
+    return preprocess(data,**preprocessargs)
 
 
 
@@ -202,41 +217,92 @@ def cell_ranger_single(adata,
 
 
 
-
-
-
 from lucy import embed
 
-def to_lsagraph(adatas,base = 'pca40', intra_neigh = 15, inter_neigh = 1,
+def lapgraph(adatas,base = 'pca40', intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, outlier_threshold = .8,
-              scaling_threshold = .9, recalculate = False):
+              scaling_threshold = .9, dataset_adjacency = None):
 
     X = to_arrays(adatas, base)
-    lsagraph =  embed.linear_assignment_integrate(X,
+    graph =  embed.linear_assignment_integrate(X,
                             intra_neigh=intra_neigh,
                             inter_neigh = inter_neigh,
                             scaling_num_neighbors = scaling_num_neighbors,
                             outlier_threshold = outlier_threshold,
-                            scaling_threshold=scaling_threshold)
+                            scaling_threshold=scaling_threshold,
+                                dataset_adjacency=dataset_adjacency)
+    return (graph, base)
 
-    return (lsagraph, base)
-
-
-
-def graph_embed(adatas, lsagraph, n_components):
-
+def graph_embed(adatas, lapgraph, n_components= 2, label = 'lap'):
     # do the embedding
-    graph, base = lsagraph
+    graph, base = lapgraph
     X = to_arrays(adatas, base)
-
     projection = embed.distmatrixumap(X,graph, components = n_components)
-
-    # unstack
-    asd = np.hstack([ a.obs['batch'] for a in adatas])
-    split = [ projection[asd == i] for i in np.unique( asd)]
-
-    # add embedding to anndatas
-    for a,s in zip(adatas,split):
-        a.obsm[f'lsa{n_components}'] = s
+    adatas = attach_stack(adatas, projection,label)
     return adatas
+
+
+
+
+def pca(adatas, dim=40, label = 'pca40'):
+
+    if label in adatas[0].obsm:
+        print('redundant pca :) ')
+    # get a result
+    data = stack(adatas)
+    scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
+    stackedPCA =  pca_on_scaled_data(scaled, dim)
+    return attach_stack(adatas, stackedPCA ,label)
+
+def pca_on_scaled_data(scaled, dim):
+    if  not issparse(scaled):
+        stackedPCA = decomposition.PCA(n_components  = dim).fit_transform(scaled)
+    else:
+        stackedPCA = sc.pp._pca._pca_with_sparse(scaled,dim)['X_pca']
+    return stackedPCA
+
+
+def umap(adatas, dim = 10, label = 'umap10', start = 'pca40'):
+
+    if label in adatas[0].obsm:
+        print('redundant umap :) ')
+
+    attr = data.obsm.get(start,'')
+    X = stack_single_attribute(adatas, attr = attr)
+    res = uumap.UMAP(n_components = dim).fit_transform(X)
+    return attach_stack(adatas, res ,label)
+
+
+from sklearn.preprocessing import scale
+def project(adatas,start='', **kwargs):
+
+    data = stack_single_attribute(adatas,attr= start)
+
+    if 'pca' in kwargs:
+        scaled = scale(data, with_mean= False)
+        dim = kwargs['pca']
+        data =  pca_on_scaled_data(scaled, dim)
+        start = f"pca{dim}"
+        attach_stack(adatas, data , start)
+
+    if 'umap' in kwargs:
+        dim = kwargs['umap']
+        data = uumap.UMAP(n_components = dim).fit_transform(data)
+        start = f"umap{dim}"
+        attach_stack(adatas, data , start)
+
+    if  'lapumap' in kwargs:
+        dim = kwargs['lapumap']
+        sim = embed.make_adjacency(similarity(adatas),algo=0,neighbors=10)
+        gr = lapgraph(adatas,base=start,dataset_adjacency = sim)
+        start = f"lapumap{dim}"
+        graph_embed(adatas,gr,n_components = dim, label = start)
+
+    return adatas
+
+
+
+# predict function that just diffuses labels
+def predict(adatas, tartget_id, labelname= 'predictedlabels'):
+    pass
 

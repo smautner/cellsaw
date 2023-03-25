@@ -2,14 +2,7 @@ from lmz import *
 import scanpy as sc
 import numpy as np
 
-def subsample(data,num=1000, seed=None, copy = False):
-    np.random.seed(seed)
-    obs_indices = np.random.choice(data.n_obs, size=num, replace=True)
-    r=  data[obs_indices]
-    if copy:
-        r = r.copy()
-    r.obs_names_make_unique()
-    return r
+
 
 
 def rename_obs(datasets, batch, typ):

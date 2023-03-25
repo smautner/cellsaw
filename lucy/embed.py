@@ -1,4 +1,5 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose
+from scipy.sparse.csgraph import minimum_spanning_tree
 from pprint import pprint
 import time
 from scipy.optimize import linear_sum_assignment
@@ -60,6 +61,7 @@ def neighborgraph(x, neighbors):
     diff[diff > 0 ] = 0
     z-= diff
     check_symmetric(z,raise_exception=True)
+
     return z
 
 
@@ -181,57 +183,105 @@ def average_knn_distance(I,J,i_ids,j_ids,numneigh):
     stack = np.vstack((d1,d2))
     return np.mean(stack, axis=0).T
 
+from sklearn.neighbors import NearestNeighbors
+def neighborgraph_p_weird(x, neighbors):
+    # neighbors = max(1, int(x.shape[0]*(neighbors_perc/100)))
+    z= nbrs.kneighbors_graph(x,neighbors)
+    diff = z-z.T
+    diff[diff > 0 ] = 0
+    z-= diff
+    return z
+
+def neighborgraph_p_real(x, neighbors):
+    z = np.zeros_like(x)
+    np.fill_diagonal(x,np.NINF)
+    for i,row in enumerate(x):
+        sr = np.argsort(row)
+        z[i][sr[-neighbors:]]  = 1
+    diff = z-z.T
+    diff[diff > 0 ] = 0
+    z-= diff
+    return z
+
+
+
+
+
+def make_adjacency(similarity, algo=0, neighbors=10):
+        n_perc = neighbors = max(1, int(similarity.shape[0]*(neighbors/100)))
+        simm = neighborgraph_p_weird if algo == 1 else neighborgraph_p_real
+        return simm(similarity, n_perc)
+
+
 def linear_assignment_integrate(Xlist,
                                 intra_neigh=15,
                                 inter_neigh = 1,
                                 scaling_num_neighbors = 2,
                                 outlier_threshold = .8,
                                 scaling_threshold=.9,
+                                dataset_adjacency = False,
                                 showtime = False):
 
     lsatime = 0.0
     eutime = 0.0
 
-    def make_distance_matrix(i,j):
-        if i == j:
-            return sparse.lil_matrix(neighborgraph(Xlist[i],intra_neigh)), 0,0
+
+
+    def adjacent(i,j):
+        if isinstance( dataset_adjacency, np.ndarray):
+            return  dataset_adjacency[i][j] == 1
         else:
-            '''
-            based = hungdists/= .25
-            dm = avg 1nn dist in both
-            based*=dm
-            '''
-            # hungarian
-            eustart=time.time()
-            ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
-            eutime = time.time() - eustart
-            res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
-            if inter_neigh==0:
-                return res
+            return True
 
-            lsastart=time.time()
-            i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
-            lsatime=(time.time()-lsastart)
-
-            # remove worst 25% hits
-            sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
-            lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
-            outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
-            ij_lsa_distances[outlier_ids] = 0
-
-            # normalize
-            lsa_normalisation_factor = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*scaling_threshold)]
-            ij_lsa_distances /= lsa_normalisation_factor
-            #
-            #dm = (avgdist(Xlist[i], hoodsize)+avgdist(Xlist[j],hoodsize))/2
-            #dab *=dm
-            average_knn_distance_factors = average_knn_distance(Xlist[i],Xlist[j], i_ids , j_ids, scaling_num_neighbors)
-            ij_lsa_distances *= average_knn_distance_factors
+    def make_distance_matrix(i,j):
+            if i == j:
+                # use the maximum between neighborgraph and min spanning tree to make sure all is connected
+                neighborAdj = sparse.lil_matrix(neighborgraph(Xlist[i],intra_neigh))
+                distancemat = metrics.euclidean_distances(Xlist[i])
+                tree = sparse.lil_matrix(minimum_spanning_tree(distancemat))
+                return tree.maximum(neighborAdj), 0,0
 
 
-            # make a matrix
-            res[i_ids,j_ids] = ij_lsa_distances
-            return res, lsatime, eutime
+            elif not adjacent(i,j):
+                # just fill with zeros :)
+                return  sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32),0,0
+            else:
+                '''
+                based = hungdists/= .25
+                dm = avg 1nn dist in both
+                based*=dm
+                '''
+                # hungarian
+                eustart=time.time()
+                ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
+                eutime = time.time() - eustart
+                res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
+                if inter_neigh==0:
+                    return res
+
+                lsastart=time.time()
+                i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
+                lsatime=(time.time()-lsastart)
+
+                # remove worst 25% hits
+                sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
+                lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
+                outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
+                ij_lsa_distances[outlier_ids] = 0
+
+                # normalize
+                lsa_normalisation_factor = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*scaling_threshold)]
+                ij_lsa_distances /= lsa_normalisation_factor
+                #
+                #dm = (avgdist(Xlist[i], hoodsize)+avgdist(Xlist[j],hoodsize))/2
+                #dab *=dm
+                average_knn_distance_factors = average_knn_distance(Xlist[i],Xlist[j], i_ids , j_ids, scaling_num_neighbors)
+                ij_lsa_distances *= average_knn_distance_factors
+
+
+                # make a matrix
+                res[i_ids,j_ids] = ij_lsa_distances
+                return res, lsatime, eutime
 
 
     # then we built a row:
@@ -260,10 +310,11 @@ def linear_assignment_integrate(Xlist,
 
 
 
-
 def KNNFormater(Data, precomputedKNNIndices, precomputedKNNDistances):
     from pynndescent import NNDescent
-    pyNNDobject = NNDescent(np.vstack(Data), metric='euclidean', random_state=1337)
+    # print('asd1')
+    pyNNDobject = NNDescent(np.vstack(Data), metric='euclidean', random_state=1337,n_jobs = 1)
+    # print('asd2')
     pyNNDobject._neighbor_graph = (precomputedKNNIndices.copy(), precomputedKNNDistances.copy())
     precomputedKNN = (precomputedKNNIndices, precomputedKNNDistances, pyNNDobject)
     return precomputedKNN
@@ -283,7 +334,6 @@ def stack_n_fill(a,val):
 from umap import UMAP
 def distmatrixumap(dataXlist,dm,components = 10):
     sparseMatrix = sparse.csr_matrix(dm)
-
     precomputedKNNIndices = []
     precomputedKNNDistances = []
     # for ip in range(len(sparseMatrix.indptr)-1):
@@ -306,6 +356,7 @@ def distmatrixumap(dataXlist,dm,components = 10):
                  metric='euclidean',
                  precomputed_knn=precomputedKNN,
                  force_approximation_algorithm=True)
-    return mymap.fit_transform(np.vstack(dataXlist))
+    r=  mymap.fit_transform(np.vstack(dataXlist))
+    return r
 
 

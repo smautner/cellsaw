@@ -93,7 +93,12 @@ class tinyUmap():
 
 
 
-def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False, mixlabels = []):
+def plot_X(Xlist, labels, plotsperline=3,
+           grad=False, size=3.5, plug = False,
+           mkmix = False, mixlabels = [], titles = []):
+
+    if not titles:
+        titles = Map(str, Range(Xlist))
     # make a tinyumap with the right dimensions
     itemstodraw = len(Xlist) + mkmix
     rows = ((itemstodraw - 1) // plotsperline) + 1
@@ -103,9 +108,9 @@ def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mk
     alllabels = np.concatenate(labels)
     themap = tools.spacemap(np.unique(alllabels)) if not grad else {}
 
-    for x, y in zip(Xlist, labels):
+    for x, y, title in zip(Xlist, labels, titles):
         y = themap.encode(y)
-        d.draw(x, y, title=None, labeldict=themap.getitem, legend = True)
+        d.draw(x, y, title=title, labeldict=themap.getitem, legend = True)
 
 
     if mkmix:
@@ -113,67 +118,6 @@ def plot_X(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mk
         d.draw(np.vstack(Xlist),themap.encode(alllabels), labeldict= themap.getitem, legend = True)
 
     plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-def plot_XX(Xlist, labels, plotsperline=3, grad=False, size=3.5, plug = False, mkmix = False, mixlabels = []):
-    # make a tinyumap with the right dimensions
-    itemstodraw = len(Xlist) + mkmix
-    rows = ((itemstodraw - 1) // plotsperline) + 1
-    columns = plotsperline if itemstodraw > plotsperline else itemstodraw
-    d = tinyUmap(dim=(rows, columns), size=size, lim = Xlist)  # default is a row
-    # set same limit for all the plots
-    concatX = np.vstack(Xlist)
-    xmin, ymin = concatX.min(axis=0)
-    xmax, ymax = concatX.max(axis=0)
-    # xdiff = np.abs(xmax - xmin)
-    # ydiff = np.abs(ymax - ymin)
-    # plt.xlim(xmin - 0.1 * xdiff, xmax + 0.1 * xdiff)
-    # plt.ylim(ymin - 0.1 * ydiff, ymax + 0.1 * ydiff)
-    themap = tools.spacemap(np.unique(np.concatenate(labels)))
-    for x, y in zip(Xlist, labels):
-        #y,sm = tools.labelsToIntList(y)
-        y = themap.encode(y)
-        if not grad:
-            d.draw(x, y, title=None, labeldict=themap.getitem)
-            # plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5), bbox_to_anchor=(1.1, -.01))
-            # plt.legend(markerscale=1.5, fontsize=4, ncol=int(len(X) * 2.5))
-            plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
-        else:
-            d.next()
-            plt.gca().axes.yaxis.set_ticklabels([])
-            plt.gca().axes.xaxis.set_ticklabels([])
-            plt.scatter(x[:, 0], x[:, 1], c=y, s=1)
-            # plt.colorbar(shrink=.5)
-            # plt.tick_params(labelsize=4)
-        if plug:
-            plug.draw(themap)
-        plt.xlim(xmin, xmax)
-        plt.ylim(ymin, ymax)
-    if mkmix:
-        if not mixlabels:
-            mixlabelslabels = [i*2 for i,stack in enumerate(Xlist) for item in stack]
-        else:
-            mixlabels = themap.encode(mixlabels)
-        d.draw(np.vstack(Xlist),mixlabels)
-        plt.legend(bbox_to_anchor=(1, 1), loc="upper left", markerscale=1.2, fontsize=3.5)
-    plt.show()
-
-
-
-
-
-
 
 
 
@@ -225,7 +169,7 @@ def mkconfusion(y1, y2):
     return res, sm1, sm2
 
 
-def confuse(y1, y2, norm=True, draw=False):
+def confusion_matrix(y1, y2, norm=True, draw=False):
     '''
     the task here is to draw a confision matrix
     returns translated labels for y2
@@ -267,14 +211,14 @@ def confuse(y1, y2, norm=True, draw=False):
     return [sm1.getitem[g[sm2.getint[y]]] for y in y2]
 
 
-def confuse2(labels):
+def plot_confusion_matrix_twice(labels):
     '''
     does the confusionmatrix twice, normalized and unnormalized, and plots!
     '''
     y1, y2 = labels
     f = plt.figure(figsize=(16, 8))
     ax = plt.subplot(121, title='absolute hits')
-    confuse(y1, y2, norm=False, draw=True)
+    confusion_matrix(y1, y2, norm=False, draw=True)
     ax = plt.subplot(122, title='relative hits (2x hits / sumOfLabels)')
-    confuse(y1, y2, norm=True, draw=True)
+    confusion_matrix(y1, y2, norm=True, draw=True)
     plt.tight_layout()
