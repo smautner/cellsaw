@@ -212,6 +212,30 @@ def make_adjacency(similarity, algo=0, neighbors=10):
         simm = neighborgraph_p_weird if algo == 1 else neighborgraph_p_real
         return simm(similarity, n_perc)
 
+def merge_adjacency(*args):
+    if len(args) == 1:
+        return args[0]
+    return np.logical_or(args[0],merge_adjacency(*args[1:]))
+
+def make_star(size = 5, center =2):
+    ret = np.zeros((size,size))
+    ret[center] = 1
+    ret[:,center] = 1
+    return ret
+
+def make_sequence(size = 5, indices = [0,1]):
+    ret = np.zeros((size,size))
+    for i in range(size):
+        for j in indices:
+            if i+j < size and i+j >= 0:ret[i,i+j] = 1
+    return ret
+
+
+def test_matrixmaker():
+    m = make_star(size = 5, center = 1)
+    s = make_sequence(size=5, indices=[0,1,2])
+    print(s,m,merge_adjacency(s,m))
+
 
 def linear_assignment_integrate(Xlist,
                                 intra_neigh=15,
