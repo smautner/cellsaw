@@ -144,13 +144,16 @@ def subsample_to_min_cellcount(adatas):
                                 copy=False)
         return adatas
 
+import warnings
 def subsample(data,num=1000, seed=None, copy = False):
     np.random.seed(seed)
     obs_indices = np.random.choice(data.n_obs, size=num, replace=True)
-    r=  data[obs_indices]
-    if copy:
-        r = r.copy()
-    r.obs_names_make_unique()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r=  data[obs_indices]
+        if copy:
+            r = r.copy()
+        r.obs_names_make_unique()
     return r
 
 def subsample_preprocess(adatas,num = 1000 ,copy = False, **preprocessargs):
