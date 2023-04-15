@@ -95,7 +95,7 @@ setup(
     version=get_version(),
     author='Stefan Mautner',
     author_email='myl4stn4m3@cs.uni-freiburg.de',
-        packages=['cellsaw','cellsaw.similarity','cellsaw.merge','cellsaw.annotate','cellsaw.io_tools','cellsaw.merge.diffusion','lucy'],
+        packages=['cellsaw','cellsaw.similarity','cellsaw.merge','cellsaw.annotate','cellsaw.io_utils','cellsaw.merge.diffusion','lucy'],
     scripts=[ ],
     include_package_data=True,
     package_data={},
