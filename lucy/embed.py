@@ -207,10 +207,11 @@ def neighborgraph_p_real(x, neighbors):
 
 
 
-def make_adjacency(similarity, algo=0, neighbors=10):
-        n_perc = neighbors = max(1, int(similarity.shape[0]*(neighbors/100)))
+def make_adjacency(similarity, algo=0, connection_percentage=.9):
+        neighbors = max(1, int(similarity.shape[0]*connection_percentage))
+        assert neighbors <= similarity.shape[0], f'{neighbors=}{similarity.shape = } {connection_percentage=}'
         simm = neighborgraph_p_weird if algo == 1 else neighborgraph_p_real
-        return simm(similarity, n_perc)
+        return simm(similarity, neighbors)
 
 def merge_adjacency(*args):
     if len(args) == 1:
@@ -223,7 +224,14 @@ def make_star(size = 5, center =2):
     ret[:,center] = 1
     return ret
 
-def make_sequence(size = 5, indices = [0,1]):
+
+def make_sequence(sim, percentage=.1):
+    size = sim.shape[0]
+    ind = max(1, int(size*percentage))
+    ind  = Range(ind)
+    return _make_sequence(size, ind)
+
+def _make_sequence(size = 5, indices = [0,1]):
     ret = np.zeros((size,size))
     for i in range(size):
         for j in indices:

@@ -20,6 +20,9 @@ def load_scib(path = '/home/ubuntu/benchdata/'):
     # split by batch
     datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()] for z
                  in datasets]
+    for batchlist in datasets:
+        for batch in batchlist:
+            batch.uns['timeseries'] = False
     return datasets
 
 
@@ -33,6 +36,9 @@ def load_timeseries(path = './',remove_unassigned = True):
 
     datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()]
                  for z in datasets]
+    for batchlist in datasets:
+        for batch in batchlist:
+            batch.uns['timeseries'] = True
     return datasets
 
 
