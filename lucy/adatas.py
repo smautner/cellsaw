@@ -145,6 +145,11 @@ def subsample_to_min_cellcount(adatas):
         return adatas
 
 import warnings
+def subsample_iflarger(data,**kwargs):
+    if data.X.shape[0] > kwargs['subsample']:
+        return subsample(data,**kwargs)
+    return data.copy() if kwargs.get('copy', False) else data
+
 def subsample(data,num=1000, seed=None, copy = False):
     np.random.seed(seed)
     obs_indices = np.random.choice(data.n_obs, size=num, replace=True)

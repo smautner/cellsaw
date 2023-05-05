@@ -225,10 +225,11 @@ def make_star(size = 5, center =2):
     return ret
 
 
-def make_sequence(sim, percentage=.1):
+def make_sequence(sim, numnei =1):
     size = sim.shape[0]
-    ind = max(1, int(size*percentage))
-    ind  = Range(ind)
+    # ind = max(1, int(size*percentage))
+
+    ind  = Range(numnei)
     return _make_sequence(size, ind)
 
 def _make_sequence(size = 5, indices = [0,1]):
