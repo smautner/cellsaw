@@ -45,31 +45,7 @@ space = {
 }
 
 
-# def cv_scores_by_weight(weights):
-#     why = np.array([0]*4 + [1]*7)
-#     skf = StratifiedKFold(n_splits=4, random_state=None, shuffle=True)
-#     r= {}
-#     for train_index, test_index in skf.split(why, why):
-#         params = optimize(weights, train_index )
-#         print(params)
-#         for test in test_index:
-#             r[test] = runscore(params, test)
-#     return r
-# r=[]
-# for score_mix in [.4,.6,.8]:
-#     for score_shape in [2,4,6,8]:
-#         weights = [1,score_shape, score_mix]
-#         cvblob = cv_scores_by_weight(weights)
-#         r.append([score_mix,score_shape, cvblob])
-# print(r)
 
-
-
-# trials = uopt.fffmin(evalp,
-#                      items= Range(ssdata),
-#                      probing_evals = 40,   # 50
-#                      probing_parallel = 3, # 3
-#                      after_evals =  40 , space=space3) # 200
 
 def eval_single( x = 0,score_weights=[],**kwargs): # connect should be 0..1 , but its nice to catch errors :)
     data = [s.copy() for s in ssdata[x]]

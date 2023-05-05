@@ -28,6 +28,8 @@ from lucy import load, adatas
 
 def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_components=5,outlier_threshold = .75,
           scaling_threshold = .25,  pre_pca = 30, connect = 1231, nalg = 0, connect_ladder = 1): # connect should be 0..1 , but its nice to catch errors :)
+    assert connect < 1.1, "parameters were not passed.. :)"
+
 
     data = adatas.pca(data,dim = pre_pca, label = 'pca')
     if data[0].uns['timeseries']:

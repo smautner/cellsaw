@@ -146,7 +146,7 @@ def subsample_to_min_cellcount(adatas):
 
 import warnings
 def subsample_iflarger(data,**kwargs):
-    if data.X.shape[0] > kwargs['subsample']:
+    if data.X.shape[0] > kwargs['num']:
         return subsample(data,**kwargs)
     return data.copy() if kwargs.get('copy', False) else data
 
