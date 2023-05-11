@@ -62,7 +62,7 @@ def target_function(x, config, budget, **kwargs):
     #     budget = max_budget
 
     start = time.time()
-
+    kwargs =  config.get_dictionary()
     assert kwargs['connect'] < 2
     mix, shape, (train,test) = x
     print(f"{budget=}")
@@ -85,6 +85,7 @@ def optimize(x):
 
     def target(*z,**y):
         return target_function(x,*z,**y)
+    print(f"start opti")
 
     dehb = DEHB(
         f=target,
