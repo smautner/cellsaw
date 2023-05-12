@@ -1,6 +1,7 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose, flatten
 import numpy as np
 import structout as so
-from lmz import *
+
 from lucy import load, adatas
 from sklearn.metrics import  silhouette_score
 import ubergauss.tools as ut
@@ -77,8 +78,27 @@ params  = ut.xmap(optimize,tasks,n_jobs = len(tasks))
 
 
 breakpoint()
+
+
+
+def evalscores(tp):
+    task,param = tp
+    params = param[0]
+    r = []
+    for test in task[2][1]:
+        score = runscore(params,test)
+        for scorename,value in BLABLA:
+            r.append({f'mix':task[0],f'shape':task[1], f'dataset':test,f'value':value, f'method':scorename})
+    return r
+
 # we use this later for the eval
 def runscore(params, test_id):
     data = wrappers.dolucy(ssdata[test_id],**params)
     scores = wrappers.score(data)
     return scores
+
+r = ut.xmap( evalscores , Zip(tasks, params))
+r= flatten(r)
+print(r)
+
+
