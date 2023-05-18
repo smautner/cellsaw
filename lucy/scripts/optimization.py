@@ -1,4 +1,4 @@
-from lmz import Map,Zip,Filter,Grouper,Range,Transpose, flatten
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose, Flatten
 import numpy as np
 import structout as so
 
@@ -14,6 +14,11 @@ import wrappers
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
+
+
+######################
+#  the stuff here is outdated.. see optimize_dehb for new formatting plan :)
+#
 
 
 
@@ -77,28 +82,38 @@ tasks = [(mix,shape,tt) for mix in [.4,.6,.8] for shape in [2,4,6,8] for tt in t
 params  = ut.xmap(optimize,tasks,n_jobs = len(tasks))
 
 
-breakpoint()
+# def evalscores(tp):
+#     task,param = tp
+#     params = param[0]
+#     params = {k:p if len(str(p)) > 4 else int(p) for k,p in params.items()}
+#     r = []
+#     for test in task[2][1]:
+#         scores = runscore(params,test)
+#         for scorename,value in zip('label shilouette batchmix'.split(), scores):
+#             r.append({f'mix':task[0],f'shape':task[1], f'dataset':test,f'score':value, f'test':scorename, f'algo':f'lucy'})
+#     return r
 
+# #we use this later for the eval
+# def runscore(params, test_id):
+#     data = wrappers.dolucy(ssdata[test_id],**params)
+#     scores = wrappers.scores(data)
+#     return scores
 
+# # r= flatten(r)
+# # print(r)
+# # params,tasks, ssdata =  ut.loadfile( 'opt1.delme2')
+# # r = ut.xmap( evalscores , Zip(tasks, params ))
 
-def evalscores(tp):
-    task,param = tp
-    params = param[0]
-    r = []
-    for test in task[2][1]:
-        score = runscore(params,test)
-        for scorename,value in BLABLA:
-            r.append({f'mix':task[0],f'shape':task[1], f'dataset':test,f'value':value, f'method':scorename})
-    return r
-
-# we use this later for the eval
-def runscore(params, test_id):
-    data = wrappers.dolucy(ssdata[test_id],**params)
-    scores = wrappers.score(data)
-    return scores
-
-r = ut.xmap( evalscores , Zip(tasks, params))
-r= flatten(r)
-print(r)
-
+# def getmnndicts(id):
+#     data = wrappers.domnn(ssdata[id])
+#     scores = wrappers.scores(data)
+#     r = []
+#     for mix in [.4,.6,.8]:
+#         for shape in [2,4,6,8]:
+#             for scorename,value in zip('label shilouette batchmix'.split(), scores):
+#                 r.append({f'mix':mix,f'shape':shape, f'dataset':id,f'score':value, f'test':scorename, f'algo':f'mnn'})
+#     return r
+# r = ut.xmap( getmnndicts , Range(ssdata))
+# print(r)
+# breakpoint()
 
