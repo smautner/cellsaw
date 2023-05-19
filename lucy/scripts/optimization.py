@@ -12,34 +12,14 @@ from hyperopt.pyll import scope
 from ubergauss import hyperopt as uopt
 import wrappers
 import numpy as np
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, KFold
 
-
-
-######################
-#  the stuff here is outdated.. see optimize_dehb for new formatting plan :)
-#
-
-
-
-
-datasets = load.load_scib() + load.load_timeseries(path= '/home/ubuntu/repos/cellsaw/notebooks/')
-debug = False
-if not debug:
-    ssdata = [[adatas.subsample(i,750,31442)  for i in series[:10]]  for series in datasets]
-    evals  = 150
-else:
-    ssdata = [[adatas.subsample(i,500,31443)  for i in series[:3]]  for series in datasets]
-    evals  = 2
-
-why = np.array([0]*4 + [1]*7)
-skf = StratifiedKFold(n_splits=4, random_state=None, shuffle=True)
-train_test = list(skf.split(why,why))
-ssdata = Map(adatas.preprocess, ssdata)
+from ubergauss.hyperopt import spaceship
 
 
 space = {
     'intra_neigh' : scope.int(hp.quniform('intra_neigh',10,25,1)),
+    'use_ladder' : hp.choice(f'use_ladder',[0,1]),
     'inter_neigh' : scope.int(hp.quniform('inter_neigh',1,5,1)),
     'scaling_num_neighbors' : scope.int(hp.quniform('scaling_num_neighbors',1,5,1)),
     'embed_components' : scope.int(hp.quniform('embed_components',4,30,1)),
@@ -53,33 +33,88 @@ space = {
 
 
 
-def eval_single( x = 0,score_weights=[],**kwargs): # connect should be 0..1 , but its nice to catch errors :)
-    data = [s.copy() for s in ssdata[x]]
+space = {
+    'intra_neigh' : scope.int(hp.quniform('intra_neigh',10,25,1)),
+    'use_ladder' : hp.choice(f'use_ladder',[0,1]),
+    'inter_neigh' : scope.int(hp.quniform('inter_neigh',1,5,1)),
+    'scaling_num_neighbors' : scope.int(hp.quniform('scaling_num_neighbors',1,5,1)),
+    'embed_components' : scope.int(hp.quniform('embed_components',4,30,1)),
+    'scaling_threshold' : hp.uniform('scaling_threshold',.05,.95),
+    'outlier_threshold' : hp.uniform('outlier_threshold',.5,.95),
+    'pre_pca' : scope.int(hp.quniform('pre_pca',30,50,1)),
+    'connect' : hp.uniform('connect',.3,1),
+    'connect_ladder' : scope.int(hp.quniform('connect_ladder',1,4,1))
+}
+
+
+
+def eval_single(ss_id = 0,score_weights=[],**kwargs): # connect should be 0..1 , but its nice to catch errors :)
+    ssdata = ut.loadfile(f'garbage/{ss_id}.delme')
+    data = [adatas.subsample_iflarger(s,num=1000,copy = False) for s in ssdata]
     data = wrappers.dolucy(data,**kwargs)
+    scores = wrappers.scores(data)
     scores = wrappers.scores(data)
     return -np.dot(scores, score_weights)
 
 
-def optimize(x):
-    mix, shape, (train,test) = x
+def optimize(task):
+    train = task[1]
+    weights = [task[0][s] for s in f'label silhouette batchmix'.split()]
 
     def eval_set(kwargs):
-        return np.mean(Map(eval_single, train , score_weights = [1,shape,mix],**kwargs))
+        return np.mean(Map(eval_single, train , score_weights = weights,**kwargs))
 
     trials = Trials()
     best = fmin(eval_set,
           algo=tpe.suggest,
                 trials = trials,
                 space = space,
-                max_evals=evals)
+                max_evals=2)
 
     # print the improcement path...
     losses = trials.losses()
     so.lprint(losses)
-    return best,trials
+    return best
 
-tasks = [(mix,shape,tt) for mix in [.4,.6,.8] for shape in [2,4,6,8] for tt in train_test]
-params  = ut.xmap(optimize,tasks,n_jobs = len(tasks))
+
+def experiment_setup(scib = False, ts = False, batches = 3, tspath= '/home/ubuntu/repos/cellsaw/notebooks/'):
+    datasets = load.load_scib() if scib else []
+    datasets += load.load_timeseries(path = tspath) if ts else []
+
+    ssdata = [[adatas.subsample(i,2000,31443)  for i in series[:batches]] for series in datasets]
+    ssdata = Map(adatas.preprocess, ssdata)
+
+    for i,s in enumerate(ssdata):
+        ut.dumpfile(s, f'garbage/{i}.delme')
+    return Range(ssdata)
+
+
+
+if __name__ == '__main__':
+
+    ds_ids = Range(4)#experiment_setup(scib = True, batches = 30)
+    skf = KFold(n_splits=4, random_state=None, shuffle=True)
+    tasks = []
+    for train, test in skf.split(ds_ids):
+        for batchmix in [.7,.8,.9]:
+            for silhouette in [10,9,8,7]:
+                tasks+= [[{f'label': 1, f'batchmix':batchmix, f'silhouette':silhouette}, train, test]]
+
+    # tasks = tasks [:12]
+    results =  ut.xmap(optimize,tasks, n_jobs = len(tasks))
+    ut.dumpfile(results,f'params.delme')
+    print( wrappers.evalscores(tasks, results))
+    breakpoint()
+
+
+
+
+
+
+
+
+
+
 
 
 # def evalscores(tp):

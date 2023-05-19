@@ -1,3 +1,4 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose
 import lucy.score as lscore
 from sklearn.metrics import  silhouette_score
 import scanpy as sc
@@ -26,7 +27,12 @@ from lucy import load, adatas
 
 def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_components=5,outlier_threshold = .75,
           scaling_threshold = .25,  pre_pca = 30, connect = 1231, nalg = 0,use_ladder= 0,connect_ladder = 1): # connect should be 0..1 , but its nice to catch errors :)
+
+    # hyperopt best sucks because it will give me floats ...
+    intra_neigh, inter_neigh, scaling_num_neighbors, embed_components, pre_pca, use_ladder, connect_ladder = Map(int, [intra_neigh, inter_neigh, scaling_num_neighbors, embed_components, pre_pca, use_ladder, connect_ladder ])
     assert connect < 1.1, "parameters were not passed.. :)"
+
+
 
 
     data = adatas.pca(data,dim = pre_pca, label = 'pca')
@@ -93,7 +99,6 @@ def evalscores(tasks,incumbents):
 
 
 def getmnndicts(tasks,incumbents, all_tests): # i could calculate all_tests from  the tasks, but its easier if i just pass it
-
 
     ssdata = [ut.loadfile(f'garbage/{test}.delme') for test in all_tests]
     score = {i:runmnn(ssdata[i]) for i in all_tests }
