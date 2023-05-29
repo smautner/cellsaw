@@ -3,6 +3,7 @@ import lucy.score as lscore
 from sklearn.metrics import  silhouette_score
 import scanpy as sc
 import ubergauss.tools as ut
+import mnnpy
 
 
 def scores(data, projectionlabel = 'lsa'):
@@ -61,12 +62,19 @@ def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_co
 ###############
 
 def domnn(adata):
-    #
-    # breakpoint()
-    mnn = sc.external.pp.mnn_correct(adata, n_jobs = 30)
-    mnnstack = adatas.stack(mnn[0][0])
+
+    # this used to work...
+    #mnn = sc.external.pp.mnn_correct(adata, n_jobs = 30)
+    #mnnstack = adatas.stack(mnn[0][0])
+
+    # needs to be dense...
+    for a in adata:
+        a.X = ut.zehidense(a.X)
+    mnn = mnnpy.mnn_correct(*adata)
+
+
     data = adatas.stack(adata)
-    data.obsm['lsa'] = mnnstack.X
+    data.obsm['lsa'] = mnn[0].X
     return data
 
 # we use this later for the eval
