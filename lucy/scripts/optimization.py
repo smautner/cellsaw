@@ -1,7 +1,6 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose, Flatten
 import numpy as np
 import structout as so
-
 from lucy import load, adatas
 from sklearn.metrics import  silhouette_score
 import ubergauss.tools as ut
@@ -10,26 +9,10 @@ import lucy.score as lscore
 from hyperopt import fmin, tpe, hp, Trials
 from hyperopt.pyll import scope
 from ubergauss import hyperopt as uopt
-import wrappers
+import lucy.scripts.wrappers as wrappers
 import numpy as np
 from sklearn.model_selection import StratifiedKFold, KFold
-
 from ubergauss.hyperopt import spaceship
-
-
-space = {
-    'intra_neigh' : scope.int(hp.quniform('intra_neigh',10,25,1)),
-    'use_ladder' : hp.choice(f'use_ladder',[0,1]),
-    'inter_neigh' : scope.int(hp.quniform('inter_neigh',1,5,1)),
-    'scaling_num_neighbors' : scope.int(hp.quniform('scaling_num_neighbors',1,5,1)),
-    'embed_components' : scope.int(hp.quniform('embed_components',4,30,1)),
-    'scaling_threshold' : hp.uniform('scaling_threshold',.05,.95),
-    'outlier_threshold' : hp.uniform('outlier_threshold',.5,.95),
-    'pre_pca' : scope.int(hp.quniform('pre_pca',30,50,1)),
-    'connect' : hp.uniform('connect',.3,1),
-    'connect_ladder' : scope.int(hp.quniform('connect_ladder',1,4,1))
-}
-
 
 
 
@@ -53,7 +36,6 @@ def eval_single(ss_id = 0,score_weights=[],**kwargs): # connect should be 0..1 ,
     data = [adatas.subsample_iflarger(s,num=1000,copy = False) for s in ssdata]
     data = wrappers.dolucy(data,**kwargs)
     scores = wrappers.scores(data)
-    scores = wrappers.scores(data)
     return -np.dot(scores, score_weights)
 
 
@@ -69,12 +51,12 @@ def optimize(task):
           algo=tpe.suggest,
                 trials = trials,
                 space = space,
-                max_evals=2)
+                max_evals=100)
 
     # print the improcement path...
     losses = trials.losses()
     so.lprint(losses)
-    return best
+    return best, trials
 
 
 def experiment_setup(scib = False, ts = False, batches = 3, tspath= '/home/ubuntu/repos/cellsaw/notebooks/'):
@@ -89,10 +71,12 @@ def experiment_setup(scib = False, ts = False, batches = 3, tspath= '/home/ubunt
     return Range(ssdata)
 
 
-
 if __name__ == '__main__':
 
-    ds_ids = Range(4)#experiment_setup(scib = True, batches = 30)
+    ds_ids = Range(4)
+    #ds_ids = experiment_setup(scib = True, batches = 3)
+    ds_ids = experiment_setup(scib = True, batches = 10)
+
     skf = KFold(n_splits=4, random_state=None, shuffle=True)
     tasks = []
     for train, test in skf.split(ds_ids):
@@ -100,55 +84,31 @@ if __name__ == '__main__':
             for silhouette in [10,9,8,7]:
                 tasks+= [[{f'label': 1, f'batchmix':batchmix, f'silhouette':silhouette}, train, test]]
 
-    # tasks = tasks [:12]
     results =  ut.xmap(optimize,tasks, n_jobs = len(tasks))
-    ut.dumpfile(results,f'params.delme')
-    print( wrappers.evalscores(tasks, results))
-    breakpoint()
+    ut.dumpfile(tasks,f'lasttasks.delme')
+    ut.dumpfile(results,f'params2.delme')
 
 
 
 
+def loadresults(path= f''):
+    results = ut.loadfile(f'{path}params2.delme')
+    results,trials = Transpose(results)
+    tasks = ut.loadfile(f'{path}lasttasks.delme')
+    return results, tasks
+
+
+
+def evaluate(path= f''):
+    results, tasks  = loadresults(path)
+    #  print what we need to make the pandas table
+    pandasdict = wrappers.evalscores(tasks, results, datapath = path) +  wrappers.getmnndicts(tasks, 0, Range(4), datapath = path)
+    print(pandasdict)
 
 
 
 
+def merge_tasks_params():
+    results, tasks = loadresults()
 
-
-
-
-# def evalscores(tp):
-#     task,param = tp
-#     params = param[0]
-#     params = {k:p if len(str(p)) > 4 else int(p) for k,p in params.items()}
-#     r = []
-#     for test in task[2][1]:
-#         scores = runscore(params,test)
-#         for scorename,value in zip('label shilouette batchmix'.split(), scores):
-#             r.append({f'mix':task[0],f'shape':task[1], f'dataset':test,f'score':value, f'test':scorename, f'algo':f'lucy'})
-#     return r
-
-# #we use this later for the eval
-# def runscore(params, test_id):
-#     data = wrappers.dolucy(ssdata[test_id],**params)
-#     scores = wrappers.scores(data)
-#     return scores
-
-# # r= flatten(r)
-# # print(r)
-# # params,tasks, ssdata =  ut.loadfile( 'opt1.delme2')
-# # r = ut.xmap( evalscores , Zip(tasks, params ))
-
-# def getmnndicts(id):
-#     data = wrappers.domnn(ssdata[id])
-#     scores = wrappers.scores(data)
-#     r = []
-#     for mix in [.4,.6,.8]:
-#         for shape in [2,4,6,8]:
-#             for scorename,value in zip('label shilouette batchmix'.split(), scores):
-#                 r.append({f'mix':mix,f'shape':shape, f'dataset':id,f'score':value, f'test':scorename, f'algo':f'mnn'})
-#     return r
-# r = ut.xmap( getmnndicts , Range(ssdata))
-# print(r)
-# breakpoint()
 

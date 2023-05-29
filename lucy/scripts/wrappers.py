@@ -1,4 +1,4 @@
-from lmz import Map,Zip,Filter,Grouper,Range,Transpose
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose, Flatten
 import lucy.score as lscore
 from sklearn.metrics import  silhouette_score
 import scanpy as sc
@@ -62,9 +62,9 @@ def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_co
 
 def domnn(adata):
     #
+    # breakpoint()
     mnn = sc.external.pp.mnn_correct(adata, n_jobs = 30)
     mnnstack = adatas.stack(mnn[0][0])
-
     data = adatas.stack(adata)
     data.obsm['lsa'] = mnnstack.X
     return data
@@ -81,37 +81,64 @@ def runscore(params, dataset):
 
 # just format a task like this: [{deescription dict for the optimizer}, train-instances, test-instances]
 
-
-def evalscores(tasks,incumbents):
-
-    r = []
-    for task, params in zip(tasks,incumbents):
-        for test in task[2]:
-            ssdata = ut.loadfile(f'garbage/{test}.delme')
-            #data = [s.copy() for s in ssdata[test]]
-            score = runscore(params,ssdata)
-            for scorename, value in zip('label shilouette batchmix'.split(), score):
-                nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'lucy'}
-                nuvalues.update(task[0])
-                r.append(nuvalues)
+def _eval(x):
+    task, params, test , datapath= x
+    r=[]
+    ssdata = ut.loadfile(f'{datapath}garbage/{test}.delme')
+    #data = [s.copy() for s in ssdata[test]]
+    score = runscore(params,ssdata)
+    for scorename, value in zip('label shilouette batchmix'.split(), score):
+        nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'lucy'}
+        nuvalues.update(task[0])
+        r.append(nuvalues)
     return r
 
+def evalscores(tasks,incumbents, datapath = f''):
+
+    # r = []
+    # for task, params in zip(tasks,incumbents):
+    #     for test in task[2]:
+    #         r+= _evalhelper(task,params,test):
+
+    r = ut.xmap(_eval, [ (t,p,id, datapath) for (t,p) in zip(tasks, incumbents) for id in t[2]])
+    return Flatten(r)
 
 
-def getmnndicts(tasks,incumbents, all_tests): # i could calculate all_tests from  the tasks, but its easier if i just pass it
 
-    ssdata = [ut.loadfile(f'garbage/{test}.delme') for test in all_tests]
-    score = {i:runmnn(ssdata[i]) for i in all_tests }
+def loadmnn(test, datapath = f''):
+    ssdata = ut.loadfile(f'{datapath}garbage/{test}.delme')
+    return  (test, scores(domnn(ssdata)))
+
+def getmnndicts(tasks,incumbents, all_tests, datapath = f''): # i could calculate all_tests from  the tasks, but its easier if i just pass it
+    rmnn = lambda x: loadmnn(x,datapath)
+    scores=ut.xmap(loadmnn, all_tests)
+    scores = dict(scores)
+
     print(f"scoring with mnn might destroy ss... i should run this last or copy.")
 
     r = []
     for task in tasks:
         for test in task[2]:
-            score = scoress[test]
+            score = scores[test]
             for scorename, value in zip('label shilouette batchmix'.split(), score):
                 nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'mnn'}
                 nuvalues.update(task[0])
                 r.append(nuvalues)
     return r
 
+
+def plot_grouped(data):
+    '''
+    mostly put this here as example... probably better to run in jupyter
+    '''
+    import seaborn as sns
+    import pandas as pd
+    from matplotlib import pyplot as plt
+
+    data2 = pd.DataFrame(data+mnndata)
+    data2["rank"] = data2.groupby(["test", 'silhouette', 'batchmix'])["score"].rank(method="dense", ascending=True)
+    g = sns.FacetGrid(data2, col="silhouette", row="batchmix" )
+    g.map_dataframe(sns.barplot, x="test", y = 'rank', hue = 'algo', palette = 'husl')
+    plt.legend()
+    plt.show()
 
