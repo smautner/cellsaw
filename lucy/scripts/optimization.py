@@ -1,5 +1,4 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose, Flatten
-import numpy as np
 import structout as so
 from lucy import load, adatas
 from sklearn.metrics import  silhouette_score
@@ -99,10 +98,10 @@ def loadresults(path= f''):
 
 
 
-def evaluate(path= f''):
+def evaluate(path= f'',numds = 4):
     results, tasks  = loadresults(path)
     #  print what we need to make the pandas table
-    pandasdict = wrappers.evalscores(tasks, results, datapath = path) +  wrappers.getmnndicts(tasks, 0, Range(4), datapath = path)
+    pandasdict =  wrappers.getmnndicts(tasks, 0, Range(numds), datapath = path) + wrappers.evalscores(tasks, results, datapath = path)
     print(pandasdict)
 
 
