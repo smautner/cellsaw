@@ -20,7 +20,7 @@ space = {
     'use_ladder' : hp.choice(f'use_ladder',[0,1]),
     'inter_neigh' : scope.int(hp.quniform('inter_neigh',1,5,1)),
     'scaling_num_neighbors' : scope.int(hp.quniform('scaling_num_neighbors',1,5,1)),
-    'embed_components' : scope.int(hp.quniform('embed_components',4,30,1)),
+    'embed_components' : 8,#scope.int(hp.quniform('embed_components',4,30,1)),
     'scaling_threshold' : hp.uniform('scaling_threshold',.05,.95),
     'outlier_threshold' : hp.uniform('outlier_threshold',.5,.95),
     'pre_pca' : scope.int(hp.quniform('pre_pca',30,50,1)),
@@ -55,6 +55,7 @@ def optimize(task):
     # print the improcement path...
     losses = trials.losses()
     so.lprint(losses)
+    ut.dumpfile(best, f'garbage/BEST_{i}.delme')
     return best, trials
 
 
@@ -62,7 +63,7 @@ def experiment_setup(scib = False, ts = False, batches = 3, tspath= '/home/ubunt
     datasets = load.load_scib() if scib else []
     datasets += load.load_timeseries(path = tspath) if ts else []
 
-    ssdata = [[adatas.subsample(i,2000,31443)  for i in series[:batches]] for series in datasets]
+    ssdata = [[adatas.subsample(i,1000,31443)  for i in series[:batches]] for series in datasets]
     ssdata = Map(adatas.preprocess, ssdata)
 
     for i,s in enumerate(ssdata):
@@ -79,8 +80,8 @@ if __name__ == '__main__':
     skf = KFold(n_splits=4, random_state=None, shuffle=True)
     tasks = []
     for train, test in skf.split(ds_ids):
-        for batchmix in [.7,.8,.9]:
-            for silhouette in [10,9,8,7]:
+        for batchmix in [.5,.6,.7]:
+            for silhouette in [10,15,20]:
                 tasks+= [[{f'label': 1, f'batchmix':batchmix, f'silhouette':silhouette}, train, test]]
 
     results =  ut.xmap(optimize,tasks, n_jobs = len(tasks))
@@ -96,8 +97,6 @@ def loadresults(path= f''):
     tasks = ut.loadfile(f'{path}lasttasks.delme')
     return results, tasks
 
-
-
 def evaluate(path= f'',numds = 4):
     results, tasks  = loadresults(path)
     #  print what we need to make the pandas table
@@ -105,9 +104,5 @@ def evaluate(path= f'',numds = 4):
     print(pandasdict)
 
 
-
-
-def merge_tasks_params():
-    results, tasks = loadresults()
 
 
