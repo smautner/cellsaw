@@ -70,7 +70,8 @@ def domnn(adata):
     # needs to be dense...
     for a in adata:
         a.X = ut.zehidense(a.X)
-    mnn = mnnpy.mnn_correct(*adata)
+    mnnpy.settings.normalization = "single"
+    mnn = mnnpy.mnn_correct(*adata, n_jobs = 1)
 
 
     data = adatas.stack(adata)
