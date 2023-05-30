@@ -3,7 +3,7 @@ import lucy.score as lscore
 from sklearn.metrics import  silhouette_score
 import scanpy as sc
 import ubergauss.tools as ut
-#import mnnpy
+import mnnpy
 
 
 def scores(data, projectionlabel = 'lsa'):
