@@ -3,7 +3,6 @@ import lucy.score as lscore
 from sklearn.metrics import  silhouette_score
 import scanpy as sc
 import ubergauss.tools as ut
-import mnnpy
 
 
 def scores(data, projectionlabel = 'lsa'):
@@ -68,6 +67,7 @@ def domnn(adata):
     #mnnstack = adatas.stack(mnn[0][0])
 
     # needs to be dense...
+    import mnnpy
     for a in adata:
         a.X = ut.zehidense(a.X)
     mnnpy.settings.normalization = "single"

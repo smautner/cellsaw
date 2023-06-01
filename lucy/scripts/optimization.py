@@ -55,12 +55,11 @@ def optimize(task):
     # print the improcement path...
     losses = trials.losses()
     so.lprint(losses)
-    ut.dumpfile(best, f'garbage/BEST_{i}.delme')
     return best, trials
 
 
-def experiment_setup(scib = False, ts = False, batches = 3, tspath= '/home/ubuntu/repos/cellsaw/notebooks/'):
-    datasets = load.load_scib() if scib else []
+def experiment_setup(scib = False, ts = False, batches = 3,ibpath=f'/home/stefan/benchdata/', tspath= '/home/ubuntu/repos/cellsaw/notebooks/'):
+    datasets = load.load_scib(path = ibpath) if scib else []
     datasets += load.load_timeseries(path = tspath) if ts else []
 
     ssdata = [[adatas.subsample(i,1000,31443)  for i in series[:batches]] for series in datasets]
@@ -70,12 +69,17 @@ def experiment_setup(scib = False, ts = False, batches = 3, tspath= '/home/ubunt
         ut.dumpfile(s, f'garbage/{i}.delme')
     return Range(ssdata)
 
+opts = '''
+--scib bool False
+--ts bool False
+'''
 
 if __name__ == '__main__':
-
-    ds_ids = Range(4)
+    import  dirtyopts
+    #ds_ids = Range(4)
     #ds_ids = experiment_setup(scib = True, batches = 3)
-    ds_ids = experiment_setup(scib = True, batches = 10)
+    kwargs = dirtyopts.parse(opts).__dict__
+    ds_ids = experiment_setup(**kwargs, batches = 10)
 
     skf = KFold(n_splits=4, random_state=None, shuffle=True)
     tasks = []
