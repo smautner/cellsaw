@@ -16,6 +16,26 @@ def scores(data, projectionlabel = 'lsa'):
     return score, silou, batchmix
 
 
+def scores_paired(data, projectionlabel = 'lsa'):
+
+    '''
+    assume we have a timeseries dataset, we now report the mean of scores with a windowsize of 2
+    '''
+
+
+    y = data.obs['label'].tolist()
+    ybatch = data.obs['batch'].tolist()
+    projection = data.obsm[projectionlabel]
+
+    batches = np.unique(ybatch)
+    selectors = [ ybatch == batches[i] | y == batches[i+1]  for i in range(len(batches) -1)  ] # selects (adjacent) pairs of batches
+
+    score = np.mean([lscore.neighbor_labelagreement(projection[s],y[s],5) for s in selectors])
+    silou = np.mean([silhouette_score(projection[s],y[s]) for s in selectors])
+    batchmix = np.mean([-lscore.neighbor_labelagreement(projection[s],ybatch[s],5) for s in selectors ])
+
+    return score, silou, batchmix
+
 
 
 ###########
@@ -78,11 +98,6 @@ def domnn(adata):
     data.obsm['lsa'] = mnn[0].X
     return data
 
-# we use this later for the eval
-def runscore(params, dataset):
-    data = dolucy(dataset,**params)
-    score = scores(data)
-    return score
 
 
 
@@ -95,12 +110,22 @@ def _eval(x):
     r=[]
     ssdata = ut.loadfile(f'{datapath}garbage/{test}.delme')
     #data = [s.copy() for s in ssdata[test]]
-    score = runscore(params,ssdata)
-    for scorename, value in zip('label shilouette batchmix'.split(), score):
+
+
+    data = dolucy(ssdata,**params)
+    score = scores(data)
+    score_paired = scores_paired(data)
+
+    for scorename, value, sc in zip('label shilouette batchmix'.split(), score):
         nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'lucy'}
+        nuvalues.update({f"pair score":sc})
         nuvalues.update(task[0])
         r.append(nuvalues)
+
+
     return r
+
+
 
 def evalscores(tasks,incumbents, datapath = f''):
 
@@ -116,21 +141,26 @@ def evalscores(tasks,incumbents, datapath = f''):
 
 def loadmnn(test, datapath = f''):
     ssdata = ut.loadfile(f'{datapath}garbage/{test}.delme')
-    return  (test, scores(domnn(ssdata)))
+    mnn = domnn(ssdata)
+    return  test, scores(mnn), scores_paired(mnn)
 
 def getmnndicts(tasks,incumbents, all_tests, datapath = f''): # i could calculate all_tests from  the tasks, but its easier if i just pass it
     rmnn = lambda x: loadmnn(x,datapath)
-    scores=ut.xmap(loadmnn, all_tests)
+
+    scores = ut.xmap(loadmnn, all_tests)
+
     scores = dict(scores)
 
-    print(f"scoring with mnn might destroy ss... i should run this last or copy.")
 
+
+    print(f"scoring with mnn might destroy ss... i should run this last or copy.")
     r = []
     for task in tasks:
         for test in task[2]:
-            score = scores[test]
-            for scorename, value in zip('label shilouette batchmix'.split(), score):
-                nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'mnn'}
+            score, pairscore = scores[test]
+
+            for scorename, value, sc2 in zip('label shilouette batchmix'.split(), score, pairscore):
+                nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'mnn', f'pair score': sc2}
                 nuvalues.update(task[0])
                 r.append(nuvalues)
     return r
