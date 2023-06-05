@@ -120,7 +120,7 @@ def loadmnn(test, datapath = f''):
 
 def getmnndicts(tasks,incumbents, all_tests, datapath = f''): # i could calculate all_tests from  the tasks, but its easier if i just pass it
     rmnn = lambda x: loadmnn(x,datapath)
-    scores=ut.xmap(loadmnn, all_tests)
+    scores=ut.xmap(rmnn, all_tests)
     scores = dict(scores)
 
     print(f"scoring with mnn might destroy ss... i should run this last or copy.")
@@ -136,18 +136,16 @@ def getmnndicts(tasks,incumbents, all_tests, datapath = f''): # i could calculat
     return r
 
 
-def plot_grouped(data):
-    '''
-    mostly put this here as example... probably better to run in jupyter
-    '''
-    import seaborn as sns
-    import pandas as pd
-    from matplotlib import pyplot as plt
+def loadresults(path= f''):
+    results = ut.loadfile(f'{path}params2.delme')
+    results,trials = Transpose(results)
+    tasks = ut.loadfile(f'{path}lasttasks.delme')
+    return results, tasks
 
-    data2 = pd.DataFrame(data+mnndata)
-    data2["rank"] = data2.groupby(["test", 'silhouette', 'batchmix'])["score"].rank(method="dense", ascending=True)
-    g = sns.FacetGrid(data2, col="silhouette", row="batchmix" )
-    g.map_dataframe(sns.barplot, x="test", y = 'rank', hue = 'algo', palette = 'husl')
-    plt.legend()
-    plt.show()
+def evaluate(path= f'',numds = 4, mnn = True, lucy = True):
+    results, tasks  = loadresults(path)
+    #  print what we need to make the pandas table
+    pandasdict =  getmnndicts(tasks, 0, Range(numds), datapath = path)  if mnn else []
+    pandasdict += evalscores(tasks, results, datapath = path) if lucy else[]
+    return  pandasdict
 

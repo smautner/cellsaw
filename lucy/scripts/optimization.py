@@ -58,8 +58,9 @@ def optimize(task):
     return best, trials
 
 
-def experiment_setup(scib = False, ts = False, batches = 3,ibpath=f'/home/stefan/benchdata/', tspath= '/home/ubuntu/repos/cellsaw/notebooks/'):
-    datasets = load.load_scib(path = ibpath) if scib else []
+def experiment_setup(scib = False, ts = False, batches = 3,
+                     ibpath=f'/home/stefan/benchdata/', tspath= '/home/ubuntu/repos/cellsaw/notebooks/'):
+    datasets = load.load_scib() if scib else []
     datasets += load.load_timeseries(path = tspath) if ts else []
 
     ssdata = [[adatas.subsample(i,1000,31443)  for i in series[:batches]] for series in datasets]
@@ -93,19 +94,6 @@ if __name__ == '__main__':
     ut.dumpfile(results,f'params2.delme')
 
 
-
-
-def loadresults(path= f''):
-    results = ut.loadfile(f'{path}params2.delme')
-    results,trials = Transpose(results)
-    tasks = ut.loadfile(f'{path}lasttasks.delme')
-    return results, tasks
-
-def evaluate(path= f'',numds = 4):
-    results, tasks  = loadresults(path)
-    #  print what we need to make the pandas table
-    pandasdict =  wrappers.getmnndicts(tasks, 0, Range(numds), datapath = path) + wrappers.evalscores(tasks, results, datapath = path)
-    print(pandasdict)
 
 
 
