@@ -3,6 +3,7 @@ import lucy.score as lscore
 from sklearn.metrics import  silhouette_score
 import scanpy as sc
 import ubergauss.tools as ut
+import numpy as np
 
 
 def scores(data, projectionlabel = 'lsa'):
@@ -23,12 +24,13 @@ def scores_paired(data, projectionlabel = 'lsa'):
     '''
 
 
-    y = data.obs['label'].tolist()
-    ybatch = data.obs['batch'].tolist()
+    y = np.array(data.obs['label'].tolist())
+    ybatch = np.array(data.obs['batch'].tolist())
     projection = data.obsm[projectionlabel]
 
     batches = np.unique(ybatch)
-    selectors = [ ybatch == batches[i] | y == batches[i+1]  for i in range(len(batches) -1)  ] # selects (adjacent) pairs of batches
+    # breakpoint()
+    selectors = [ np.logical_or(ybatch == batches[i] , y == batches[i+1] ) for i in range(len(batches) -1)  ] # selects (adjacent) pairs of batches
 
     score = np.mean([lscore.neighbor_labelagreement(projection[s],y[s],5) for s in selectors])
     silou = np.mean([silhouette_score(projection[s],y[s]) for s in selectors])
@@ -116,7 +118,7 @@ def _eval(x):
     score = scores(data)
     score_paired = scores_paired(data)
 
-    for scorename, value, sc in zip('label shilouette batchmix'.split(), score):
+    for scorename, value, sc in zip('label shilouette batchmix'.split(), score, score_paired):
         nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'lucy'}
         nuvalues.update({f"pair score":sc})
         nuvalues.update(task[0])
@@ -146,16 +148,16 @@ def loadmnn(test, datapath = f''):
 
 def getmnndicts(tasks,incumbents, all_tests, datapath = f''): # i could calculate all_tests from  the tasks, but its easier if i just pass it
     rmnn = lambda x: loadmnn(x,datapath)
-    scores=ut.xmap(rmnn, all_tests)
-    scores = dict(scores)
+    ds_score_pairscore = ut.xmap(rmnn, all_tests)
 
+    ds_score_pairscore  = {s[0]:s for s in ds_score_pairscore}
 
 
     print(f"scoring with mnn might destroy ss... i should run this last or copy.")
     r = []
     for task in tasks:
         for test in task[2]:
-            score, pairscore = scores[test]
+            _, score, pairscore = ds_score_pairscore[test]
 
             for scorename, value, sc2 in zip('label shilouette batchmix'.split(), score, pairscore):
                 nuvalues = {'dataset':test,f'score':value, f'test':scorename, f'algo':f'mnn', f'pair score': sc2}
