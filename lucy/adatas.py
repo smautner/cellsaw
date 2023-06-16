@@ -71,6 +71,11 @@ def split_by_adatas(adatas, stack):
     batch_ids = np.hstack([ a.obs['batch'] for a in adatas])
     return [ stack [batch_ids == batch] for batch in np.unique(batch_ids)]
 
+
+def split_by_obs(adatas, obs=f'batch'):
+    batch_ids = adatas.obs[obs]
+    return [ adatas [batch_ids == batch] for batch in np.unique(batch_ids)]
+
 def attach_stack(adatas, stack, label):
     '''
     if we generate data for all cells on the stacked-adatas,

@@ -95,14 +95,14 @@ def plot_pair2(data,fname = f''):
     print(data2)
     sns.barplot(data = data2, x = 'test', y = 'rank', hue = 'algo')
     plt.legend()
-    if fname:
+    if jname:
         plt.savefig(fname)
     plt.show()
 
 def collect_pairthing():
     # d,e  = Map(ut.loadfile,f'scbi_del ts_del'.split())
     e=  ut.loadfile( f'pairsc_del')
-    # a = wrappers.evaluate(path = f'/home/ubuntu/data/yoda/8outscib/', numds =4, mnn=False)
+    # a wrappers.evaluate(path = f'/home/ubuntu/data/yoda/8outscib/', numds =4, mnn=False)
     # b = wrappers.evaluate(path = f'/home/ubuntu/data/yoda/scib_odata/', numds =4, mnn=False)
     # ut.dumpfile((a,b), f'var_del')
     plot_pair2(e, f'pair_union.png')

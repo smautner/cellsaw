@@ -54,9 +54,6 @@ def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_co
     intra_neigh, inter_neigh, scaling_num_neighbors, embed_components, pre_pca, use_ladder, connect_ladder = Map(int, [intra_neigh, inter_neigh, scaling_num_neighbors, embed_components, pre_pca, use_ladder, connect_ladder ])
     assert connect < 1.1, "parameters were not passed.. :)"
 
-
-
-
     data = adatas.pca(data,dim = pre_pca, label = 'pca')
     # if data[0].uns['timeseries']:
     if use_ladder:
