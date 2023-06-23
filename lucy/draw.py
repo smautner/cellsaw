@@ -110,6 +110,7 @@ def plot_X(Xlist, labels, plotsperline=3,
 
     for x, y, title in zip(Xlist, labels, titles):
         y = themap.encode(y)
+        # d.draw(x, y, labeldict=themap.getitem, legend = True)
         d.draw(x, y, title=title, labeldict=themap.getitem, legend = True)
 
 

@@ -6,11 +6,14 @@ import ubergauss.tools as ut
 
 
 import matplotlib
-matplotlib.use('module://matplotlib-sixel')
+# matplotlib.use('module://matplotlib-sixel')
+import matplotlib.pyplot as plt
+
 
 # get optimized values
 def loadparams():
     results, tasks  = wrappers.loadresults('/home/ubuntu/data/yoda/8outts/')
+    print(f"{ results=}")
     params = results[0]
     return params
 
@@ -26,10 +29,15 @@ def project2d(params, adata):
     data = wrappers.dolucy(adata, **params)
     return data
 
+
 def plot(data):
     datas = adatas.split_by_obs(data)
-    adatas.plot(datas, projection = f'lsa')
+    #  plt.figure(figsize=(10,10), dpi = 300)
+    adatas.plot(datas, projection = f'lsa', size = 3)
 
+# p = loadparams()
+# ssd = loaddata()
+# data = project2d(p,ssd[0])
 
 
 
