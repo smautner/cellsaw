@@ -13,9 +13,10 @@ import matplotlib.pyplot as plt
 # get optimized values
 def loadparams():
     results, tasks  = wrappers.loadresults('/home/ubuntu/data/yoda/8outts/')
-    print(f"{ results=}")
-    params = results[0]
-    return params
+    for r,taskitem in zip(results, tasks):
+        for label, thing in zip('optigoal train test'.split(), taskitem):
+            r[label] = thing
+    return results
 
 def loaddata():
     datasets = load.load_timeseries(path = ut.fixpath(f"~/repos/cellsaw/notebooks/"))

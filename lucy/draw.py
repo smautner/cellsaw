@@ -223,3 +223,64 @@ def plot_confusion_matrix_twice(labels):
     ax = plt.subplot(122, title='relative hits (2x hits / sumOfLabels)')
     confusion_matrix(y1, y2, norm=True, draw=True)
     plt.tight_layout()
+
+
+
+
+from collections import Counter
+from ubergauss.tools import spacemap
+import matplotlib as mpl
+
+def mkcolors(label):
+    colorsm = spacemap(np.unique(label))
+    cmap = plt.cm.get_cmap('turbo', len(colorsm.integerlist))
+    myrgb = Map(cmap, colorsm.encode(label))
+    return Map(mpl.colors.rgb2hex, myrgb)
+
+def filtercounter(c,thresh = .1):
+    #
+    return c
+
+def adatas_to_sankey(adatas):
+    source,target ,value = [],[],[]
+
+    #for i in range(0,len(adatas)-1):
+    #print(adatas[0].obs['label'])
+
+    for i in range(len(adatas)-1):
+        a1 = adatas[i]
+        a2 = adatas[i+1]
+        c = Counter(zip(a1.obs['label'],a2.obs['label']))
+        c = filtercounter(c, thresh = .1)
+        # c = {k:v for k,v in c.items() if v > len(adatas[i])* .5}
+        s,t = Transpose(list(c.keys()))
+        source+=[ss+str(i) for ss in s]
+        target+=[tt+str(i+1) for tt in t]
+        # thresh  =  len(adatas[i])* .1
+        # vialue +=  [ cc if cc > thresh else 0 for cc in c.values() ]
+        value = list(c.values())
+
+    sm = spacemap(np.unique(source+target))
+    #label = sm.decode(np.sort(sm.integerlist))
+    # label = sm.itemlist
+    label = [s[:-1] for s in sm.itemlist ]
+
+    return {'label':label, 'color':mkcolors(label)}, {'source':sm.encode(source), 'target':sm.encode(target), 'value':value}
+
+def adatas_to_sankey_fig(adatas, doalign = False):
+    import plotly.graph_objects as go
+    if doalign:
+        import lucy.adatas as ada
+        ada.align(da[0], base = None)
+
+    node,link = adatas_to_sankey(adatas)
+    fig = go.Figure(data=[go.Sankey(
+        node = node,
+        link = link )])
+
+    fig.update_layout( hovermode = 'x', title="title",
+    font=dict(size = 10, color = 'white'),
+    plot_bgcolor='black',
+    paper_bgcolor='black')
+
+    return fig

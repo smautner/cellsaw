@@ -174,7 +174,7 @@ def subsample_preprocess(adatas,num = 1000 ,copy = False, **preprocessargs):
 
 def align(adatas, base = 'pca40' ):
     for i in range(len(adatas)-1):
-        hung, _ = hung_adatas(adatas[i], adatas[i+1], base= base)
+        hung, _ = hungarian(adatas[i], adatas[i+1], base= base)
         adatas[i+1]= adatas[i+1][hung[1]]
 
 def to_array(ad,base):
