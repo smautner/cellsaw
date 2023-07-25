@@ -33,7 +33,7 @@ space = {
 def eval_single(ss_id = 0,score_weights=[],**kwargs): # connect should be 0..1 , but its nice to catch errors :)
     ssdata = ut.loadfile(f'garbage/{ss_id}.delme')
     data = [adatas.subsample_iflarger(s,num=1000,copy = False) for s in ssdata]
-    data = wrappers.dolucy(data,**kwargs)
+    data = wrappers.embed(data,**kwargs)
     scores = wrappers.scores(data)
     return -np.dot(scores, score_weights)
 

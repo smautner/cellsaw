@@ -48,8 +48,13 @@ from lucy import load, adatas
 
 
 def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_components=5,outlier_threshold = .75,
-          scaling_threshold = .25,  pre_pca = 30, connect = 1231, nalg = 0,use_ladder= 0,connect_ladder = 1): # connect should be 0..1 , but its nice to catch errors :)
-
+          scaling_threshold = .25,  pre_pca = 30, connect = 1231, nalg = 0,use_ladder= 0,connect_ladder = 1,
+           **kwargs): # connect should be 0..1 , but its nice to catch errors :)
+    '''
+    this does our embedding,
+    written such that the optimizer can do its thing
+    <=> do mnn
+    '''
     # hyperopt best sucks because it will give me floats ...
     intra_neigh, inter_neigh, scaling_num_neighbors, embed_components, pre_pca, use_ladder, connect_ladder = Map(int, [intra_neigh, inter_neigh, scaling_num_neighbors, embed_components, pre_pca, use_ladder, connect_ladder ])
     assert connect < 1.1, "parameters were not passed.. :)"
@@ -61,16 +66,17 @@ def dolucy( data ,intra_neigh=10,inter_neigh=5, scaling_num_neighbors=1,embed_co
     else:
         dataset_adjacency = adatas.embed.make_sequence(adatas.similarity(data),  connect_ladder)
 
-    lsa_graph = adatas.lapgraph(data,base = 'pca',
+    lsa_graph = adatas.to_linear_assignment_graph(data,base = 'pca',
                                               intra_neigh = intra_neigh,
                                               inter_neigh = inter_neigh,
                                               scaling_num_neighbors = scaling_num_neighbors,
                                               outlier_threshold = outlier_threshold,
                                               scaling_threshold = scaling_threshold,
                                               dataset_adjacency =  dataset_adjacency)
+
     data = adatas.graph_embed(data,lsa_graph,n_components = embed_components, label = 'lsa')
     data = adatas.stack(data)
-    return data
+    return data, lsa_graph
 
 
 
@@ -135,7 +141,6 @@ def evalscores(tasks,incumbents, datapath = f''):
 
     r = ut.xmap(_eval, [ (t,p,id, datapath) for (t,p) in zip(tasks, incumbents) for id in t[2]])
     return Flatten(r)
-
 
 
 def loadmnn(test, datapath = f''):

@@ -67,14 +67,22 @@ def stack_single_attribute(adatas, attr = ""):
         data = [a.obsm[attr] for a in adatas]
     return ut.vstack(data)
 
+
+def unique_nosort(items):
+    uitems, index = np.unique(items, return_index=True)
+    # index shows us the first appearance of an item,
+    # thus sort so that we get the first appearing first
+    return [items[i] for i in sorted(index)]
+
 def split_by_adatas(adatas, stack):
+    # TODO
     batch_ids = np.hstack([ a.obs['batch'] for a in adatas])
-    return [ stack [batch_ids == batch] for batch in np.unique(batch_ids)]
+    return [ stack [batch_ids == batch] for batch in unique_nosort(batch_ids)]
 
 
 def split_by_obs(adatas, obs=f'batch'):
     batch_ids = adatas.obs[obs]
-    return [ adatas [batch_ids == batch] for batch in np.unique(batch_ids)]
+    return [ adatas [batch_ids == batch] for batch in unique_nosort(batch_ids)]
 
 def attach_stack(adatas, stack, label):
     '''
@@ -176,6 +184,7 @@ def align(adatas, base = 'pca40' ):
     for i in range(len(adatas)-1):
         hung, _ = hungarian(adatas[i], adatas[i+1], base= base)
         adatas[i+1]= adatas[i+1][hung[1]]
+    return adatas
 
 def to_array(ad,base):
     return ad.X if not base else ad.obsm[base]
@@ -232,7 +241,7 @@ def cell_ranger_single(adata,
 
 from lucy import embed
 
-def lapgraph(adatas,base = 'pca40', intra_neigh = 15, inter_neigh = 1,
+def to_linear_assignment_graph(adatas,base = 'pca40', intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, outlier_threshold = .8,
               scaling_threshold = .9, dataset_adjacency = None):
 
@@ -255,6 +264,14 @@ def graph_embed(adatas, lapgraph, n_components= 2, label = 'lap'):
     return adatas
 
 
+def graph_embed2(distance_adjacency_matrix,adatas = None, label=f'lsa' ,n_components = 2, **kwargs):
+    res =  uumap.UMAP(n_components=n_components,
+                     metric='precomputed',
+                     **kwargs).fit_transform(distance_adjacency_matrix)
+    if adatas:
+        adatas.obsm[label] = res
+        return adatas
+    return res
 
 
 def pca(adatas, dim=40, label = 'pca40'):

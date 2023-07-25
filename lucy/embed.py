@@ -11,6 +11,7 @@ from ubergauss import tools
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.utils import check_symmetric
+from lucy import adatas
 
 
 ####################
@@ -45,7 +46,7 @@ def linear_sum_assignment_matrices(x1, x2, repeats,
 ###########
 def avg1nndistance(listofdistancemat):
     def calculate1nn_distance(q):
-        return np.mean([ np.min(q[q!=0])  for row in q])
+        return np.mean([ np.min(row[row!=0])  for row in q])
     list1nn_means = Map(calculate1nn_distance,listofdistancemat)
     return np.mean(list1nn_means)
 
@@ -66,6 +67,7 @@ def neighborgraph(x, neighbors):
 
 
 from matplotlib import pyplot as plt
+"""
 def linear_assignment_kernel(x1,x2, neighbors = 3,
                              neighbors_inter= 1, sigmafac = 1, linear_assignment_factor = 1, return_dm = False):
 
@@ -163,8 +165,43 @@ def linear_assignment_kernel_XXX(x1,x2, neighbors = 3,
     # sns.heatmap(similarity_matrix); plt.show()
 
     return  similarity_matrix
+"""
+
+from sklearn.semi_supervised import LabelSpreading,LabelPropagation
+def diffuse_label(adatas_stacked, lap_graph, targetslices,
+                  sigmafac = 1 ,label = f'label', new_label = f'diffuselabel'):
+    '''
+    adatas_stacked and lapgraph are the output in wrappers.dolucy
+
+    i want to use the transduct_ thing in sklearn labelpro after fit.
+    so i build a kernel that just returns my precomputed lap_graph and give it to fit.
+    '''
+
+    # first we build the kernel-similarity-matrix
+    distance_matrix = lap_graph[0]
+    distance_matrix = dijkstra(distance_matrix, directed = False)
+    sigma = np.mean([ np.min(row[row!=0])  for row in distance_matrix])*sigmafac
+    similarity_matrix = np.exp(-distance_matrix/sigma)
+
+    # we want to diffuse the labels, so we ..
+    # 1. turn them into integers as required by sklearn
+    newy = list(adatas_stacked.obs[label])
+    newy, sm  = tools.labelsToIntList(newy)
+    newy = np.array(newy)
+    # 2. we mask the batches we want to calculate labels for..
+    batchnames = adatas.unique_nosort(adatas_stacked.obs[f'batch'])
+    for r in [batchnames[i] for i in targetslices]:
+        newy[(adatas_stacked.obs[f'batch'] == r).to_numpy()] = -1
 
 
+    # now we have everything to run tue model..
+    model = LabelSpreading()
+    model.set_params(kernel = lambda x,y: similarity_matrix)
+    model.fit(adatas_stacked.X.todense(), newy)
+
+    # attach results to our adata object
+    adatas_stacked.obs[new_label] = sm.decode(model.transduction_)
+    return adatas_stacked, similarity_matrix
 
 
 
@@ -365,8 +402,8 @@ def stack_n_fill(a,val):
 
 
 from umap import UMAP
-def distmatrixumap(dataXlist,dm,components = 10):
-    sparseMatrix = sparse.csr_matrix(dm)
+def distmatrixumap(dataXlist, distance_adjacency_matrix,components = 10):
+    sparseMatrix = sparse.csr_matrix(distance_adjacency_matrix)
     precomputedKNNIndices = []
     precomputedKNNDistances = []
     # for ip in range(len(sparseMatrix.indptr)-1):

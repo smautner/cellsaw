@@ -24,7 +24,7 @@ def cprunmnn(ds):
 
 def cprunlucy(ds):
     data = [z.copy() for z in ds]
-    data = nu.dolucy(data)
+    data = nu.embed(data)
     return data
 
 if __name__ == "__main__":

@@ -123,6 +123,21 @@ def plot_X(Xlist, labels, plotsperline=3,
 
 
 
+def batchplot(adatas):
+    # stackedadatas
+
+    #sm= tools.spacemap(np.unique(stacked.obs['batch']))
+    #plt.scatter(*Transpose(stacked.obsm['lsa']), c= sm.encode(stacked.obs['batch']) )
+
+    df = pd.DataFrame({a:b for a,b in zip('x y batch label'.split(),
+                                          [*Transpose(adatas.obsm['lsa']),
+                                           adatas.obs['batch'], adatas.obs['label'] ] )})
+    # return df
+    ax = sns.scatterplot(data = df, x = 'x', y= 'y', hue = 'label', style = 'batch', s   = 10)
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+    plt.show()
+
+
 class drawMovingCenters:
     def __init__(self,XX,yy):
         # we build something like:
@@ -227,7 +242,8 @@ def plot_confusion_matrix_twice(labels):
 
 
 
-from collections import Counter
+import pprint
+from collections import Counter, defaultdict
 from ubergauss.tools import spacemap
 import matplotlib as mpl
 
@@ -237,50 +253,139 @@ def mkcolors(label):
     myrgb = Map(cmap, colorsm.encode(label))
     return Map(mpl.colors.rgb2hex, myrgb)
 
-def filtercounter(c,thresh = .1):
-    #
-    return c
 
-def adatas_to_sankey(adatas):
+
+def  add_by_leftk(cnt, leftk, support_ab, support_ba):
+    a_outcount = defaultdict(list)
+    for (a,b),count in cnt.items():
+        a_outcount[a].append((count,a,b))
+
+    clean_count = {}
+    for a in a_outcount.keys():
+        asd = sorted(a_outcount[a], key = lambda x: x[0], reverse= True)[:leftk]
+        for count, a, b in asd:
+            clean_count[(a,b)] = count
+            support_ba.pop(b, None)
+            support_ab.pop(a, None)
+    return clean_count
+
+
+def  add_by_rightk(cnt, rightk, support_ab, support_ba):
+
+    b_outcount = defaultdict(list)
+    for (a,b),count in cnt.items():
+        b_outcount[b].append((count,a,b))
+
+    clean_count = {}
+    for bkey in b_outcount.keys():
+        asd = sorted(b_outcount[bkey], key = lambda x: x[0], reverse= True)[:rightk]
+        for count, a, b in asd:
+            clean_count[(a,b)] = count
+            support_ba.pop(b, None)
+            support_ab.pop(a, None)
+    return clean_count
+
+
+def  add_by_thresh(cnt, thresh, support_ab, support_ba):
+    # sum outgoing for each source
+    a_outcount = defaultdict(int)
+    for (a,b),count in cnt.items():
+        a_outcount[a] += count
+
+    clean_count = {}
+    # add what is passing the threshold
+    for (a,b),count in cnt.items():
+        if count > a_outcount[a] * thresh:
+            clean_count[(a,b)] = count
+            # popping b so we will be left with the unaccounted
+            support_ba.pop(b, None)
+            support_ab.pop(a, None)
+
+    return clean_count
+
+def clean_counter(cnt, thresh=1, leftk = 0, rightk = 0):
+    '''
+    we remove connectins from the counter to remove noise
+    - threshold is for the outflow of a..
+        if a connection a->b has below threshold connections, we remove it
+        however we can not remove all such connections as lone
+        instances in b need to be preserverd
+    '''
+    # we cant drop targets so we keep a list and remove the covered ones later
+    support_ba = defaultdict(list)
+    for (a,b),count in cnt.items():
+        support_ba[b].append([count, a])
+
+    support_ab = defaultdict(list)
+    for (a,b),count in cnt.items():
+        support_ab[a].append([count, b])
+
+
+    clean_count = add_by_thresh(cnt, thresh, support_ab, support_ba)
+    clean_count.update(add_by_leftk(cnt, leftk, support_ab, support_ba))
+    clean_count.update(add_by_rightk(cnt, rightk, support_ab, support_ba))
+
+
+    # add the remaining b instances
+    # adding all adds too much junk
+    # so we sort and only add one
+    for b,aa in support_ba.items():
+        aa = sorted(aa, key = lambda x:x[0], reverse = True)
+        a = aa[0][1]
+        clean_count[(a,b)] = cnt[(a,b)]
+    for a,bb in support_ab.items():
+        bb = sorted(bb, key = lambda x:x[0], reverse = True)
+        b = bb[0][1]
+        clean_count[(a,b)] = cnt[(a,b)]
+
+
+    return clean_count
+
+
+
+
+def adatas_to_sankey(adatas, thresh = .1, leftk = 0, rightk = 0, labelfield = f'label'):
     source,target ,value = [],[],[]
 
-    #for i in range(0,len(adatas)-1):
-    #print(adatas[0].obs['label'])
+    node_groups = []
 
     for i in range(len(adatas)-1):
         a1 = adatas[i]
         a2 = adatas[i+1]
-        c = Counter(zip(a1.obs['label'],a2.obs['label']))
-        c = filtercounter(c, thresh = .1)
-        # c = {k:v for k,v in c.items() if v > len(adatas[i])* .5}
+        c = Counter(zip(a1.obs[labelfield],a2.obs[labelfield]))
+        c = clean_counter(c, thresh = thresh, leftk=leftk, rightk= rightk)
+
         s,t = Transpose(list(c.keys()))
         source+=[ss+str(i) for ss in s]
         target+=[tt+str(i+1) for tt in t]
-        # thresh  =  len(adatas[i])* .1
-        # vialue +=  [ cc if cc > thresh else 0 for cc in c.values() ]
-        value = list(c.values())
+
+        value += list(c.values())
+        node_groups.append( [ss+str(i) for ss in s])
+
 
     sm = spacemap(np.unique(source+target))
-    #label = sm.decode(np.sort(sm.integerlist))
-    # label = sm.itemlist
+
     label = [s[:-1] for s in sm.itemlist ]
+
+    # node_groups = Map(sm.encode, node_groups) doesnt work //
 
     return {'label':label, 'color':mkcolors(label)}, {'source':sm.encode(source), 'target':sm.encode(target), 'value':value}
 
-def adatas_to_sankey_fig(adatas, doalign = False):
+def adatas_to_sankey_fig(adatas, align = False, thresh = .15, leftk= 0, rightk = 0, label ='label'):
     import plotly.graph_objects as go
-    if doalign:
+    if align:
         import lucy.adatas as ada
-        ada.align(da[0], base = None)
+        ada.align(adatas, base = align)
 
-    node,link = adatas_to_sankey(adatas)
+    node,link = adatas_to_sankey(adatas, thresh = thresh, leftk=leftk, rightk= rightk, labelfield = label)
     fig = go.Figure(data=[go.Sankey(
         node = node,
-        link = link )])
+        link = link
+        )])
 
     fig.update_layout( hovermode = 'x', title="title",
-    font=dict(size = 10, color = 'white'),
-    plot_bgcolor='black',
-    paper_bgcolor='black')
+    font=dict(size = 10, color = 'black'),
+    plot_bgcolor='white',
+    paper_bgcolor='white')
 
     return fig
