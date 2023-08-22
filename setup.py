@@ -110,13 +110,14 @@ setup(
         "scipy >= 1.3",
         "scikit-learn >= 0.21",
         "seaborn >= 0.9",
-        'scikit-misc',
+        #'scikit-misc',
         "networkx >= 2.3",
         "dill",
         "ubergauss",
         "lmz",
-        "lapsolver",
-        'tabulate'
+        'mnnpy',
+        #"lapsolver",
+        #'tabulate'
     ],
     cmdclass={'sdist': sdist, 'install': install}
 )
