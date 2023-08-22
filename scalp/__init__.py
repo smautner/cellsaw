@@ -39,6 +39,7 @@ def test_scalp():
     print("=============== PCA ===============")
     a = pca.pca(a)
     print(f"{a[0].obsm['pca40'].shape = }")
+    assert a[0].obsm['pca40'].shape == (600,40)
 
     # print("=============== mnn ===============")
     # a = mnn.mnn(a)
@@ -46,23 +47,29 @@ def test_scalp():
 
     print("=============== umap ===============")
     a = umapwrap.adatas_umap(a,label= 'umap10')
-    print(f"{ a[0].obsm[f'umap10'].shape= }")
+    print(f"{ a[0].obsm['umap10'].shape= }")
+    assert a[0].obsm['umap10'].shape == (600,10)
 
     print("=============== make lina-graph ===============")
     matrix = graph.to_linear_assignment_graph(a, base ='pca40')
     print(f"{matrix.shape=}")
+    assert matrix.shape== (1800,1800)
 
     print("=============== diffuse label ===============")
-    import copy
-    b = diffuse.diffuse_label(copy.deepcopy(a), matrix, use_labels_from_datasets=[2, 1], new_label ='difflabel')
-    print(f"{type(b[0].obs['difflabel'])=}")
-    print(f"{b[0].obs['difflabel'].shape=}")
+    a = diffuse.diffuse_label(a, matrix, use_labels_from_datasets=[2, 1], new_label ='difflabel')
+    #print(f"{type(a[0].obs['difflabel'])=}")
+    print(f"{a[0].obs['difflabel'].shape=}")
+    assert a[0].obs['difflabel'].shape== (600,)
 
     print("=============== sklearn diffusion ===============")
-    b = diffuse.diffuse_label_sklearn(b, ids_to_mask=[2, 1], new_label ='skdiff')
-    print(f"{b[0].obs['skdiff'].shape=}")
-
+    a = diffuse.diffuse_label_sklearn(a, ids_to_mask=[2, 1], new_label ='skdiff')
+    print(f"{a[0].obs['skdiff'].shape=}")
+    assert a[0].obs['skdiff'].shape== (600,)
 
     print("=============== lina-graph umap ===============")
     a = umapwrap.graph_umap(a,matrix, label = 'graphumap')
-    print(f"{ a[0].obsm[f'graphumap'].shape= }")
+    print(f"{ a[0].obsm['graphumap'].shape= }")
+    assert a[0].obsm['graphumap'].shape== (600,2)
+
+
+
