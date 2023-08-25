@@ -1,7 +1,12 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 from scalp.data import transform
 import ubergauss.tools as ut
+import scanpy.external.pp as sep
 
+def scanorama(adatas, base = 'pca40', batchindicator = 'batch', obslabel =  'scanorama'):
+    adata = transform.stack(adatas)
+    sep.scanorama_integrate(adata,batchindicator, basis = base, adjusted_basis = obslabel)
+    return transform.split_by_obs(adata)
 
 def mnn(adata, label = 'mnn'):
 

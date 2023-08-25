@@ -37,3 +37,9 @@ def scores(data, projectionlabel = 'lsa'):
     batchmix = -neighbor_labelagreement(sim,ybatch,5)
     return score, silou, batchmix
 
+
+from sklearn.metrics import adjusted_rand_score as ari
+def anndata_ari(ad, label2='label', label1='label'):
+    return ari(ad.obs[label1], ad.obs[label2])
+
+

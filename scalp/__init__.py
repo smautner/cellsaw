@@ -36,14 +36,20 @@ def test_scalp():
 
     a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3, maxcells = 600, datasets = ["Immune_ALL_hum_mou.h5ad"])[0]
 
+
+    # print("=============== mnn ===============")
+    # mnn and scanvi are no longer maintained, scanoram is second on the nature method ranking
+    # a = mnn.mnn(a)
+    # print(f"{ a[0].obsm[f'mnn'].shape= }")
+
     print("=============== PCA ===============")
     a = pca.pca(a)
     print(f"{a[0].obsm['pca40'].shape = }")
     assert a[0].obsm['pca40'].shape == (600,40)
 
-    # print("=============== mnn ===============")
-    # a = mnn.mnn(a)
-    # print(f"{ a[0].obsm[f'mnn'].shape= }")
+    print("=============== scanorama ===============")
+    a = mnn.scanorama(a)
+    print(f"{ a[0].obsm[f'scanorama'].shape= }")
 
     print("=============== umap ===============")
     a = umapwrap.adatas_umap(a,label= 'umap10')

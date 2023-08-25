@@ -1,8 +1,16 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 import pprint
 from collections import Counter, defaultdict
 from ubergauss.tools import spacemap
-import matplotlib as mpl
+import numpy as np
 
+import plotly.io as pio
+import io
+from PIL import Image
+
+import matplotlib
+
+from matplotlib import pyplot as plt
 
 
 
@@ -10,7 +18,7 @@ def mkcolors(label):
     colorsm = spacemap(np.unique(label))
     cmap = plt.cm.get_cmap('turbo', len(colorsm.integerlist))
     myrgb = Map(cmap, colorsm.encode(label))
-    return Map(mpl.colors.rgb2hex, myrgb)
+    return Map(matplotlib.colors.rgb2hex, myrgb)
 
 
 def  add_by_leftk(cnt, leftk, support_ab, support_ba):
@@ -129,13 +137,15 @@ def adatas_to_sankey(adatas, thresh = .1, leftk = 0, rightk = 0, labelfield = f'
     return {'label':label, 'color':mkcolors(label)}, {'source':sm.encode(source), 'target':sm.encode(target), 'value':value}
 
 
-def adatas_to_sankey_fig(adatas, align = False, thresh = .15, leftk= 0, rightk = 0, label ='label'):
+def adatas_to_sankey_fig(adatas, align = False, thresh = .15,
+                         leftk= 0, rightk = 0, label ='label'):
     import plotly.graph_objects as go
     if align:
         import lucy.adatas as ada
         ada.align(adatas, base = align)
 
-    node,link = adatas_to_sankey(adatas, thresh = thresh, leftk=leftk, rightk= rightk, labelfield = label)
+    node,link = adatas_to_sankey(adatas, thresh = thresh, leftk=leftk,
+                                 rightk= rightk, labelfield = label)
     fig = go.Figure(data=[go.Sankey(
         node = node,
         link = link
@@ -147,3 +157,30 @@ def adatas_to_sankey_fig(adatas, align = False, thresh = .15, leftk= 0, rightk =
     paper_bgcolor='white')
 
     return fig
+
+def mplplot(plotly_fig):
+    image_bytes = pio.to_image(plotly_fig, format='png')
+    pil_image = Image.open(io.BytesIO(image_bytes))
+    plt.figure()
+    plt.imshow(pil_image)
+    plt.show()
+
+
+def test_sankey():
+    from scalp import data, pca, diffuse, umapwrap, mnn, graph, test_config
+    from scalp.output import score
+    a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3, maxcells = 600, datasets = ["Immune_ALL_hum_mou.h5ad"])[0]
+
+
+    matplotlib.use('module://matplotlib-sixel')
+    plotly_fig = adatas_to_sankey_fig(a, thresh = .15, leftk= 0, rightk = 0, label ='label')
+    mplplot(plotly_fig)
+    print()
+    print()
+
+    a = diffuse.diffuse_label_sklearn(a, ids_to_mask=[2,1], new_label ='skdiff')
+    print(f"{Map(score.anndata_ari, a, label2='skdiff')=}")
+
+
+
+
