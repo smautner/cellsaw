@@ -1,18 +1,10 @@
-
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.cluster import hierarchy as hira
-from scipy.spatial.distance import squareform
-from scipy.cluster.hierarchy import linkage
-from sklearn.metrics import precision_score
 import pandas as pd
-import matplotlib.pyplot as plt
 from ubergauss import tools
 import numpy as np
-from umap import UMAP
-import seaborn as sns
 from scipy.optimize import linear_sum_assignment as lsa
-from lmz import *
 
 from lucy import draw
 from scalp.data.align import align

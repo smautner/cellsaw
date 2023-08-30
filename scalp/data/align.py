@@ -13,7 +13,9 @@ def hungarian(adata, adata2, base):
         hung, dist = hung_nparray(*X)
         return hung, dist[hung]
 
-
+from sklearn.metrics import pairwise_distances
+from scipy.optimize import linear_sum_assignment
+from matplotlib import pyplot as plt
 def hung_nparray(X1, X2, debug = False,metric='euclidean'):
     distances = pairwise_distances(X1,X2, metric=metric)
     row_ind, col_ind = linear_sum_assignment(distances)

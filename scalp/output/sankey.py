@@ -1,5 +1,6 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 import pprint
+import data.align as data
 from collections import Counter, defaultdict
 from ubergauss.tools import spacemap
 import numpy as np
@@ -36,7 +37,7 @@ def  add_by_leftk(cnt, leftk, support_ab, support_ba):
     return clean_count
 
 
-def  add_by_rightk(cnt, rightk, support_ab, support_ba):
+def add_by_rightk(cnt, rightk, support_ab, support_ba):
 
     b_outcount = defaultdict(list)
     for (a,b),count in cnt.items():
@@ -141,8 +142,7 @@ def adatas_to_sankey_fig(adatas, align = False, thresh = .15,
                          leftk= 0, rightk = 0, label ='label'):
     import plotly.graph_objects as go
     if align:
-        import lucy.adatas as ada
-        ada.align(adatas, base = align)
+        data.align(adatas, base = align)
 
     node,link = adatas_to_sankey(adatas, thresh = thresh, leftk=leftk,
                                  rightk= rightk, labelfield = label)
@@ -173,9 +173,8 @@ def test_sankey():
 
 
     matplotlib.use('module://matplotlib-sixel')
-    plotly_fig = adatas_to_sankey_fig(a, thresh = .15, leftk= 0, rightk = 0, label ='label')
+    plotly_fig = adatas_to_sankey_fig(a, thresh = .15,align="X",leftk= 0, rightk = 0, label ='label')
     mplplot(plotly_fig)
-    print()
     print()
 
     a = diffuse.diffuse_label_sklearn(a, ids_to_mask=[2,1], new_label ='skdiff')

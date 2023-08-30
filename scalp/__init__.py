@@ -33,6 +33,8 @@ def embed( data ,pre_pca = 40,isodim = 10, intra_neigh = 15, inter_neigh = 1,
 
 def test_scalp():
     from scalp import data, pca, diffuse, umapwrap, mnn, graph, test_config
+    from scalp.output import score
+    from scalp.data.align import align
 
     a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3, maxcells = 600, datasets = ["Immune_ALL_hum_mou.h5ad"])[0]
 
@@ -46,6 +48,7 @@ def test_scalp():
     a = pca.pca(a)
     print(f"{a[0].obsm['pca40'].shape = }")
     assert a[0].obsm['pca40'].shape == (600,40)
+    align(a,'pca40')
 
     print("=============== scanorama ===============")
     a = mnn.scanorama(a)
@@ -66,6 +69,7 @@ def test_scalp():
     #print(f"{type(a[0].obs['difflabel'])=}")
     print(f"{a[0].obs['difflabel'].shape=}")
     assert a[0].obs['difflabel'].shape== (600,)
+    print(f"{Map(score.anndata_ari, a, label2='difflabel')=}")
 
     print("=============== sklearn diffusion ===============")
     a = diffuse.diffuse_label_sklearn(a, ids_to_mask=[2, 1], new_label ='skdiff')

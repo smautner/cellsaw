@@ -52,7 +52,7 @@ def attach_stack(adatas, stack, label):
 
 
 def to_array(ad,base):
-    return ad.X if not base else ad.obsm[base]
+    return ad.X if (not base or 'X') else ad.obsm[base]
 
 
 def to_arrays(adatas,base):
