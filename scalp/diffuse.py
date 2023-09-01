@@ -7,11 +7,11 @@ from sklearn.semi_supervised import LabelSpreading
 
 
 
-def diffuse_label_sklearn(adatas, ids_to_mask = [], base='pca40', new_label = 'sk_diffuse'):
-
+def diffuse_label_sklearn(adatas, use_labels_from_dataset_ids = [], base='pca40', new_label = 'sk_diffuse'):
     adatas_stacked = transform.stack(adatas)
 
-    masked_y, sm =mask_y(adatas_stacked,'label',ids_to_mask)
+    ids_to_mask = [ i for i in lmz.Range(adatas) if i not in use_labels_from_dataset_ids]
+    masked_y, sm = mask_y(adatas_stacked,'label',ids_to_mask)
 
 
     # now we have everything to run tue model..
@@ -34,7 +34,7 @@ def mask_y(adatas_stacked, label, ids_to_mask):
     return newy, sm
 
 
-def diffuse_label(adatas, distance_matrix, use_labels_from_datasets,
+def diffuse_label(adatas, distance_matrix, use_labels_from_dataset_ids,
                   sigmafac = 1, label = f'label', new_label = f'diffuselabel'):
     '''
     adatas_stacked and lapgraph are the output in wrappers.dolucy
@@ -52,7 +52,7 @@ def diffuse_label(adatas, distance_matrix, use_labels_from_datasets,
     # 1. turn them into integers as required by sklearn
     # 2. we mask the batches we want to calculate labels for..
     adatas_stacked = transform.stack(adatas)
-    maskds = [ i for i in lmz.Range(adatas) if i not in use_labels_from_datasets]
+    maskds = [ i for i in lmz.Range(adatas) if i not in use_labels_from_dataset_ids]
     masked_y, sm =mask_y(adatas_stacked, label, maskds)
 
 

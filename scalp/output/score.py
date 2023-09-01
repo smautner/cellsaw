@@ -39,7 +39,7 @@ def scores(data, projectionlabel = 'lsa'):
 
 
 from sklearn.metrics import adjusted_rand_score as ari
-def anndata_ari(ad, label2='label', label1='label'):
-    return ari(ad.obs[label1], ad.obs[label2])
+def anndata_ari(ad, predicted_label='label', true_label='label'):
+    return ari(ad.obs[true_label], ad.obs[predicted_label])
 
 

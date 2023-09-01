@@ -17,9 +17,10 @@ def load_scib(path, datasets = False):
     batch,typ = Transpose (Map(lambda x:x.split(), 'batch final_annotation#batch final_annotation#batch cell_type#tech celltype'.split("#")))
     # rename fields
     rename_obs(datasets,batch, typ)
-    # split by batch
-    datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()] for z
+    # split by batch, added the copy to avoid the warning message for initialozing view
+    datasets =  [[z[z.obs['batch']==i].copy() for i in z.obs['batch'].unique()] for z
                  in datasets]
+
     for batchlist in datasets:
         for batch in batchlist:
             batch.uns['timeseries'] = False
