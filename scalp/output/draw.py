@@ -246,3 +246,29 @@ def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
     labels = [a.obs[label] for a in adatas]
     batch_labels = [a.obs['batch'][0] for a in adatas]
     draw.plot_X(X, labels,titles = batch_labels,**kwargs)
+
+
+
+
+def snsplot(adatas, coordinate_label = 'pca2',label = 'label', splitby = 'batch'):
+    '''
+     an attempt to redo draw via seaborn
+    '''
+
+    # for sns we need pandas dataframes,,,
+    adatas = stack(adatas)
+
+    data = pd.DataFrame({a:b for a,b in zip(f'x y batch label'.split(),
+                                          [*Transpose(adatas.obsm[coordinate_label]),
+                                           adatas.obs[splitby], adatas.obs[label] ] )})
+
+    # x,y  = Transpose(adatas.obsm['pca2'])
+    # return df
+    g = sns.FacetGrid( data, col="batch", col_wrap=3) # , height=2, ylim=(0, 10))
+
+    g.map_dataframe( sns.scatterplot , x = 'x', y= 'y', hue = 'label', s   = 10)
+    g.add_legend()
+    g.set( yticks=[])
+    g.set( xticks=[])
+    g.set_axis_labels("", "")
+    plt.show()
