@@ -251,25 +251,29 @@ def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
 
 
 def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
-            splitby = 'batch', edgecolors = None):
+            splitby = 'batch', compare_label_to = None):
     '''
      an attempt to redo draw via seaborn
     '''
 
     # for sns we need pandas dataframes,,,
+    col_order =[ a.obs[splitby][0] for a in adatas]
     adatas = stack(adatas)
+
     data = {a:b for a,b in zip(f'x y batch label'.split(),
                                           [*Transpose(adatas.obsm[coordinate_label]),
                                            adatas.obs[splitby], adatas.obs[label] ] )}
-    if edgecolors:
-        data['edgecolors'] = ['w' if z else 'r' for z in adatas.obs[edgecolors]  == adatas.obs[label]]
+    if compare_label_to:
+        data['edgecolors'] = ['w' if z else 'r' for z in adatas.obs[compare_label_to]  == adatas.obs[label]]
 
 
     data = pd.DataFrame(data)
 
     # x,y  = Transpose(adatas.obsm['pca2'])
     # return df
-    g = sns.FacetGrid( data, col="batch", col_wrap=3) # , height=2, ylim=(0, 10))
+
+    # print(f"{col_order=}")
+    g = sns.FacetGrid( data, col=splitby, col_wrap=3, col_order = col_order) # , height=2, ylim=(0, 10))
 
     def myscatterplot(data = None,*args,**kwargs):
         edgecolors = kwargs.pop('edgecolor')
@@ -278,8 +282,8 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
         sns.scatterplot(data = data, *args,**kwargs)
 
     # g.map_dataframe( sns.scatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
-    g.map_dataframe( myscatterplot , x = 'x', y= 'y', hue = label, s   = 10,
-                    edgecolor= 'edgecolors' if edgecolors else None)
+    g.map_dataframe( myscatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
+                    edgecolor= 'edgecolors' if compare_label_to else None)
     g.add_legend()
     g.set( yticks=[])
     g.set( xticks=[])
