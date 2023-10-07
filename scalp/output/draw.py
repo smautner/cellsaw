@@ -250,6 +250,25 @@ def plot(adatas, projection = 'umap2', label= 'label', **kwargs):
 
 
 
+
+# we just leave this here for now, seems superfluous though..
+def get_hue_order_to_color_mapping(g):
+  """Creates a dictionary that maps the hue order to a color value in a FacetGrid.
+  Args:
+    g: A FacetGrid object.
+  Returns:
+    A dictionary that maps the hue order to a color value in the FacetGrid.
+  """
+  hue_order = g.hue_order
+  cmap = g.cmap
+  hue_to_color_mapping = {}
+  for hue in hue_order:
+    color = cmap(hue)
+    hue_to_color_mapping[hue] = color
+  return hue_to_color_mapping
+
+
+
 def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
             splitby = 'batch', compare_label_to = None):
     '''
@@ -260,11 +279,12 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
     col_order =[ a.obs[splitby][0] for a in adatas]
     adatas = stack(adatas)
 
-    data = {a:b for a,b in zip(f'x y batch label'.split(),
+    data = {a:b for a,b in zip('x y batch label'.split(),
                                           [*Transpose(adatas.obsm[coordinate_label]),
                                            adatas.obs[splitby], adatas.obs[label] ] )}
     if compare_label_to:
         data['edgecolors'] = ['w' if z else 'r' for z in adatas.obs[compare_label_to]  == adatas.obs[label]]
+
 
 
     data = pd.DataFrame(data)
@@ -281,9 +301,9 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
             kwargs['edgecolor'] =  data['edgecolors'].tolist()
         sns.scatterplot(data = data, *args,**kwargs)
 
-    # g.map_dataframe( sns.scatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
     g.map_dataframe( myscatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
-                    edgecolor= 'edgecolors' if compare_label_to else None)
+                     edgecolor = 'edgecolors' if compare_label_to else None)
+
     g.add_legend()
     g.set( yticks=[])
     g.set( xticks=[])
