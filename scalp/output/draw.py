@@ -283,27 +283,30 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
                                           [*Transpose(adatas.obsm[coordinate_label]),
                                            adatas.obs[splitby], adatas.obs[label] ] )}
     if compare_label_to:
-        data['edgecolors'] = ['w' if z else 'r' for z in adatas.obs[compare_label_to]  == adatas.obs[label]]
-
-
+        data['edgecolors'] = ['True' if z else 'False' for z in adatas.obs[compare_label_to]  == adatas.obs[label]]
 
     data = pd.DataFrame(data)
 
-    # x,y  = Transpose(adatas.obsm['pca2'])
-    # return df
 
-    # print(f"{col_order=}")
+
+
     g = sns.FacetGrid( data, col=splitby, col_wrap=3, col_order = col_order) # , height=2, ylim=(0, 10))
 
     def myscatterplot(data = None,*args,**kwargs):
         edgecolors = kwargs.pop('edgecolor')
         if edgecolors:
-            kwargs['edgecolor'] =  data['edgecolors'].tolist()
+            # kwargs['edgecolor'] =  data['edgecolors'].tolist()
+            kwargs['style'] = 'edgecolors'
+            kwargs['markers'] = {'True': 'o', "False": 'X'}
+
         sns.scatterplot(data = data, *args,**kwargs)
+
+
+    # g.map_dataframe( sns.scatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
+    #                  edgecolor = 'edgecolors' if compare_label_to else None)
 
     g.map_dataframe( myscatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
                      edgecolor = 'edgecolors' if compare_label_to else None)
-
     g.add_legend()
     g.set( yticks=[])
     g.set( xticks=[])
