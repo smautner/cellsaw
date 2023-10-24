@@ -78,6 +78,9 @@ def clean_counter(cnt, thresh=1, leftk = 0, rightk = 0):
         if a connection a->b has below threshold connections, we remove it
         however we can not remove all such connections as lone
         instances in b need to be preserverd
+
+    leftK(rightK): consider connections between two batches, an intem at the left(right)
+                   can have <= k , outgoin connections (thicker connections prefered)
     '''
     # we cant drop targets so we keep a list and remove the covered ones later
     support_ba = defaultdict(list)
@@ -163,6 +166,7 @@ def plt_plotly(plotly_fig):
     pil_image = Image.open(io.BytesIO(image_bytes))
     plt.figure()
     plt.imshow(pil_image)
+    plt.axis('off')
     plt.show()
 
 def plot(dataset, **kwargs):
