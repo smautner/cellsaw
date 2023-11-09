@@ -1,38 +1,56 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
-from scalp import data, pca, diffuse, umapwrap, graph
+# from scalp import data, pca, diffuse, umapwrap, graph
 from scalp.data import transform
-from scalp import data, pca, diffuse, umapwrap, mnn, graph, test_config
+from scalp import data, pca, umapwrap, mnn, graph, test_config
+from scalp import diffuse
 from scalp.output import score
 from scalp.data.align import align
 from sklearn.manifold import Isomap
 
-def embed( data ,pre_pca = 40,isodim = 10, intra_neigh = 15, inter_neigh = 1,
+from scalp.umapwrap import graph_umap
+from scalp.output.draw import snsplot
+
+
+
+
+
+
+def mkgraph( data ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, outlier_threshold = .8,
-              scaling_threshold = .9, dataset_adjacency = None):
+              scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
     '''
     this does our embedding,
     written such that the optimizer can do its thing
     '''
     data = pca.pca(data,dim = pre_pca, label = 'pca')
-
     matrix = graph.to_linear_assignment_graph(data,base = 'pca',
                                                   intra_neigh = intra_neigh,
                                                   inter_neigh = inter_neigh,
                                                   scaling_num_neighbors = scaling_num_neighbors,
                                                   outlier_threshold = outlier_threshold,
                                                   scaling_threshold = scaling_threshold,
-                                                  dataset_adjacency =  dataset_adjacency)
+                                                  dataset_adjacency =  dataset_adjacency,
+                                              add_tree=add_tree)
     #data = umapwrap.graph_umap(data, matrix, label = 'graphumap')
-    emb = Isomap(n_components=isodim,metric = 'precomputed').fit_transform(matrix)
-    data = transform.attach_stack(data, emb, 'emb')
-    data = transform.stack(data)
-    return data
+    if False: # debug
+        from scipy.sparse import csr_matrix
+        import structout as so
+        matrix2 = csr_matrix(matrix)
+        vals = [ len(x.data) for x in matrix2]
+        print(f"will plot the number of neighbors for each item... {min(vals)=},{max(vals)=}")
+        so.lprint(vals)
+    return data, matrix
 
 
-def make_matrix_diffuse_label(a, **kwargs):
-    a = pca.pca(a)
-    matrix = graph.to_linear_assignment_graph(a, base ='pca40')
-    return diffuse.diffuse_label(a, matrix, **kwargs) # use_labels_from_datasets=[2, 1], new_label ='difflabel')
+# diffuse.diffuse_label  -> diffuses the label
+
+def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
+    dataset = umapwrap.graph_umap(dataset,matrix,label = embed_label)
+    snsplot(dataset,coordinate_label=embed_label,**snskwargs)
+    return dataset
+
+
+
 
 def test_scalp():
     a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3, maxcells = 600, datasets = ["Immune_ALL_hum_mou.h5ad"])[0]
@@ -62,14 +80,14 @@ def test_scalp():
     assert matrix.shape== (1800,1800)
 
     print("=============== diffuse label ===============")
-    a = diffuse.diffuse_label(a, matrix, use_labels_from_datasets=[2, 1], new_label ='difflabel')
+    a = diffuse.diffuse_label(a, matrix, use_labels_from_dataset_ids=[2, 1], new_label ='difflabel')
     #print(f"{type(a[0].obs['difflabel'])=}")
     print(f"{a[0].obs['difflabel'].shape=}")
     assert a[0].obs['difflabel'].shape== (600,)
     print(f"{Map(score.anndata_ari, a, predicted_label='difflabel')=}")
 
     print("=============== sklearn diffusion ===============")
-    a = diffuse.diffuse_label_sklearn(a, ids_to_mask=[2, 1], new_label ='skdiff')
+    a = diffuse.diffuse_label_sklearn(a, use_labels_from_dataset_ids=[2, 1], new_label ='skdiff')
     print(f"{a[0].obs['skdiff'].shape=}")
     assert a[0].obs['skdiff'].shape== (600,)
 

@@ -15,16 +15,17 @@ import structout as so
 def to_linear_assignment_graph(adatas,base = 'pca40',
                                intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, outlier_threshold = .8,
-              scaling_threshold = .9, dataset_adjacency = None):
+              scaling_threshold = .9, dataset_adjacency = None, add_tree= True,):
 
     X = to_arrays(adatas, base)
     graph =  linear_assignment_integrate(X,
-                                                         intra_neigh=intra_neigh,
+                                                         intra_neigh=intra_neigh,add_tree=add_tree,
                                                          inter_neigh = inter_neigh,
                                                          scaling_num_neighbors = scaling_num_neighbors,
                                                          outlier_threshold = outlier_threshold,
                                                          scaling_threshold=scaling_threshold,
                                                          dataset_adjacency=dataset_adjacency)
+
     return graph
 
 
@@ -54,17 +55,22 @@ def neighborgraph(x, neighbors):
     return z
 
 
-def symmetric_spanning_tree_neighborgraph(x, neighbors):
+import structout as so
 
+def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True):
+
+    # neighbors graph
     neighborsgraph= nbrs.kneighbors_graph(x,neighbors,mode='distance')
+    neighborsgraph.data += 0.0000001 # if we densify, connections disapear
+    # so.lprint( [ len(x.data) for x in neighborsgraph] )
     neighborsgraph= ut.zehidense(neighborsgraph)
 
+    # min spanning tree
     distancemat = metrics.euclidean_distances(x)
-    tree = minimum_spanning_tree(distancemat)
+    tree = minimum_spanning_tree(distancemat) if add_tree else neighborsgraph
     tree= ut.zehidense(tree)
-    # diff = z-z.T
-    # diff[diff > 0 ] = 0
-    # z-= diff
+
+    # combine and return
     combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
     check_symmetric(combinedgraph,raise_exception=True)
@@ -92,6 +98,7 @@ def linear_assignment_integrate(Xlist,
                                 outlier_threshold = .8,
                                 scaling_threshold=.9,
                                 dataset_adjacency = False,
+                                add_tree = True,
                                 showtime = False):
 
     lsatime = 0.0
@@ -108,7 +115,7 @@ def linear_assignment_integrate(Xlist,
     def make_distance_matrix(i,j):
             if i == j:
                 # use the maximum between neighborgraph and min spanning tree to make sure all is connected
-                r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh)
+                r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh, add_tree = add_tree)
                 r = sparse.lil_matrix(r),0,0
                 return r
 
@@ -171,7 +178,6 @@ def linear_assignment_integrate(Xlist,
 
             col.append(distance_matrix)
         row.append(col)
-
 
     distance_matrix = sparse.vstack([sparse.hstack(col) for col in row])
 

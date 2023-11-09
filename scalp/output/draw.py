@@ -276,7 +276,7 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
     '''
 
     # for sns we need pandas dataframes,,,
-    col_order =[ a.obs[splitby][0] for a in adatas]
+    col_order =[ a.obs[splitby].iloc[0] for a in adatas]
     adatas = stack(adatas)
 
     data = {a:b for a,b in zip('x y batch label'.split(),
@@ -298,6 +298,8 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
             # kwargs['edgecolor'] =  data['edgecolors'].tolist()
             kwargs['style'] = 'edgecolors'
             kwargs['markers'] = {'True': 'o', "False": 'X'}
+            kwargs['sizes'] = { "False": 4 , f"True": 10 }
+            kwargs['size'] = 'edgecolors'
 
         sns.scatterplot(data = data, *args,**kwargs)
 

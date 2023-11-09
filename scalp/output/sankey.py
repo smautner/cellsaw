@@ -113,7 +113,7 @@ def clean_counter(cnt, thresh=1, leftk = 0, rightk = 0):
     return clean_count
 
 
-def adatas_to_sankey(adatas, thresh = .1, leftk = 0, rightk = 0, labelfield = f'label'):
+def adatas_to_sankey(adatas, thresh = .1, left_outgoing_max_edges = 0, right_outgoing_max_edges = 0, labelfield = f'label'):
     source,target ,value = [],[],[]
 
     node_groups = []
@@ -122,7 +122,7 @@ def adatas_to_sankey(adatas, thresh = .1, leftk = 0, rightk = 0, labelfield = f'
         a1 = adatas[i]
         a2 = adatas[i+1]
         c = Counter(zip(a1.obs[labelfield],a2.obs[labelfield]))
-        c = clean_counter(c, thresh = thresh, leftk=leftk, rightk= rightk)
+        c = clean_counter(c, thresh = thresh, leftk=left_outgoing_max_edges, rightk= right_outgoing_max_edges)
 
         s,t = Transpose(list(c.keys()))
         source+=[ss+str(i) for ss in s]
@@ -142,13 +142,13 @@ def adatas_to_sankey(adatas, thresh = .1, leftk = 0, rightk = 0, labelfield = f'
 
 
 def adatas_to_sankey_fig(adatas, align = False, thresh = .15,
-                         leftk= 0, rightk = 0, label ='label', title = ''):
+                         left_outgoing_max_edges= 0, right_outgoing_max_edges = 0, label ='label', title = ''):
     import plotly.graph_objects as go
     if align:
         data.align(adatas, base = align)
 
-    node,link = adatas_to_sankey(adatas, thresh = thresh, leftk=leftk,
-                                 rightk= rightk, labelfield = label)
+    node,link = adatas_to_sankey(adatas, thresh = thresh, left_outgoing_max_edges=left_outgoing_max_edges,
+                                 right_outgoing_max_edges= right_outgoing_max_edges, labelfield = label)
     fig = go.Figure(data=[go.Sankey(
         node = node,
         link = link
@@ -185,7 +185,7 @@ def test_sankey():
 
 
     matplotlib.use('module://matplotlib-sixel')
-    plotly_fig = adatas_to_sankey_fig(a, thresh = .15,align="X",leftk= 0, rightk = 0, label ='label')
+    plotly_fig = adatas_to_sankey_fig(a, thresh = .15,align="X",left_outgoing_max_edges= 0, right_outgoing_max_edges = 0, label ='label')
     plt_plotly(plotly_fig)
     print()
 
