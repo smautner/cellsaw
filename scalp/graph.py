@@ -11,6 +11,7 @@ import time
 from scipy.optimize import linear_sum_assignment
 from sklearn.neighbors import NearestNeighbors
 import structout as so
+import ubergauss.tools as ut
 
 def to_linear_assignment_graph(adatas,base = 'pca40',
                                intra_neigh = 15, inter_neigh = 1,
@@ -35,9 +36,20 @@ def iterated_linear_sum_assignment(distances, repeats):
         d = distances[r,c].copy()
         distances [r,c] = np.inf
         return r,c,d
-
     cc, rr, dist  = Transpose([ linear_sum_assignment_iteration(distances) for _ in range(repeats)  ])
     return np.hstack(cc) , np.hstack(rr), np.hstack(dist)
+
+def repeated_subsample_linear_sum_assignment(distances, repeats, num_instances):
+    # BUILDME
+    def linear_sum_assignment_iteration(distances):
+        r, c = linear_sum_assignment(distances)
+        d = distances[r,c].copy()
+        distances [r,c] = np.inf
+        return r,c,d
+    cc, rr, dist  = Transpose([ linear_sum_assignment_iteration(distances) for _ in range(repeats)  ])
+    return np.hstack(cc) , np.hstack(rr), np.hstack(dist)
+
+
 
 import ubergauss.tools as ut
 
@@ -112,7 +124,8 @@ def linear_assignment_integrate(Xlist,
         else:
             return True
 
-    def make_distance_matrix(i,j):
+    def make_distance_matrix(ij):
+            i,j = ij
             if i == j:
                 # use the maximum between neighborgraph and min spanning tree to make sure all is connected
                 r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh, add_tree = add_tree)
@@ -163,14 +176,18 @@ def linear_assignment_integrate(Xlist,
                 res[i_ids,j_ids] = ij_lsa_distances
                 return res, lsatime, eutime
 
+    n_datas = len(Xlist)
+    tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
+    parts = ut.xxmap( make_distance_matrix, tasks)
+    getpart=dict(zip(tasks,parts))
 
     # then we built a row:
     row = []
-    for i in range(len(Xlist)):
+    for i in range(n_datas):
         col = []
-        for j in range(len(Xlist)):
+        for j in range(n_datas):
             if i <= j:
-                distance_matrix,a,b = make_distance_matrix(i,j)
+                distance_matrix,a,b = getpart[(i,j)]
                 lsatime+=a
                 eutime += b
             else:

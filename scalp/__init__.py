@@ -1,29 +1,21 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
-# from scalp import data, pca, diffuse, umapwrap, graph
 from scalp.data import transform
 from scalp import data, pca, umapwrap, mnn, graph, test_config
 from scalp import diffuse
 from scalp.output import score
 from scalp.data.align import align
-from sklearn.manifold import Isomap
-
-from scalp.umapwrap import graph_umap
 from scalp.output.draw import snsplot
 
 
-
-
-
-
-def mkgraph( data ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
+def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, outlier_threshold = .8,
               scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
     '''
     this does our embedding,
     written such that the optimizer can do its thing
     '''
-    data = pca.pca(data,dim = pre_pca, label = 'pca')
-    matrix = graph.to_linear_assignment_graph(data,base = 'pca',
+    adatas = pca.pca(adatas,dim = pre_pca, label = 'pca')
+    matrix = graph.to_linear_assignment_graph(adatas,base = 'pca',
                                                   intra_neigh = intra_neigh,
                                                   inter_neigh = inter_neigh,
                                                   scaling_num_neighbors = scaling_num_neighbors,
@@ -39,7 +31,7 @@ def mkgraph( data ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
         vals = [ len(x.data) for x in matrix2]
         print(f"will plot the number of neighbors for each item... {min(vals)=},{max(vals)=}")
         so.lprint(vals)
-    return data, matrix
+    return adatas, matrix
 
 
 # diffuse.diffuse_label  -> diffuses the label
