@@ -119,13 +119,13 @@ def plot_X(Xlist, labels, plotsperline=3,
 from scalp.data.transform import stack, to_arrays
 
 
-def batchplot(adatas):
+def batchplot(adatas, from_obsm = 'embedding'):
     # stackedadatas
     #sm= tools.spacemap(np.unique(stacked.obs['batch']))
     #plt.scatter(*Transpose(stacked.obsm['lsa']), c= sm.encode(stacked.obs['batch']) )
     adatas = stack(adatas)
     df = pd.DataFrame({a:b for a,b in zip('x y batch label'.split(),
-                                          [*Transpose(adatas.obsm['lsa']),
+                                          [*Transpose(adatas.obsm[from_obsm]),
                                            adatas.obs['batch'], adatas.obs['label'] ] )})
     # return df
     ax = sns.scatterplot(data = df, x = 'x', y= 'y', hue = 'label', style = 'batch', s   = 10)
@@ -287,11 +287,7 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
 
     data = pd.DataFrame(data)
 
-
-
-
     g = sns.FacetGrid( data, col=splitby, col_wrap=3, col_order = col_order) # , height=2, ylim=(0, 10))
-
     def myscatterplot(data = None,*args,**kwargs):
         edgecolors = kwargs.pop('edgecolor')
         if edgecolors:
@@ -302,13 +298,11 @@ def snsplot(adatas, coordinate_label = 'pca2',label = 'label',
             kwargs['size'] = 'edgecolors'
 
         sns.scatterplot(data = data, *args,**kwargs)
-
-
-    # g.map_dataframe( sns.scatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
-    #                  edgecolor = 'edgecolors' if compare_label_to else None)
-
     g.map_dataframe( myscatterplot , x = 'x', y= 'y', hue = 'label', s   = 10,
                      edgecolor = 'edgecolors' if compare_label_to else None)
+
+
+
     g.add_legend()
     g.set( yticks=[])
     g.set( xticks=[])

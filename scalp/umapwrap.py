@@ -17,11 +17,16 @@ def adatas_umap(adatas, dim = 10, label = 'umap10', from_obsm = 'pca40'):
 def graph_umap(adatas, distance_adjacency_matrix,
                label=f'lsa', n_neighbors = 10,
                n_components = 2, **kwargs):
-
-
     # res =  umap.UMAP(n_components=n_components,
     #                  metric='precomputed',n_neighbors = n_neighbors,
     #                  **kwargs).fit_transform(distance_adjacency_matrix)
     distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
     res = graphumap.graphumap(distance_adjacency_matrix, n_dim=n_components)
+    return attach_stack(adatas, res, label)
+
+
+def graph_NX(adatas, distance_adjacency_matrix,
+               label=f'spring',algo='spring', n_components = 2, **kwargs):
+
+    res = graphumap.embed_via_nx(distance_adjacency_matrix,algo = algo, dim=n_components)
     return attach_stack(adatas, res, label)

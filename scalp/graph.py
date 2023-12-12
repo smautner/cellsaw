@@ -39,15 +39,26 @@ def iterated_linear_sum_assignment(distances, repeats):
     cc, rr, dist  = Transpose([ linear_sum_assignment_iteration(distances) for _ in range(repeats)  ])
     return np.hstack(cc) , np.hstack(rr), np.hstack(dist)
 
+
+
+def lsa_sample(distance_matrix, num_instances):
+    # get random indices
+    row_indices = np.random.choice(distance_matrix.shape[0], num_instances, replace = False)
+    col_indices = np.random.choice(distance_matrix.shape[1], num_instances, replace = False)
+
+    # get matches and distances
+    subdistance_matrix = distance_matrix[row_indices][:,col_indices]
+    r, c = linear_sum_assignment(subdistance_matrix)
+    d =    subdistance_matrix[r,c].copy()
+
+    # since subdistances is basically reindexing, we need to undo that:
+    r = ut.spacemap(row_indices).decode(r)
+    c = ut.spacemap(col_indices).decode(c)
+    return r,c,d
+
 def repeated_subsample_linear_sum_assignment(distances, repeats, num_instances):
-    # BUILDME
-    def linear_sum_assignment_iteration(distances):
-        r, c = linear_sum_assignment(distances)
-        d = distances[r,c].copy()
-        distances [r,c] = np.inf
-        return r,c,d
-    cc, rr, dist  = Transpose([ linear_sum_assignment_iteration(distances) for _ in range(repeats)  ])
-    return np.hstack(cc) , np.hstack(rr), np.hstack(dist)
+    rr, cc, dist  = Transpose([ lsa_sample(distances,num_instances) for _ in range(repeats)  ])
+    return np.hstack(rr) , np.hstack(cc), np.hstack(dist)
 
 
 
@@ -71,26 +82,42 @@ import structout as so
 
 def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True):
 
-    # neighbors graph
-    neighborsgraph= nbrs.kneighbors_graph(x,neighbors,mode='distance')
-    neighborsgraph.data += 0.0000001 # if we densify, connections disapear
-    # so.lprint( [ len(x.data) for x in neighborsgraph] )
-    neighborsgraph= ut.zehidense(neighborsgraph)
 
     # min spanning tree
     distancemat = metrics.euclidean_distances(x)
-    tree = minimum_spanning_tree(distancemat) if add_tree else neighborsgraph
+    tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
     tree= ut.zehidense(tree)
+
+
+
+    # faster version of neighborsgraph
+    part = np.argpartition(distancemat, neighbors, axis = 1)[:,:neighbors]
+    neighborsgraph = np.zeros_like(distancemat)
+    np.put_along_axis(neighborsgraph,part, np.take(distancemat,part), axis = 1)
+
+    # breakpoint()
+
+    # neighbors graph
+
+    # neighborsgraph= nbrs.kneighbors_graph(distancemat, neighbors,mode='distance')
+    # neighborsgraph.data += 0.0000001 # if we densify, connections disapear
+
+    # so.lprint( [ len(x.data) for x in neighborsgraph] )
+
+    neighborsgraph= ut.zehidense(neighborsgraph)
+
 
     # combine and return
     combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
+    np.fill_diagonal(combinedgraph,0)
     check_symmetric(combinedgraph,raise_exception=True)
     return combinedgraph
 
 
 
 def avgdist(a,numneigh = 2):
+    #  return mean distance to the first numneigh neighbors for each item in a
     nbrs = NearestNeighbors(n_neighbors=1+numneigh).fit(a)
     distances, indices = nbrs.kneighbors(a)
     return np.mean(distances[:,1:], axis = 1)
@@ -110,12 +137,7 @@ def linear_assignment_integrate(Xlist,
                                 outlier_threshold = .8,
                                 scaling_threshold=.9,
                                 dataset_adjacency = False,
-                                add_tree = True,
-                                showtime = False):
-
-    lsatime = 0.0
-    eutime = 0.0
-
+                                add_tree = True, epsilon = 1e-6 ):
 
 
     def adjacent(i,j):
@@ -129,7 +151,7 @@ def linear_assignment_integrate(Xlist,
             if i == j:
                 # use the maximum between neighborgraph and min spanning tree to make sure all is connected
                 r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh, add_tree = add_tree)
-                r = sparse.lil_matrix(r),0,0
+                r = sparse.lil_matrix(r)
                 return r
 
 
@@ -143,16 +165,15 @@ def linear_assignment_integrate(Xlist,
                 based*=dm
                 '''
                 # hungarian
-                eustart=time.time()
                 ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
-                eutime = time.time() - eustart
                 res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
                 if inter_neigh==0:
                     return res
 
-                lsastart=time.time()
-                i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
-                lsatime=(time.time()-lsastart)
+                if inter_neigh < 10:
+                    i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
+                else:
+                     i_ids,j_ids, ij_lsa_distances = repeated_subsample_linear_sum_assignment(ij_euclidian_distances,inter_neigh,100)
 
                 # remove worst 25% hits
                 sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
@@ -162,24 +183,54 @@ def linear_assignment_integrate(Xlist,
                     ij_lsa_distances[outlier_ids] = 0
 
                 # normalize
-                if scaling_threshold < 1:
-                    lsa_normalisation_factor = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*scaling_threshold)]
-                    ij_lsa_distances /= lsa_normalisation_factor
+
+                # if scaling_threshold < 1:
+                #     lsa_normalisation_factor = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*scaling_threshold)]
+                #     ij_lsa_distances /= lsa_normalisation_factor
+
                 #
                 #dm = (avgdist(Xlist[i], hoodsize)+avgdist(Xlist[j],hoodsize))/2
                 #dab *=dm
-                average_knn_distance_factors = average_knn_distance(Xlist[i],Xlist[j], i_ids , j_ids, scaling_num_neighbors)
-                ij_lsa_distances *= average_knn_distance_factors
-
-
+                # average_knn_distance_factors = average_knn_distance(Xlist[i],Xlist[j], i_ids , j_ids, scaling_num_neighbors)
+                # ij_lsa_distances *= average_knn_distance_factors
                 # make a matrix
                 res[i_ids,j_ids] = ij_lsa_distances
-                return res, lsatime, eutime
+                return res
 
     n_datas = len(Xlist)
     tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
     parts = ut.xxmap( make_distance_matrix, tasks)
     getpart=dict(zip(tasks,parts))
+
+
+    if True:
+        # insane enhancement idea :D
+        for i in range(n_datas):
+            for j in range(n_datas):
+                if i < j:
+                    # use the linsum targets as a source for new neighbors
+                    currentmatrix = getpart[(i,j)]
+                    sourceNeighborsFrom = getpart[(j,j)]
+
+                    # some are removed due to the outlier threshold rule..
+                    currentMatrixNonEmpty = [True if len(r) >0 else False for r in currentmatrix.rows]
+
+                    # overwrite  relevant rows
+                    targets = [r[0] for r in currentmatrix[currentMatrixNonEmpty].rows]
+                    new_neighbors = sourceNeighborsFrom[targets]
+
+                    selfdist = sparse.csr_matrix(currentmatrix)
+                    # selfdist.data = np.full_like(selfdist.data, epsilon) # overwrite distances with epsilon
+                    selfdist = selfdist[currentMatrixNonEmpty].astype(bool) * epsilon
+                    new_neighbors += selfdist
+                    getpart[(i,j)][currentMatrixNonEmpty] =  new_neighbors
+                    # so.heatmap(getpart[(i,j)].todense(),dim=(50,50))
+                    # part = np.argpartition(distancemat, neighbors, axis = 1)[:,:neighbors]
+                    # neighborsgraph = np.zeros_like(distancemat)
+                    # np.put_along_axis(neighborsgraph,part, np.take(distancemat,part), axis = 1)
+
+                    #so.heatmap(getpart[(i,j)].todense(),dim=(50,50))
+                    #print('##############')
 
     # then we built a row:
     row = []
@@ -187,19 +238,12 @@ def linear_assignment_integrate(Xlist,
         col = []
         for j in range(n_datas):
             if i <= j:
-                distance_matrix,a,b = getpart[(i,j)]
-                lsatime+=a
-                eutime += b
+                distance_matrix = getpart[(i,j)]
             else:
                 distance_matrix = row[j][i].T
-
             col.append(distance_matrix)
         row.append(col)
-
     distance_matrix = sparse.vstack([sparse.hstack(col) for col in row])
-
-    if showtime:
-        print(f"{eutime=}")
-        print(f"{lsatime=}")
     check_symmetric(distance_matrix,raise_exception=True)
+    # so.heatmap(distance_matrix.todense(), dim = (100,100))
     return  distance_matrix

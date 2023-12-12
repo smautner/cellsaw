@@ -43,7 +43,6 @@ def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
 
 
 
-
 def test_scalp():
     a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3, maxcells = 600, datasets = ["Immune_ALL_hum_mou.h5ad"])[0]
     # print("=============== mnn ===============")

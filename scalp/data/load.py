@@ -12,8 +12,9 @@ def rename_obs(datasets, batch, typ):
 
 def load_scib(path, datasets = False):
     if not datasets:
-        datasets = "Immune_ALL_hum_mou.h5ad  Immune_ALL_human.h5ad  Lung_atlas_public.h5ad  human_pancreas_norm_complexBatch.h5ad".split()
-    datasets = [sc.read(path+data) for data in datasets]
+        datasets = "Immune_ALL_hum_mou Immune_ALL_human Lung_atlas_public human_pancreas_norm_complexBatch".split()
+
+    datasets = [sc.read(path+data+".h5ad") for data in datasets]
     batch,typ = Transpose (Map(lambda x:x.split(), 'batch final_annotation#batch final_annotation#batch cell_type#tech celltype'.split("#")))
     # rename fields
     rename_obs(datasets,batch, typ)
@@ -26,9 +27,14 @@ def load_scib(path, datasets = False):
             batch.uns['timeseries'] = False
     return datasets
 
-def load_timeseries(path,remove_unassigned = True):
-    datasets = [sc.read(path+data+".h5ad") for data in
-                "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
+def load_timeseries(path,datasets=False,remove_unassigned = True):
+
+    if not datasets:
+        datasets = "s5 509 1290 mousecortex water pancreatic cerebellum".split()
+    datasets = [sc.read(path+data+".h5ad") for data in datasets]
+
+    # datasets = [sc.read(path+data+".h5ad") for data in "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
+
     if remove_unassigned:
         okcells =  lambda ds: [ l not in ['-1','Unassigned','nan'] for l in ds.obs['label']]
         datasets = [ds[okcells(ds)] for ds in datasets]
