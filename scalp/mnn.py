@@ -3,9 +3,9 @@ from scalp.data import transform
 import ubergauss.tools as ut
 import scanpy.external.pp as sep
 
-def scanorama(adatas, base = 'pca40', batchindicator = 'batch', obslabel =  'scanorama'):
+def scanorama(adatas, base = 'pca40', batchindicator = 'batch', label =  'scanorama'):
     adata = transform.stack(adatas)
-    sep.scanorama_integrate(adata,batchindicator, basis = base, adjusted_basis = obslabel)
+    sep.scanorama_integrate(adata, batchindicator, basis = base, adjusted_basis = label)
     return transform.split_by_obs(adata)
 
 def mnn(adata, label = 'mnn'):

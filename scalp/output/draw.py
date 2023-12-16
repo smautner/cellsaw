@@ -124,6 +124,7 @@ def batchplot(adatas, from_obsm = 'embedding'):
     #sm= tools.spacemap(np.unique(stacked.obs['batch']))
     #plt.scatter(*Transpose(stacked.obsm['lsa']), c= sm.encode(stacked.obs['batch']) )
     adatas = stack(adatas)
+    assert adatas.obsm[from_obsm].shape[1] == 2, 'from_obsm not 2d'
     df = pd.DataFrame({a:b for a,b in zip('x y batch label'.split(),
                                           [*Transpose(adatas.obsm[from_obsm]),
                                            adatas.obs['batch'], adatas.obs['label'] ] )})
