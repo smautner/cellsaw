@@ -29,6 +29,16 @@ def to_linear_assignment_graph(adatas,base = 'pca40',
 
     return graph
 
+def mikasasukasa(mlsa, mcopyfrom):
+    res = np.zeros_like(mlsa)
+    for i,row in enumerate(mlsa):
+        for j in row.index:
+            newvalues = mcopyfrom[j]
+            # average distance to neighbors :)
+            res[i,j] = np.sum(newvalues)/np.count_nonzero(newvalues)
+            res[i] += newvalues
+
+
 
 def iterated_linear_sum_assignment(distances, repeats):
     def linear_sum_assignment_iteration(distances):
