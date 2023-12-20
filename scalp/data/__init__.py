@@ -17,7 +17,6 @@ from scalp.data import load
 
 def loaddata_timeseries(path,datasets=False,maxcells= 1000, maxdatasets = -1, **ppargs):
     datasets = load.load_timeseries(path , datasets= datasets)
-    print(f"{ppargs=}")
     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
     return ssdata
 

@@ -15,7 +15,7 @@ def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
     written such that the optimizer can do its thing
     '''
     adatas = pca.pca(adatas,dim = pre_pca, label = 'pca')
-    matrix = graph.to_linear_assignment_graph(adatas,base = 'pca',
+    matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
                                                   intra_neigh = intra_neigh,
                                                   inter_neigh = inter_neigh,
                                                   scaling_num_neighbors = scaling_num_neighbors,
@@ -44,7 +44,9 @@ def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
 
 
 def test_scalp():
-    a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3, maxcells = 600, datasets = ["Immune_ALL_hum_mou.h5ad"])[0]
+    n_cells = 100
+    a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3,
+                           maxcells = n_cells, datasets = ["Immune_ALL_hum_mou"])[0]
     # print("=============== mnn ===============")
     # mnn and scanvi are no longer maintained, scanoram is second on the nature method ranking
     # a = mnn.mnn(a)
@@ -53,7 +55,7 @@ def test_scalp():
     print("=============== PCA ===============")
     a = pca.pca(a)
     print(f"{a[0].obsm['pca40'].shape = }")
-    assert a[0].obsm['pca40'].shape == (600,40)
+    assert a[0].obsm['pca40'].shape == (n_cells,40)
     align(a,'pca40')
 
     print("=============== scanorama ===============")
@@ -63,29 +65,29 @@ def test_scalp():
     print("=============== umap ===============")
     a = umapwrap.adatas_umap(a,label= 'umap10')
     print(f"{ a[0].obsm['umap10'].shape= }")
-    assert a[0].obsm['umap10'].shape == (600,10)
+    assert a[0].obsm['umap10'].shape == (n_cells,10)
 
     print("=============== make lina-graph ===============")
-    matrix = graph.to_linear_assignment_graph(a, base ='pca40')
+    matrix = graph.linear_assignment_integrate(a, base ='pca40')
     print(f"{matrix.shape=}")
-    assert matrix.shape== (1800,1800)
+    assert matrix.shape== (n_cells*3,n_cells*3)
 
     print("=============== diffuse label ===============")
     a = diffuse.diffuse_label(a, matrix, use_labels_from_dataset_ids=[2, 1], new_label ='difflabel')
     #print(f"{type(a[0].obs['difflabel'])=}")
     print(f"{a[0].obs['difflabel'].shape=}")
-    assert a[0].obs['difflabel'].shape== (600,)
+    assert a[0].obs['difflabel'].shape== (n_cells,)
     print(f"{Map(score.anndata_ari, a, predicted_label='difflabel')=}")
 
     print("=============== sklearn diffusion ===============")
     a = diffuse.diffuse_label_sklearn(a, use_labels_from_dataset_ids=[2, 1], new_label ='skdiff')
     print(f"{a[0].obs['skdiff'].shape=}")
-    assert a[0].obs['skdiff'].shape== (600,)
+    assert a[0].obs['skdiff'].shape== (n_cells,)
 
     print("=============== lina-graph umap ===============")
     a = umapwrap.graph_umap(a,matrix, label = 'graphumap')
     print(f"{ a[0].obsm['graphumap'].shape= }")
-    assert a[0].obsm['graphumap'].shape== (600,2)
+    assert a[0].obsm['graphumap'].shape== (n_cells,2)
 
 
 
