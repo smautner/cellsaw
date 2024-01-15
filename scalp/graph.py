@@ -13,7 +13,7 @@ from sklearn.neighbors import NearestNeighbors
 import structout as so
 import ubergauss.tools as ut
 from scipy.sparse import csr_matrix
-
+from scipy.stats import rankdata
 
 # import matplotlib
 # matplotlib.use('module://matplotlib-backend-sixel')
@@ -59,6 +59,15 @@ def iterated_linear_sum_assignment(distances, repeats):
     cc, rr, dist  = Transpose([ linear_sum_assignment_iteration(distances) for _ in range(repeats)  ])
     return np.hstack(cc) , np.hstack(rr), np.hstack(dist)
 
+def test_cdf_remove():
+    ar = np.arange(10, dtype= float)
+    print(cdf_remove(ar,ar[::-1]))
+
+def cdf_remove(sorted, data):
+    cdf = np.cumsum(sorted)
+    cdf /= cdf[-1]
+    remove = np.random.random(len(sorted)) < cdf
+    return remove[rankdata(data,method='ordinal')-1]
 
 def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold):
     if inter_neigh < 10:
@@ -72,6 +81,9 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold):
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
+    elif outlier_threshold == 1:
+        ij_lsa_distances[cdf_remove(sorted_ij_assignment_distances, ij_lsa_distances)] = 0
+
     return i_ids, j_ids, ij_lsa_distances
 
 def lsa_sample(distance_matrix, num_instances):
@@ -98,48 +110,37 @@ def repeated_subsample_linear_sum_assignment(distances, repeats, num_instances):
 
 
 
-def neighborgraph(distancemat, neighbors):
-
-    # z= nbrs.kneighbors_graph(x,neighbors,mode='distance')
-    # z= ut.zehidense(z)
-    # z = np.stack((z,z.T), axis =2).max(axis=2)
-    # # diff = z-z.T
-    # # diff[diff > 0 ] = 0
-    # # z-= diff
-    # check_symmetric(z,raise_exception=True)
-    # return z
-
+def fast_neighborgraph(distancemat, neighbors):
     part = np.argpartition(distancemat, neighbors, axis = 1)[:,:neighbors]
     neighborsgraph = np.zeros_like(distancemat)
     np.put_along_axis(neighborsgraph, part, np.take(distancemat,part), axis = 1)
-
     return neighborsgraph
 
-
-
+def mutualNN(mtx):
+    mask = mtx != 0
+    mask &= mask.T
+    return mtx * mask
 
 def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True):
-
-
     # min spanning tree
     distancemat = metrics.euclidean_distances(x)
     tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
     tree= ut.zehidense(tree)
 
     # faster version of neighborsgraph
-    neighborsgraph = neighborgraph(distancemat, neighbors)
-
-
+    neighborsgraph = fast_neighborgraph(distancemat, neighbors)
+    neighborsgraph = mutualNN(neighborsgraph)
     # neighborsgraph = np.zeros_like(distancemat)
     # i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distancemat,neighbors,.8)
     # neighborsgraph[i_ids,j_ids] = ij_lsa_distances
 
 
-
     # combine and return
     combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
+
     np.fill_diagonal(combinedgraph,0)
+
     check_symmetric(combinedgraph,raise_exception=True)
     return combinedgraph
 

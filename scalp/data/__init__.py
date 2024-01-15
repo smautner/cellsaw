@@ -37,3 +37,4 @@ def test_load():
     from scalp import test_config
     a = loaddata_scib(test_config.scib_datapath)
     b = loaddata_timeseries(test_config.timeseries_datapath)
+
