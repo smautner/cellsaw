@@ -14,6 +14,7 @@ import structout as so
 import ubergauss.tools as ut
 from scipy.sparse import csr_matrix
 from scipy.stats import rankdata
+from collections import defaultdict
 
 # import matplotlib
 # matplotlib.use('module://matplotlib-backend-sixel')
@@ -26,13 +27,16 @@ def steal_neighbors(mlsa, mcopyfrom):
     res = np.zeros(mlsa.shape)
     mlsa = csr_matrix(mlsa)
     mcopyfrom = csr_matrix(mcopyfrom)
-
     for i, row in enumerate(mlsa):
+        ij_ctr = {}
         for j in row.indices:
             newvalues = mcopyfrom[j]
             # average distance to neighbors :)
-            res[i,j] = np.mean(newvalues.data)
             res[i] += newvalues
+            avg = np.mean(newvalues.data)
+            if not np.isnan(avg):
+                ij_ctr[(i,j)]  = avg
+        for (i,j), n in ij_ctr.items(): res[i,j] = n
 
 
     # plt.matshow(mlsa.todense())
@@ -46,6 +50,7 @@ def steal_neighbors(mlsa, mcopyfrom):
     # plt.matshow(res)
     # plt.show()
 
+    # assert not np.isnan(res).any()
     return res
 
 
@@ -63,13 +68,16 @@ def test_cdf_remove():
     ar = np.arange(10, dtype= float)
     print(cdf_remove(ar,ar[::-1]))
 
-def cdf_remove(sorted, data):
-    cdf = np.cumsum(sorted)
-    cdf /= cdf[-1]
-    remove = np.random.random(len(sorted)) < cdf
-    return remove[rankdata(data,method='ordinal')-1]
+from scipy.stats import norm
 
-def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold):
+def cdf_remove(sorted, data):
+    loc, scale = norm.fit(data)
+    probs  = 1- norm.cdf(data, loc, scale)
+    return  np.random.random(len(sorted)) > probs
+
+
+
+def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold, outlier_probabilistic_removal):
     if inter_neigh < 10:
         i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
     else:
@@ -77,11 +85,12 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold):
 
     # remove worst 25% hits
     sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
-    if outlier_threshold < 1:
+    if  outlier_threshold is not None:
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
-    elif outlier_threshold == 1:
+
+    if outlier_probabilistic_removal:
         ij_lsa_distances[cdf_remove(sorted_ij_assignment_distances, ij_lsa_distances)] = 0
 
     return i_ids, j_ids, ij_lsa_distances
@@ -121,7 +130,7 @@ def mutualNN(mtx):
     mask &= mask.T
     return mtx * mask
 
-def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True):
+def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = True):
     # min spanning tree
     distancemat = metrics.euclidean_distances(x)
     tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
@@ -129,7 +138,10 @@ def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True):
 
     # faster version of neighborsgraph
     neighborsgraph = fast_neighborgraph(distancemat, neighbors)
-    neighborsgraph = mutualNN(neighborsgraph)
+
+    if neighbors_mutual:
+        neighborsgraph = mutualNN(neighborsgraph)
+
     # neighborsgraph = np.zeros_like(distancemat)
     # i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distancemat,neighbors,.8)
     # neighborsgraph[i_ids,j_ids] = ij_lsa_distances
@@ -166,7 +178,8 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 scaling_num_neighbors = 2,
                                 outlier_threshold = .8,
                                 scaling_threshold=.9,
-                                dataset_adjacency = False,
+                                dataset_adjacency = False,intra_neighbors_mutual = True,
+                                copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
                                 add_tree = True, epsilon = 1e-6 ):
 
     if 'anndata' in str(type(Xlist[0])):
@@ -182,14 +195,16 @@ def linear_assignment_integrate(Xlist, base = 'pca',
             i,j = ij
             if i == j:
                 # use the maximum between neighborgraph and min spanning tree to make sure all is connected
-                r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh, add_tree = add_tree)
+                r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh,
+                                                          add_tree = add_tree,
+                                                          neighbors_mutual=intra_neighbors_mutual)
                 r = sparse.lil_matrix(r)
                 return r
 
 
             elif not adjacent(i,j):
                 # just fill with zeros :)
-                return  sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32),0,0
+                return  sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
             else:
                 '''
                 based = hungdists/= .25
@@ -202,7 +217,7 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                 if inter_neigh==0:
                     return res
 
-                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances,inter_neigh,outlier_threshold)
+                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances,inter_neigh,outlier_threshold,outlier_probabilistic_removal)
 
                 # normalize
 
@@ -222,10 +237,19 @@ def linear_assignment_integrate(Xlist, base = 'pca',
     n_datas = len(Xlist)
     tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
     parts = ut.xxmap( make_distance_matrix, tasks)
-    getpart=dict(zip(tasks,parts))
+    getpart = dict(zip(tasks,parts))
+
+    def steal_neigh(ij):
+        i,j = ij
+        return i,j,steal_neighbors(getpart[(i,j)], getpart[(j,j)])
+    if copy_lsa_neighbors:
+        tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
+        parts = ut.xxmap( steal_neigh, tasks)
+        for i,j,block in parts:
+            getpart[(i,j)]  = block
 
 
-    if False:
+    if False:# this is just copy_lsa_neighbors:)
         # insane enhancement idea :D
         for i in range(n_datas):
             for j in range(n_datas):

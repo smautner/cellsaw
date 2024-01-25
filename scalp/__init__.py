@@ -8,7 +8,8 @@ from scalp.output.draw import snsplot
 
 
 def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
-              scaling_num_neighbors = 2, outlier_threshold = .8,
+              scaling_num_neighbors = 2, inter_outlier_threshold = None,inter_outlier_probabilistic_removal= True,
+                intra_neighbors_mutual = True, copy_lsa_neighbors = True,
               scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
     '''
     this does our embedding,
@@ -18,10 +19,12 @@ def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
                                                   intra_neigh = intra_neigh,
                                                   inter_neigh = inter_neigh,
+                                                  outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
                                                   scaling_num_neighbors = scaling_num_neighbors,
-                                                  outlier_threshold = outlier_threshold,
+                                                  outlier_threshold = inter_outlier_threshold,
                                                   scaling_threshold = scaling_threshold,
                                                   dataset_adjacency =  dataset_adjacency,
+                                                  copy_lsa_neighbors=copy_lsa_neighbors,
                                               add_tree=add_tree)
     #data = umapwrap.graph_umap(data, matrix, label = 'graphumap')
     if False: # debug

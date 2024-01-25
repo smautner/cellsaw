@@ -1,3 +1,4 @@
+import numpy as np
 def neighborgraph_p_weird(x, neighbors):
     # neighbors = max(1, int(x.shape[0]*(neighbors_perc/100)))
     z= nbrs.kneighbors_graph(x,neighbors)
@@ -26,10 +27,19 @@ def make_adjacency(similarity, algo=0, connection_percentage=.9):
         return simm(similarity, neighbors)
 
 
+
+
 def merge_adjacency(*args):
     if len(args) == 1:
         return args[0]
     return np.logical_or(args[0],merge_adjacency(*args[1:]))
+
+def make_stairs(num_ds, kList):
+    return merge_adjacency(*[np.eye(num_ds,k=k)for k in kList]).astype(np.int32)
+
+def test_mkts():
+    print(f"{mkts(4,[-1,0,1])}")
+
 
 
 def make_star(size = 5, center =2):
