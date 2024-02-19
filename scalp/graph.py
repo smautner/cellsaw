@@ -70,10 +70,10 @@ def test_cdf_remove():
 
 from scipy.stats import norm
 
-def cdf_remove(sorted, data):
+def cdf_remove(data, bias):
     loc, scale = norm.fit(data)
-    probs  = 1- norm.cdf(data, loc, scale)
-    return  np.random.random(len(sorted)) > probs
+    probs  = 1 - norm.cdf(data, loc, scale)
+    return  np.random.random(len(data)) > (probs+bias)
 
 
 
@@ -85,13 +85,15 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold, outlie
 
     # remove worst 25% hits
     sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
-    if  outlier_threshold is not None:
+
+    if outlier_probabilistic_removal:
+        ij_lsa_distances[cdf_remove(ij_lsa_distances,outlier_threshold/2)] = 0
+
+    elif  outlier_threshold is not None:
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
 
-    if outlier_probabilistic_removal:
-        ij_lsa_distances[cdf_remove(sorted_ij_assignment_distances, ij_lsa_distances)] = 0
 
     return i_ids, j_ids, ij_lsa_distances
 

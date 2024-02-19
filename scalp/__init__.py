@@ -8,7 +8,8 @@ from scalp.output.draw import snsplot
 
 
 def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
-              scaling_num_neighbors = 2, inter_outlier_threshold = None,inter_outlier_probabilistic_removal= True,
+              scaling_num_neighbors = 2, inter_outlier_threshold = None,
+                inter_outlier_probabilistic_removal= True,
                 intra_neighbors_mutual = True, copy_lsa_neighbors = True,
               scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
     '''
@@ -19,6 +20,7 @@ def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
                                                   intra_neigh = intra_neigh,
                                                   inter_neigh = inter_neigh,
+                                                  intra_neighbors_mutual=intra_neighbors_mutual,
                                                   outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
                                                   scaling_num_neighbors = scaling_num_neighbors,
                                                   outlier_threshold = inter_outlier_threshold,

@@ -25,16 +25,16 @@ space_p1= {
         'inter_outlier_probabilistic_removal':[True,False]}
 
 space= {
-        'intra_neigh':[4,5,6],
+        'intra_neigh':[4,5,6,8,10],
         'intra_neighbors_mutual':[ True, False],
         'inter_neigh':[2,3,4],
         'add_tree':[True, False],
         'stairs':[0,1,2],
-        'copy_lsa_neighbors':[ True,False],
-        'inter_outlier_threshold':[.3,.6, .75 ,.9],
+        'copy_lsa_neighbors':[ False],
+        'inter_outlier_threshold':[.9],
         'pre_pca' : [40],
         'embed_comp' : [8],
-        'inter_outlier_probabilistic_removal':[False, True]}
+        'inter_outlier_probabilistic_removal':[ False]}
 
 def test_nya():
     p = opti.maketasks(space)[0]
@@ -127,8 +127,9 @@ if __name__ == '__main__':
     else:
         ds_ids=['eed0820f2f604c0e881a066fce833017', 'e35d2a29ea3a437ca92dfe06e2ee0c8d', '3eaff44b19084936b57c1bd627f4eceb', '4fe4b7cc44d5473cabfd0b07b442e10c', '39a84f031a2c4647a5e0f781459eb86e', '56f825c7978744b9910bb88e127a9005', '03e1f9cf9c0f4e8692c429554c7a67db']
 
+    scibNoStairs = lambda x: not (kwargs['scib'] and x['stairs'])
 
-    df = opti.gridsearch(evalparams, space,data= [ds_ids])
+    df = opti.gridsearch(evalparams, space,data= [ds_ids], taskfilter = scibNoStairs)
     print(df.corr(method='spearman'))
     opti.dfprint(df)
     ut.dumpfile(df,kwargs['out'])
