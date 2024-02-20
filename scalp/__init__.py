@@ -8,7 +8,7 @@ from scalp.output.draw import snsplot
 
 
 def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
-              scaling_num_neighbors = 2, inter_outlier_threshold = None,
+              scaling_num_neighbors = 2, inter_outlier_threshold = 0,
                 inter_outlier_probabilistic_removal= True,
                 intra_neighbors_mutual = True, copy_lsa_neighbors = True,
               scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
