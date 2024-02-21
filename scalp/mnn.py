@@ -18,11 +18,11 @@ def combat(adatas, base = 'pca40', batchindicator = 'batch', label =  'combat'):
 
 import bbknn
 def bbknnwrap(adatas, base = 'pca40',
-          batchindicator = 'batch'):
+          batchindicator = 'batch', dim = 2):
     adata = transform.stack(adatas)
     # sc.external.pp.bbknn(adata, batchindicator, use_rep=base)
     bbknn.bbknn(adata, use_rep = base)
-    sc.tl.umap(adata)
+    sc.tl.umap(adata,n_components=dim)
     return transform.split_by_obs(adata)
 
     # use this to do umap to a speciffic dim:
