@@ -77,7 +77,8 @@ def cdf_remove(data, bias):
 
 
 
-def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold, outlier_probabilistic_removal):
+def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold,
+                   outlier_probabilistic_removal, prune = 0):
     if inter_neigh < 10:
         i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
     else:
@@ -93,6 +94,7 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold, outlie
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
+
 
 
     return i_ids, j_ids, ij_lsa_distances
@@ -175,6 +177,8 @@ def average_knn_distance(I,J,i_ids,j_ids,numneigh):
 
 
 def linear_assignment_integrate(Xlist, base = 'pca',
+                                neighbors_total = 20,
+                                neighbors_intra_fraction = .5,
                                 intra_neigh=15,
                                 inter_neigh = 1,
                                 scaling_num_neighbors = 2,
@@ -186,6 +190,11 @@ def linear_assignment_integrate(Xlist, base = 'pca',
 
     if 'anndata' in str(type(Xlist[0])):
         Xlist = to_arrays(Xlist, base)
+
+    intra_neigh = max(1,np.rint(neighbors_total*neighbors_intra_fraction))
+    inter_neigh_total = max(1,np.rint(neighbors_total*(1-neighbors_intra_fraction)))
+    inter_neigh = max(1,np.rint(inter_neigh_total / len(Xlist))) # this is how many we sample
+    inter_neigh_desired = inter_neigh_total / (len(Xlist)-1) # this is how many we want
 
     def adjacent(i,j):
         if isinstance( dataset_adjacency, np.ndarray):
@@ -219,21 +228,26 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                 if inter_neigh==0:
                     return res
 
-                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances,inter_neigh,outlier_threshold,outlier_probabilistic_removal)
+                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances,
+                                                               inter_neigh,outlier_threshold,
+                                                               outlier_probabilistic_removal)
 
-                # normalize
 
-                # if scaling_threshold < 1:
-                #     lsa_normalisation_factor = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*scaling_threshold)]
-                #     ij_lsa_distances /= lsa_normalisation_factor
-
-                #
-                #dm = (avgdist(Xlist[i], hoodsize)+avgdist(Xlist[j],hoodsize))/2
-                #dab *=dm
-                # average_knn_distance_factors = average_knn_distance(Xlist[i],Xlist[j], i_ids , j_ids, scaling_num_neighbors)
-                # ij_lsa_distances *= average_knn_distance_factors
-                # make a matrix
                 res[i_ids,j_ids] = ij_lsa_distances
+
+
+
+                for i,row in enumerate(res):
+                    neighbors_have = np.sum(row > 0)
+                    if neighbors_have > inter_neigh_desired:
+                        p = inter_neigh_desired/neighbors_have
+                        targets = np.array(row.rows[0])
+                        # print(targets)
+                        select  = np.random.rand(len(targets)) < p
+                        for z in targets[select]:
+                            res[i,z] = 0
+
+
                 return res
 
     n_datas = len(Xlist)
@@ -251,33 +265,6 @@ def linear_assignment_integrate(Xlist, base = 'pca',
             getpart[(i,j)]  = block
 
 
-    if False:# this is just copy_lsa_neighbors:)
-        # insane enhancement idea :D
-        for i in range(n_datas):
-            for j in range(n_datas):
-                if i < j:
-                    getpart[(i,j)] = steal_neighbors(getpart[(i,j)], getpart[(j,j)])
-
-                    ## use the linsum targets as a source for new neighbors
-                    #currentmatrix = getpart[(i,j)]
-                    #sourceNeighborsFrom = getpart[(j,j)]
-                    ## some are removed due to the outlier threshold rule..
-                    #currentMatrixNonEmpty = [True if len(r) >0 else False for r in currentmatrix.rows]
-                    ## overwrite  relevant rows
-                    #targets = [r[0] for r in currentmatrix[currentMatrixNonEmpty].rows]
-                    #new_neighbors = sourceNeighborsFrom[targets]
-                    #selfdist = sparse.csr_matrix(currentmatrix)
-                    ## selfdist.data = np.full_like(selfdist.data, epsilon) # overwrite distances with epsilon
-                    #selfdist = selfdist[currentMatrixNonEmpty].astype(bool) * epsilon
-                    #new_neighbors += selfdist
-                    #getpart[(i,j)][currentMatrixNonEmpty] =  new_neighbors
-                    ## so.heatmap(getpart[(i,j)].todense(),dim=(50,50))
-                    ## part = np.argpartition(distancemat, neighbors, axis = 1)[:,:neighbors]
-                    ## neighborsgraph = np.zeros_like(distancemat)
-                    ## np.put_along_axis(neighborsgraph,part, np.take(distancemat,part), axis = 1)
-                    ##so.heatmap(getpart[(i,j)].todense(),dim=(50,50))
-                    ##print('##############')
-
     # then we built a row:
     row = []
     for i in range(n_datas):
@@ -289,7 +276,10 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                 distance_matrix = row[j][i].T
             col.append(distance_matrix)
         row.append(col)
-    distance_matrix = sparse.vstack([sparse.hstack(col) for col in row])
+
+
+    rows = [sparse.hstack(col) for col in row]
+    distance_matrix = sparse.vstack(rows)
 
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))

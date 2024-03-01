@@ -7,7 +7,9 @@ from scalp.data.align import align
 from scalp.output.draw import snsplot
 
 
-def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
+def mkgraph( adatas ,pre_pca = 40,
+            neighbors_total = 20, neighbors_intra_fraction = .5,
+            intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, inter_outlier_threshold = 0,
                 inter_outlier_probabilistic_removal= True,
                 intra_neighbors_mutual = True, copy_lsa_neighbors = True,
@@ -18,6 +20,8 @@ def mkgraph( adatas ,pre_pca = 40, intra_neigh = 15, inter_neigh = 1,
     '''
     adatas = pca.pca(adatas,dim = pre_pca, label = 'pca')
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
+                                                neighbors_total=neighbors_total,
+                                                neighbors_intra_fraction=neighbors_intra_fraction,
                                                   intra_neigh = intra_neigh,
                                                   inter_neigh = inter_neigh,
                                                   intra_neighbors_mutual=intra_neighbors_mutual,
