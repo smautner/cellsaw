@@ -186,15 +186,15 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 scaling_threshold=.9,
                                 dataset_adjacency = False,intra_neighbors_mutual = True,
                                 copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
-                                add_tree = True, epsilon = 1e-6 ):
+                                add_tree = True, epsilon = 1000 ):
 
     if 'anndata' in str(type(Xlist[0])):
         Xlist = to_arrays(Xlist, base)
 
-    intra_neigh = max(1,np.rint(neighbors_total*neighbors_intra_fraction))
-    inter_neigh_total = max(1,np.rint(neighbors_total*(1-neighbors_intra_fraction)))
-    inter_neigh = max(1,np.rint(inter_neigh_total / len(Xlist))) # this is how many we sample
+    intra_neigh = int(max(1,np.ceil(neighbors_total*neighbors_intra_fraction)))
+    inter_neigh_total = neighbors_total - intra_neigh #max(1,np.rint(neighbors_total*(1-neighbors_intra_fraction)))
     inter_neigh_desired = inter_neigh_total / (len(Xlist)-1) # this is how many we want
+    inter_neigh = int(np.ceil(inter_neigh_desired)) #int(max(1,np.rint(inter_neigh_total / len(Xlist)))) # this is how many we sample
 
     def adjacent(i,j):
         if isinstance( dataset_adjacency, np.ndarray):
@@ -240,24 +240,29 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                 for i,row in enumerate(res):
                     neighbors_have = np.sum(row > 0)
                     if neighbors_have > inter_neigh_desired:
-                        p = inter_neigh_desired/neighbors_have
-                        targets = np.array(row.rows[0])
-                        # print(targets)
-                        select  = np.random.rand(len(targets)) < p
-                        for z in targets[select]:
+                        assert neighbors_have > inter_neigh_desired > (neighbors_have -1), 'something is wrong with the neighbrs'
+                        # we will just remove one, so:
+                        if np.random.rand() < ( neighbors_have - inter_neigh_desired): # ok one needs to go
+                            targets = np.array(row.rows[0])
+                            z = np.random.choice(targets,1)[0]
                             res[i,z] = 0
+
+                if epsilon:
+                    res[res > 0] = epsilon
 
 
                 return res
 
     n_datas = len(Xlist)
     tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
-    parts = ut.xxmap( make_distance_matrix, tasks)
+    #parts = ut.xxmap( make_distance_matrix, tasks)
+    parts = Map( make_distance_matrix, tasks)
     getpart = dict(zip(tasks,parts))
 
     def steal_neigh(ij):
         i,j = ij
         return i,j,steal_neighbors(getpart[(i,j)], getpart[(j,j)])
+
     if copy_lsa_neighbors:
         tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
         parts = ut.xxmap( steal_neigh, tasks)

@@ -9,21 +9,20 @@ from scalp.output.draw import snsplot
 
 def mkgraph( adatas ,pre_pca = 40,
             neighbors_total = 20, neighbors_intra_fraction = .5,
-            intra_neigh = 15, inter_neigh = 1,
               scaling_num_neighbors = 2, inter_outlier_threshold = 0,
                 inter_outlier_probabilistic_removal= True,
-                intra_neighbors_mutual = True, copy_lsa_neighbors = True,
+            epsilon = 1e-6,
+                intra_neighbors_mutual = False, copy_lsa_neighbors = True,
               scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
     '''
     this does our embedding,
     written such that the optimizer can do its thing
     '''
+
     adatas = pca.pca(adatas,dim = pre_pca, label = 'pca')
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
                                                 neighbors_total=neighbors_total,
                                                 neighbors_intra_fraction=neighbors_intra_fraction,
-                                                  intra_neigh = intra_neigh,
-                                                  inter_neigh = inter_neigh,
                                                   intra_neighbors_mutual=intra_neighbors_mutual,
                                                   outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
                                                   scaling_num_neighbors = scaling_num_neighbors,
@@ -31,6 +30,7 @@ def mkgraph( adatas ,pre_pca = 40,
                                                   scaling_threshold = scaling_threshold,
                                                   dataset_adjacency =  dataset_adjacency,
                                                   copy_lsa_neighbors=copy_lsa_neighbors,
+                                               epsilon=epsilon,
                                               add_tree=add_tree)
     #data = umapwrap.graph_umap(data, matrix, label = 'graphumap')
     if False: # debug

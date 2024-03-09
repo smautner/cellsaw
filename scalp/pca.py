@@ -9,8 +9,12 @@ def pca(adatas, dim=40, label = 'pca40'):
         print('redundant pca :) ')
     # get a result
     data = stack(adatas)
-    scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
-    stackedPCA =  pca_on_scaled_data(scaled, dim)
+    if adatas[0].X.shape[1] < dim:
+        stackedPCA = data.X
+    else:
+        scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
+        stackedPCA =  pca_on_scaled_data(scaled, dim)
+
     return attach_stack(adatas, stackedPCA, label)
 
 

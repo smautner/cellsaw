@@ -9,6 +9,7 @@ from ubergauss import optimization as opti
 from scalp import data, test_config
 from warnings import simplefilter
 from scalp.data.similarity import make_stairs
+import ubergauss.hyperopt as ho
 simplefilter(action='ignore', category=FutureWarning)
 
 
@@ -25,7 +26,7 @@ space_p1= {
         'inter_outlier_probabilistic_removal':[True,False]}
 
 space= {
-        'intra_neigh':[4,5,6,8,10],
+        'neighbors_total':[4,5,6,8,10],
         'intra_neighbors_mutual':[ True, False],
         'inter_neigh':[2,3,4],
         'add_tree':[True, False],
@@ -35,6 +36,14 @@ space= {
         'pre_pca' : [40],
         'embed_comp' : [8],
         'inter_outlier_probabilistic_removal':[ False]}
+
+# 'stairs':[0,1,2],
+space3 = ho.spaceship(''' neighbors_total 10 100 1
+neighbors_intra_fraction .05 .5
+add_tree 0 1 1
+copy_lsa_neighbors 0 1 1
+inter_outlier_threshold 0.7 1
+inter_outlier_probabilistic_removal 0 1 1'''.split('\n'))
 
 def test_nya():
     p = opti.maketasks(space)[0]
@@ -53,8 +62,8 @@ def eval_single(ss_id = '',
     batches = ut.loadfile(f'garbage/{ss_id}.delme')
     # batches = [data.subsample_iflarger(s, num=100, copy = False) for s in ssdata]
 
-    embed_comp = kwargs.pop('embed_comp')
-    stairs = kwargs.pop('stairs')
+    embed_comp = kwargs.pop('embed_comp', 8)
+    stairs = kwargs.pop('stairs',None)
 
     batches, matrix = scalp.mkgraph(batches,
                                     dataset_adjacency= make_stairs(len(batches),Range(1,stairs+1)) if stairs else None, **kwargs)
@@ -129,7 +138,8 @@ if __name__ == '__main__':
 
     scibNoStairs = lambda x: not (kwargs['scib'] and x['stairs'])
 
-    df = opti.gridsearch(evalparams, space,data= [ds_ids], taskfilter = scibNoStairs)
+    # df = opti.gridsearch(evalparams, space,data= [ds_ids], taskfilter = scibNoStairs)
+    df = opti.gridsearch(evalparams,space3, tasks = [space3.sample() for i in range(60)] ,data= [ds_ids])
     print(df.corr(method='spearman'))
     opti.dfprint(df)
     ut.dumpfile(df,kwargs['out'])
