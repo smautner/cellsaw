@@ -1,7 +1,11 @@
 from scalp.data.transform import stack_single_attribute, attach_stack
+import trimap
+from sklearn.manifold import spectral_embedding
+import pacmap
 import umap
 import numpy as np
 from ubergauss import graphumap
+from ubergauss import csrjax as cj
 from scipy.sparse import csr_matrix
 
 def adatas_umap(adatas, dim = 10, label = 'umap10', from_obsm = 'pca40', **umapargs):
@@ -44,6 +48,10 @@ def graph_PCA(adatas, distance_adjacency_matrix,
     res = PCA(n_components = n_components).fit_transform(distance_adjacency_matrix)
     return attach_stack(adatas, res, label)
 
+def graph_jax(adatas, distance_adjacency_matrix,
+               label='jax', n_components = 2, **kwargs):
+    res = cj.embed(distance_adjacency_matrix, n_components = n_components)
+    return attach_stack(adatas, res, label)
 
 def graph_xumap(adatas, distance_adjacency_matrix,
                label=f'lsa', n_neighbors = 10,
@@ -52,9 +60,22 @@ def graph_xumap(adatas, distance_adjacency_matrix,
     res = umap.UMAP().fit_transform(distance_adjacency_matrix)
     return attach_stack(adatas, res, label)
 
+def graph_pacmap(adatas, distance_adjacency_matrix,
+               label=f'pacmap',
+               n_components = 2,neighbors = None, MN= .5, FP=2, **kwargs):
+    # distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
+    # distance_adjacency_matrix = distance_adjacency_matrix.todense()
+    res = pacmap.PaCMAP(n_components=n_components, n_neighbors=neighbors, MN_ratio=MN, FP_ratio=FP).fit_transform(distance_adjacency_matrix)
+    return attach_stack(adatas, res, label)
 
-
-from sklearn.manifold import spectral_embedding
+def graph_trimap(adatas, distance_adjacency_matrix,
+               label=f'trimap',
+               n_components = 2):
+    # distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
+    distance_adjacency_matrix = np.asarray(distance_adjacency_matrix.todense())
+    # res = pacmap.PaCMAP(n_components=n_components, n_neighbors=neighbors, MN_ratio=MN, FP_ratio=FP).fit_transform(distance_adjacency_matrix)
+    res = trimap.TRIMAP(use_dist_matrix=True).fit_transform(distance_adjacency_matrix)
+    return attach_stack(adatas, res, label)
 
 def graph_spectral(adatas, distance_adjacency_matrix,
                label=f'lsa', n_neighbors = 10,
@@ -63,6 +84,14 @@ def graph_spectral(adatas, distance_adjacency_matrix,
     res = spectral_embedding(distance_adjacency_matrix, n_components=2)
     return attach_stack(adatas, res, label)
 
-
+from sklearn.decomposition import TruncatedSVD
+def graph_tsvd(adatas, distance_adjacency_matrix,
+               label=f'tsvd',
+               n_components = 2):
+    # distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
+    #distance_adjacency_matrix = np.asarray(distance_adjacency_matrix.todense())
+    # res = pacmap.PaCMAP(n_components=n_components, n_neighbors=neighbors, MN_ratio=MN, FP_ratio=FP).fit_transform(distance_adjacency_matrix)
+    res = TruncatedSVD().fit_transform(distance_adjacency_matrix)
+    return attach_stack(adatas, res, label)
 
 

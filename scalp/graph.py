@@ -79,10 +79,9 @@ def cdf_remove(data, bias):
 
 def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold,
                    outlier_probabilistic_removal, prune = 0):
-    if inter_neigh < 10:
-        i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
-    else:
-        i_ids,j_ids, ij_lsa_distances = repeated_subsample_linear_sum_assignment(ij_euclidian_distances,inter_neigh,100)
+
+    i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
+    # i_ids,j_ids, ij_lsa_distances = repeated_subsample_linear_sum_assignment(ij_euclidian_distances,inter_neigh,100)
 
     # remove worst 25% hits
     sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
@@ -135,24 +134,25 @@ def mutualNN(mtx):
     return mtx * mask
 
 def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = True):
-    # min spanning tree
+
     distancemat = metrics.euclidean_distances(x)
+
+    # min spanning tree
     tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
     tree= ut.zehidense(tree)
 
     # faster version of neighborsgraph
     neighborsgraph = fast_neighborgraph(distancemat, neighbors)
+    #anti_neighborsgraph = -fast_neighborgraph(-distancemat, neighbors)+100
 
+    # make mutual
     if neighbors_mutual:
         neighborsgraph = mutualNN(neighborsgraph)
 
-    # neighborsgraph = np.zeros_like(distancemat)
-    # i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distancemat,neighbors,.8)
-    # neighborsgraph[i_ids,j_ids] = ij_lsa_distances
-
 
     # combine and return
-    combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T), axis =2)
+    #combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T, anti_neighborsgraph,anti_neighborsgraph.T), axis =2)
+    combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T ), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
 
     np.fill_diagonal(combinedgraph,0)
@@ -289,4 +289,50 @@ def linear_assignment_integrate(Xlist, base = 'pca',
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
 
+    return  distance_matrix
+
+
+
+def negstuff(Xlist,
+            base = 'pca',
+            neighbors_total = 20,
+             neighbors_intra_fraction = .5, **kwargs):
+
+    if 'anndata' in str(type(Xlist[0])):
+        Xlist = to_arrays(Xlist, base)
+
+    intra_neigh = int(max(1,np.ceil(neighbors_total*neighbors_intra_fraction)))
+
+
+    def make_distance_matrix(ij):
+        i,j = ij
+        if i == j:
+            distancemat = metrics.euclidean_distances(Xlist[i])
+            part = np.argpartition(distancemat, -3*intra_neigh, axis = 1)[:,-3*intra_neigh:]
+            np.random.shuffle(part.T)
+            part  =part[:,:intra_neigh*2]
+            neighborsgraph = np.zeros_like(distancemat)
+            np.put_along_axis(neighborsgraph, part, np.take(distancemat,part), axis = 1)
+            return sparse.lil_matrix(neighborsgraph)
+        return  sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
+
+    n_datas = len(Xlist)
+    tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
+    #parts = ut.xxmap( make_distance_matrix, tasks)
+    parts = Map( make_distance_matrix, tasks)
+    getpart = dict(zip(tasks,parts))
+
+    # then we built a row:
+    row = []
+    for i in range(n_datas):
+        col = []
+        for j in range(n_datas):
+            if i <= j:
+                distance_matrix = getpart[(i,j)]
+            else:
+                distance_matrix = row[j][i].T
+            col.append(distance_matrix)
+        row.append(col)
+    rows = [sparse.hstack(col) for col in row]
+    distance_matrix = sparse.vstack(rows)
     return  distance_matrix
