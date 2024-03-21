@@ -1,4 +1,6 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 from  sklearn.neighbors import KNeighborsClassifier
+
 from ubergauss import tools as ut
 import numpy as np
 from sklearn.metrics import  silhouette_score
@@ -65,7 +67,49 @@ def score_lin_batch(dataset, projection = 'umap'):
         prediction = SGDClassifier().fit(X,y).predict(X)
         return balanced_accuracy_score(y , prediction, adjusted=True )
 
-    # scores = np.array([1-acc(l) for l in np.unique(dataset.obs['label'])]) ### !!!!
-    # weight by label counts ..
     return np.nanmean([1-acc(l) for l in np.unique(dataset.obs['label'])])
+
+
+def scalp_scores(ds, projection = 'umap'):
+    return {'batch': score_lin_batch(ds,projection), 'label':score_lin(ds,projection)}
+
+
+from scib.metrics import metrics
+def score_scib_metrics(dataset):
+    # ds2 = dataset.copy()
+    # ds2.X = ds2.obsm['umap']
+    # https://scib.readthedocs.io/en/latest/api.html#biological-conservation-metrics
+    embed = 'umap' if 'umap' in dataset.obsm else 'X_umap'
+    sc =  metrics(dataset, dataset, 'batch', 'label', embed = embed,
+                       isolated_labels_asw_=True, silhouette_=True, hvg_score_=True, graph_conn_=True,
+           pcr_=True,
+             isolated_labels_f1_=True,
+             trajectory_=False,
+             nmi_=True,
+            ari_=True )
+
+    res =  dict(dict(sc)[0])
+    for k in list(res.keys()):
+        if np.isnan(res[k]):
+            res.pop(k)
+    res.pop('hvg_overlap',0)
+    return res
+
+
+def split_scib_scores(d):
+    batchwords = 'PCR_batch ASW_label/batch graph_conn'.split()
+
+    def split(d):
+        batch = np.mean([v for k,v in d.items() if k in batchwords ])
+        bioconservation = np.mean([v for k,v in d.items() if not k in batchwords ])
+        return bioconservation,batch
+
+    return split(d)
+
+
+def scip_scores(ds, projection = 'umap'):
+    sc = score_scib_metrics(ds)
+    bio, batch = split_scib_scores(sc)
+    return {'batch': batch,  'label':bio}
+
 

@@ -13,37 +13,15 @@ import ubergauss.hyperopt as ho
 simplefilter(action='ignore', category=FutureWarning)
 
 
-
-space_p1= {
-        'intra_neigh':[5,10,15,20],
-        'intra_neighbors_mutual':[ True, False],
-        'inter_neigh':[1,2,3,4],
-        'add_tree':[True,False],
-        'copy_lsa_neighbors':[ True,False],
-        'inter_outlier_threshold':[ None, .7, .8 , .9],
-        'pre_pca' : [40],
-        'embed_comp' : [8],
-        'inter_outlier_probabilistic_removal':[True,False]}
-
-space= {
-        'neighbors_total':[4,5,6,8,10],
-        'intra_neighbors_mutual':[ True, False],
-        'inter_neigh':[2,3,4],
-        'add_tree':[True, False],
-        'stairs':[0,1,2],
-        'copy_lsa_neighbors':[ False],
-        'inter_outlier_threshold':[.9],
-        'pre_pca' : [40],
-        'embed_comp' : [8],
-        'inter_outlier_probabilistic_removal':[ False]}
-
 # 'stairs':[0,1,2],
-space3 = ho.spaceship(''' neighbors_total 10 100 1
+space3 = ho.spaceship('''
+neighbors_total 10 100 1
 neighbors_intra_fraction .05 .5
 add_tree 0 1 1
 copy_lsa_neighbors 0 1 1
 inter_outlier_threshold 0.7 1
-inter_outlier_probabilistic_removal 0 1 1'''.split('\n'))
+inter_outlier_probabilistic_removal 0 1 1
+''')
 
 def test_nya():
     p = opti.maketasks(space)[0]
@@ -55,18 +33,16 @@ def test_nya():
 
 
 
-def eval_single(ss_id = '',
-                score_weights=[1,1,1],
-                **kwargs):
+def eval_single(**kwargs):
+    ss_id = kwargs.pop('dataset')
+    embed_comp = kwargs.pop('embed_comp', 8)
+
 
     batches = ut.loadfile(f'garbage/{ss_id}.delme')
-    # batches = [data.subsample_iflarger(s, num=100, copy = False) for s in ssdata]
-
-    embed_comp = kwargs.pop('embed_comp', 8)
     stairs = kwargs.pop('stairs',None)
 
-    batches, matrix = scalp.mkgraph(batches,
-                                    dataset_adjacency= make_stairs(len(batches),Range(1,stairs+1)) if stairs else None, **kwargs)
+    batches, matrix = scalp.mkgraph(batches, **kwargs)
+                                    # dataset_adjacency= make_stairs(len(batches), Range(1,stairs+1)) if stairs else None, **kwargs)
 
     batches = umapwrap.graph_umap(batches,matrix,
                                   n_components=embed_comp,
@@ -78,15 +54,12 @@ def eval_single(ss_id = '',
     #     exit()
 
     scores = score.scores(batches,projectionlabel='emb')
-    # return -np.dot(scores, score_weights)
+
     return scores
 
-def evalparams(dataids, **params):
-    # if params['isodim'] < params['inter_neigh']+ params['intra_neigh']:
-    #     return None
-    # return np.mean(Map(eval_single, dataids,  **params), axis = 0)
-    scores =  np.mean(Map(eval_single, dataids,  **params), axis = 0)
-    return dict(zip('class_cohesion silhouette batch_cohesion'.split(),scores))
+# def evalparams(dataids, **params):
+#     scores =  np.mean(Map(eval_single, dataids,  **params), axis = 0)
+#     return dict(zip('class_cohesion silhouette batch_cohesion'.split(),scores))
 
 
 import uuid
@@ -120,6 +93,19 @@ opts = '''
 --batches int 7
 '''
 
+
+
+
+
+
+def data_to_params(tasks, data):
+    for t in tasks:
+        for d in data:
+            t2= dict(tasks)
+            t2['dataset'] = d
+            yield t2
+
+
 if __name__ == '__main__':
     import  dirtyopts
     kwargs = dirtyopts.parse(opts).__dict__
@@ -136,16 +122,19 @@ if __name__ == '__main__':
     else:
         ds_ids=['eed0820f2f604c0e881a066fce833017', 'e35d2a29ea3a437ca92dfe06e2ee0c8d', '3eaff44b19084936b57c1bd627f4eceb', '4fe4b7cc44d5473cabfd0b07b442e10c', '39a84f031a2c4647a5e0f781459eb86e', '56f825c7978744b9910bb88e127a9005', '03e1f9cf9c0f4e8692c429554c7a67db']
 
-    scibNoStairs = lambda x: not (kwargs['scib'] and x['stairs'])
-
+    # scibNoStairs = lambda x: not (kwargs['scib'] and x['stairs'])
     # df = opti.gridsearch(evalparams, space,data= [ds_ids], taskfilter = scibNoStairs)
-    df = opti.gridsearch(evalparams,space3, tasks = [space3.sample() for i in range(60)] ,data= [ds_ids])
+    # df = opti.gridsearch(evalparams,space3, tasks = [space3.sample() for i in range(60)] ,data= [ds_ids])
+
+    tasks = [space3.sample() for i in range(60)]
+    tasks = list(data_to_params(tasks, ds_ids))
+    df = opti.gridsearch(eval_single, space3, tasks = tasks ,data= [])
+
     print(df.corr(method='spearman'))
     opti.dfprint(df)
     ut.dumpfile(df,kwargs['out'])
     print(f"{ds_ids=}")
     print(f"{kwargs=}")
-
 
     # ubergauss has a caching function somethere!
     # skf = KFold(n_splits=4, random_state=None, shuffle=True)
