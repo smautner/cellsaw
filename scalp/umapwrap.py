@@ -48,9 +48,11 @@ def graph_PCA(adatas, distance_adjacency_matrix,
     res = PCA(n_components = n_components).fit_transform(distance_adjacency_matrix)
     return attach_stack(adatas, res, label)
 
+from scalp.graph import negstuff
 def graph_jax(adatas, distance_adjacency_matrix,
                label='jax', n_components = 2, **kwargs):
-    res = cj.embed(distance_adjacency_matrix, n_components = n_components)
+    data = csr_matrix(distance_adjacency_matrix), negstuff(adatas,**kwargs)
+    res = cj.embed(data, n_components = n_components)
     return attach_stack(adatas, res, label)
 
 def graph_xumap(adatas, distance_adjacency_matrix,

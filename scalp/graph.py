@@ -183,7 +183,6 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 inter_neigh = 1,
                                 scaling_num_neighbors = 2,
                                 outlier_threshold = .8,
-                                scaling_threshold=.9,
                                 dataset_adjacency = False,intra_neighbors_mutual = True,
                                 copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
                                 add_tree = True, epsilon = 1000 ):
@@ -301,16 +300,18 @@ def negstuff(Xlist,
     if 'anndata' in str(type(Xlist[0])):
         Xlist = to_arrays(Xlist, base)
 
-    intra_neigh = int(max(1,np.ceil(neighbors_total*neighbors_intra_fraction)))
-
-
+    # intra_neigh = int(max(1,np.ceil(neighbors_total*neighbors_intra_fraction)))
+    neg_used = neighbors_total
+    neg_samples= int(Xlist[0].shape[0]/2)
+    assert neg_used <= neg_samples, f"{neg_used=}  {neg_samples=}"
     def make_distance_matrix(ij):
         i,j = ij
         if i == j:
             distancemat = metrics.euclidean_distances(Xlist[i])
-            part = np.argpartition(distancemat, -3*intra_neigh, axis = 1)[:,-3*intra_neigh:]
+            part = np.argpartition(-distancemat, neg_samples, axis = 1)[:,:neg_samples]
+            # part = np.argsort(-distancemat, axis = 1)[:,neg_samples//2:neg_samples]
             np.random.shuffle(part.T)
-            part  =part[:,:intra_neigh*2]
+            part  =part[:,:neg_used]
             neighborsgraph = np.zeros_like(distancemat)
             np.put_along_axis(neighborsgraph, part, np.take(distancemat,part), axis = 1)
             return sparse.lil_matrix(neighborsgraph)
@@ -335,4 +336,4 @@ def negstuff(Xlist,
         row.append(col)
     rows = [sparse.hstack(col) for col in row]
     distance_matrix = sparse.vstack(rows)
-    return  distance_matrix
+    return  csr_matrix(distance_matrix)

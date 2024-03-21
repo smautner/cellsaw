@@ -9,11 +9,11 @@ from scalp.output.draw import snsplot
 
 def mkgraph( adatas ,pre_pca = 40,
             neighbors_total = 20, neighbors_intra_fraction = .5,
-              scaling_num_neighbors = 2, inter_outlier_threshold = 0,
-                inter_outlier_probabilistic_removal= True,
+              scaling_num_neighbors = 2, inter_outlier_threshold = .9,
+                inter_outlier_probabilistic_removal= False,
             epsilon = 1e-6,
-                intra_neighbors_mutual = False, copy_lsa_neighbors = True,
-              scaling_threshold = .9,add_tree= True, dataset_adjacency = None ):
+                intra_neighbors_mutual = False, copy_lsa_neighbors = False,
+              add_tree= False, dataset_adjacency = None ):
     '''
     this does our embedding,
     written such that the optimizer can do its thing
@@ -27,7 +27,6 @@ def mkgraph( adatas ,pre_pca = 40,
                                                   outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
                                                   scaling_num_neighbors = scaling_num_neighbors,
                                                   outlier_threshold = inter_outlier_threshold,
-                                                  scaling_threshold = scaling_threshold,
                                                   dataset_adjacency =  dataset_adjacency,
                                                   copy_lsa_neighbors=copy_lsa_neighbors,
                                                epsilon=epsilon,
