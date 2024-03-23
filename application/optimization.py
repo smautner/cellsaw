@@ -15,35 +15,35 @@ simplefilter(action='ignore', category=FutureWarning)
 
 # 'stairs':[0,1,2],
 space3 = ho.spaceship('''
-neighbors_total 10 100 1
-neighbors_intra_fraction .05 .5
-add_tree 0 1 1
+neighbors_total 15 45 1
+neighbors_intra_fraction .3 .7
+inter_outlier_threshold .60 .97
 copy_lsa_neighbors 0 1 1
-inter_outlier_threshold 0.7 1
+intra_neighbors_mutual 0 1 1
 inter_outlier_probabilistic_removal 0 1 1
+add_tree 0 1 1
 ''')
 
 def test_nya():
     p = opti.maketasks(space)[0]
     p = {'intra_neigh': 5, 'intra_neighbors_mutual': True, 'inter_neigh': 1, 'add_tree': False, 'copy_lsa_neighbors': True, 'inter_outlier_threshold': 0.8, 'pre_pca': 40, 'embed_comp': 8, 'inter_outlier_probabilistic_removal': True}
     print(p)
-    did= 'b450f36d15cf4f0b921dadf2c7af7533'
+    did= '38fe76f71bb744009a2cef28893e7823'
     r = eval_single(did, **p)
     return r
 
 
 
 def eval_single(**kwargs):
+    args = dict(kwargs)
     ss_id = kwargs.pop('dataset')
     embed_comp = kwargs.pop('embed_comp', 8)
 
-
     batches = ut.loadfile(f'garbage/{ss_id}.delme')
-    stairs = kwargs.pop('stairs',None)
+    # stairs = kwargs.pop('stairs',None)
 
     batches, matrix = scalp.mkgraph(batches, **kwargs)
                                     # dataset_adjacency= make_stairs(len(batches), Range(1,stairs+1)) if stairs else None, **kwargs)
-
     batches = umapwrap.graph_umap(batches,matrix,
                                   n_components=embed_comp,
                                   label = 'emb')
@@ -53,9 +53,9 @@ def eval_single(**kwargs):
     #     print(kwargs, ss_id)
     #     exit()
 
-    scores = score.scores(batches,projectionlabel='emb')
-
-    return scores
+    scores = score.scalp_scores(batches,projection='emb')
+    args.update(scores)
+    return args
 
 # def evalparams(dataids, **params):
 #     scores =  np.mean(Map(eval_single, dataids,  **params), axis = 0)
@@ -94,14 +94,10 @@ opts = '''
 '''
 
 
-
-
-
-
 def data_to_params(tasks, data):
     for t in tasks:
         for d in data:
-            t2= dict(tasks)
+            t2= dict(t)
             t2['dataset'] = d
             yield t2
 
@@ -126,15 +122,16 @@ if __name__ == '__main__':
     # df = opti.gridsearch(evalparams, space,data= [ds_ids], taskfilter = scibNoStairs)
     # df = opti.gridsearch(evalparams,space3, tasks = [space3.sample() for i in range(60)] ,data= [ds_ids])
 
-    tasks = [space3.sample() for i in range(60)]
+    tasks = [space3.sample() for i in range(100)]
     tasks = list(data_to_params(tasks, ds_ids))
     df = opti.gridsearch(eval_single, space3, tasks = tasks ,data= [])
+    df.to_csv('out.csv', index=False)
 
-    print(df.corr(method='spearman'))
-    opti.dfprint(df)
-    ut.dumpfile(df,kwargs['out'])
-    print(f"{ds_ids=}")
-    print(f"{kwargs=}")
+    # ut.dumpfile(df,kwargs['out'])
+    # print(df.corr(method='spearman'))
+    # opti.dfprint(df)
+    # print(f"{ds_ids=}")
+    # print(f"{kwargs=}")
 
     # ubergauss has a caching function somethere!
     # skf = KFold(n_splits=4, random_state=None, shuffle=True)

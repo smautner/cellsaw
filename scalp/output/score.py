@@ -107,7 +107,7 @@ def split_scib_scores(d):
     return split(d)
 
 
-def scip_scores(ds, projection = 'umap'):
+def scib_scores(ds, projection = 'umap'):
     sc = score_scib_metrics(ds)
     bio, batch = split_scib_scores(sc)
     return {'batch': batch,  'label':bio}

@@ -185,7 +185,7 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 outlier_threshold = .8,
                                 dataset_adjacency = False,intra_neighbors_mutual = True,
                                 copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
-                                add_tree = True, epsilon = 1000 ):
+                                add_tree = True, epsilon = 1e4 ):
 
     if 'anndata' in str(type(Xlist[0])):
         Xlist = to_arrays(Xlist, base)
