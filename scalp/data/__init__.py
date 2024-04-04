@@ -55,6 +55,7 @@ def create_anndata(matrix, labels, batch_string):
     adata = sc.AnnData(X=matrix)
     adata.obs['label'] = labels
     adata.obs['batch'] = np.repeat(batch_string, len(labels))
+    adata.obsm['umap'] = matrix
     return adata
 
 def mkblobs(sizes = [[20,25],[25,20],[23,22]], clusterspread = .2 , batchspread = 1):
@@ -63,5 +64,6 @@ def mkblobs(sizes = [[20,25],[25,20],[23,22]], clusterspread = .2 , batchspread 
         centers = np.array([[sid, batchid * batchspread] for sid in Range(slist)] )
         X,y = make_blobs(n_samples= slist, centers = centers, cluster_std = clusterspread)
         res.append(create_anndata(X,y, batchid))
+
     return res
 

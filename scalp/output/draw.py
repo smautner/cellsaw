@@ -6,7 +6,6 @@ from ubergauss import tools
 import numpy as np
 from scipy.optimize import linear_sum_assignment as lsa
 
-from lucy import draw
 from scalp.data.align import align
 
 col = plt.cm.get_cmap('tab20').colors
