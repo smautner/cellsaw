@@ -133,6 +133,41 @@ def mutualNN(mtx):
     mask &= mask.T
     return mtx * mask
 
+from collections import Counter
+def spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = True):
+    '''
+    the plan:
+    '''
+
+    model = NearestNeighbors(n_neighbors=neighbors*2).fit(x)
+    distances, indices = model.kneighbors(x)
+    counts = np.bincount(indices)
+    counts_mat = counts[indices]
+    cnt_srt = np.argsort(counts_mat, axis = 1)
+    indices_new = np.take_along_axis(indices, cnt_srt, axis =1)[:,:neighbors]
+    neighborsgraph = np.zeros_like((x.shape[0],x.shape[0]))
+    np.put_along_axis(neighborsgraph,indices_new,1,axis=1)
+
+    # distancemat = metrics.euclidean_distances(x)
+
+
+    # min spanning tree
+    # tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
+    # tree= ut.zehidense(tree)
+    # faster version of neighborsgraph
+    # neighborsgraph = fast_neighborgraph(distancemat, neighbors)
+    #anti_neighborsgraph = -fast_neighborgraph(-distancemat, neighbors)+100
+    # make mutual
+    # if neighbors_mutual:
+    # neighborsgraph = mutualNN(neighborsgraph)
+    # combine and return
+    #combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T, anti_neighborsgraph,anti_neighborsgraph.T), axis =2)
+    combinedgraph = np.stack((neighborsgraph,neighborsgraph.T ), axis =2)
+    combinedgraph = combinedgraph.max(axis=2)
+    np.fill_diagonal(combinedgraph,0)
+    # check_symmetric(combinedgraph,raise_exception=True)
+    return combinedgraph
+
 def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = True):
 
     distancemat = metrics.euclidean_distances(x)
@@ -185,15 +220,27 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 outlier_threshold = .8,
                                 dataset_adjacency = False,intra_neighbors_mutual = True,
                                 copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
-                                add_tree = True, epsilon = 1e4 ):
+                                add_tree = True, epsilon = 1e-4 ):
 
     if 'anndata' in str(type(Xlist[0])):
         Xlist = to_arrays(Xlist, base)
+
+
+
+    if len(Xlist) ==1:
+                r = symmetric_spanning_tree_neighborgraph(Xlist[0],
+                # r = spanning_tree_neighborgraph(Xlist[0],
+                                                          int(neighbors_total),
+                                                          add_tree = add_tree,
+                                                          neighbors_mutual=intra_neighbors_mutual)
+                r = sparse.lil_matrix(r)
+                return r
 
     intra_neigh = int(max(1,np.ceil(neighbors_total*neighbors_intra_fraction)))
     inter_neigh_total = neighbors_total - intra_neigh #max(1,np.rint(neighbors_total*(1-neighbors_intra_fraction)))
     inter_neigh_desired = inter_neigh_total / (len(Xlist)-1) # this is how many we want
     inter_neigh = int(np.ceil(inter_neigh_desired)) #int(max(1,np.rint(inter_neigh_total / len(Xlist)))) # this is how many we sample
+
 
     def adjacent(i,j):
         if isinstance( dataset_adjacency, np.ndarray):

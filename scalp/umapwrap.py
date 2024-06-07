@@ -64,11 +64,35 @@ def graph_xumap(adatas, distance_adjacency_matrix,
 
 def graph_pacmap(adatas, distance_adjacency_matrix,
                label=f'pacmap',
-               n_components = 2,neighbors = None, MN= .5, FP=2, **kwargs):
+               n_components = 2, neighbors = None, MN= .5, FP=2, **kwargs):
     # distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
     # distance_adjacency_matrix = distance_adjacency_matrix.todense()
     res = pacmap.PaCMAP(n_components=n_components, n_neighbors=neighbors, MN_ratio=MN, FP_ratio=FP).fit_transform(distance_adjacency_matrix)
+
+
     return attach_stack(adatas, res, label)
+
+def graph_pacmap2(adatas, distance_adjacency_matrix,label='pacmap2',n_components =2):
+
+    X , di = graphumap.make_knn(csr_matrix(distance_adjacency_matrix))
+    nbrs=X
+    n,n_neighbors = X.shape
+
+    scaled_dist = np.ones((n, n_neighbors)) # No scaling is needed
+    # Type casting is needed for numba acceleration
+    X = X.astype(np.float32)
+    scaled_dist = scaled_dist.astype(np.float32)
+    # make sure n_neighbors is the same number you want when fitting the data
+    pair_neighbors = pacmap.sample_neighbors_pair(X.astype(np.float32), scaled_dist.astype(np.float32), nbrs.astype(np.int32), np.int32(n_neighbors))
+    # initializing the pacmap instance
+    # feed the pair_neighbors into the instance
+    embedding = pacmap.PaCMAP(n_components=n_components, n_neighbors=n_neighbors, MN_ratio=0.5, FP_ratio=2.0, pair_neighbors=pair_neighbors)
+
+    # fit the data (The index of transformed data corresponds to the index of the original data)
+    X_transformed = embedding.fit_transform(X, init="pca")
+
+    return attach_stack(adatas, X_transformed, label)
+
 
 def graph_trimap(adatas, distance_adjacency_matrix,
                label=f'trimap',

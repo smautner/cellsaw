@@ -49,7 +49,7 @@ def heatmap(df, val = 'lin'):
 
 from ubergauss import optimization as uo
 def run_scores():
-    def f(_,cspread=0,bspread=6,degree = 0):
+    def f(_,cspread=0,bspread=1,degree = 0):
 
         dataset = scalp.data.mkblobs(sizes =
                                      [[40,24,21],[20,45,20],[20,23,42]],
@@ -61,11 +61,12 @@ def run_scores():
         return {'batch' : score.score_lin_batch(dataset),
                 'lin': score.score_lin(dataset)}
 
-    pdict = {'cspread' :np.arange(.25,4,.25), 'degree' :np.arange(0, 200, 20 )}
+    pdict = {'cspread' :np.arange(.1,1,.1), 'degree' :np.arange(0, 90, 10 )}
 
     df = uo.gridsearch(f,param_dict = pdict, data = [1])
-    heatmap(df, 'lin')
+
     heatmap(df,'batch')
+    heatmap(df, 'lin')
     return df
 
 import pandas as pd

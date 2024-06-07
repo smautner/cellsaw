@@ -67,3 +67,18 @@ def mkblobs(sizes = [[20,25],[25,20],[23,22]], clusterspread = .2 , batchspread 
 
     return res
 
+
+def rotate(anndata, degree=90):
+    center = anndata.X.mean(axis=0)
+    anndata.X -= center
+    angle = degree/180*np.pi
+    rot = np.array([[np.cos(angle),-np.sin(angle)],
+                    [np.sin(angle),np.cos(angle)]])
+    anndata.X = anndata.X @ rot
+    anndata.X+= center
+    anndata.obsm['umap']= anndata.X
+    return anndata
+
+
+
+

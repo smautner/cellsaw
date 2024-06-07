@@ -18,7 +18,6 @@ def mkgraph( adatas ,pre_pca = 40,
     this does our embedding,
     written such that the optimizer can do its thing
     '''
-
     adatas = pca.pca(adatas,dim = pre_pca, label = 'pca')
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
                                                 neighbors_total=neighbors_total,
@@ -40,6 +39,7 @@ def mkgraph( adatas ,pre_pca = 40,
         print(f"will plot the number of neighbors for each item... {min(vals)=},{max(vals)=}")
         so.lprint(vals)
     return adatas, matrix
+
 
 
 # diffuse.diffuse_label  -> diffuses the label
