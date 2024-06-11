@@ -15,6 +15,7 @@ import ubergauss.tools as ut
 from scipy.sparse import csr_matrix
 from scipy.stats import rankdata
 from collections import defaultdict
+from sklearn import preprocessing as skprep
 
 # import matplotlib
 # matplotlib.use('module://matplotlib-backend-sixel')
@@ -165,13 +166,14 @@ def spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = T
     combinedgraph = np.stack((neighborsgraph,neighborsgraph.T ), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
     np.fill_diagonal(combinedgraph,0)
-    # check_symmetric(combinedgraph,raise_exception=True)
+    check_symmetric(combinedgraph,raise_exception=True) # graph_umap needs a symmetic matrix
     return combinedgraph
 
 def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = True):
 
     distancemat = metrics.euclidean_distances(x)
-
+    distancemat = skprep.normalize(distancemat, axis =0) # DOTO this should get a flag
+    #return fast_neighborgraph(distancemat, neighbors)
     # min spanning tree
     tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
     tree= ut.zehidense(tree)
@@ -184,12 +186,10 @@ def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_
     if neighbors_mutual:
         neighborsgraph = mutualNN(neighborsgraph)
 
-
     # combine and return
     #combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T, anti_neighborsgraph,anti_neighborsgraph.T), axis =2)
     combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T ), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
-
     np.fill_diagonal(combinedgraph,0)
 
     check_symmetric(combinedgraph,raise_exception=True)
@@ -293,7 +293,7 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                             z = np.random.choice(targets,1)[0]
                             res[i,z] = 0
 
-                if epsilon:
+                if epsilon > -1:
                     res[res > 0] = epsilon
 
 
