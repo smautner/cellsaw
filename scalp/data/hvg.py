@@ -8,10 +8,10 @@ def check_adatas(adatas):
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
 
 
-def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', make_even = True):
+def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', make_even = True, pretransformed = False):
     check_adatas(adatas)
     if hvg == 'cell_ranger':
-        adatas = cell_ranger(adatas)
+        adatas = cell_ranger(adatas, pretransformed = pretransformed)
     else:
         assert False
 
@@ -75,22 +75,29 @@ def subsample_to_min_cellcount(adatas):
 
 def cell_ranger(adatas, mingenes = 200,
                         normrow= True,
+                        pretransformed = False,
                         log = True):
     if 'cell_ranger' in adatas[0].var:
         return adatas
 
-    return Map( lambda x:cell_ranger_single(x, mingenes=mingenes, normrow= normrow,  log= log), adatas)
+    return Map( lambda x:cell_ranger_single(x, mingenes=mingenes, normrow= normrow,  log= log, pretransformed = pretransformed), adatas)
 
 
 def cell_ranger_single(adata,
                         mingenes = 200,
                         normrow= True,
+                        pretransformed = False,
                         log = True):
 
+    if pretransformed:
+        adata.X = np.expm1(adata.X)
     okgenes = sc.pp.filter_genes(adata, min_counts=3, inplace=False)[0]
-    sc.pp.normalize_total(adata, 1e4)
+
+    if not pretransformed:
+        sc.pp.normalize_total(adata, 1e4)
     sc.pp.log1p(adata)
     adata2 = adata[:,okgenes].copy()
+
     sc.pp.highly_variable_genes(adata2, n_top_genes=5000,
                                          flavor='cell_ranger',
                                         inplace=True)

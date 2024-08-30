@@ -24,7 +24,7 @@ def loaddata_timeseries(path,datasets=False,maxcells= 1000, maxdatasets = -1, **
 
 def loaddata_scib(path, datasets = False, maxcells= 1000, maxdatasets = -1, **ppargs):
     datasets = load.load_scib(path, datasets= datasets)
-    ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
+    ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets,pretransformed = True, **ppargs)
     return ssdata
 
 
