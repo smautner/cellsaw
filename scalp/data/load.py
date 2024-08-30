@@ -1,7 +1,7 @@
 from lmz import *
 import scanpy as sc
 import numpy as np
-
+import anndata as ann
 
 def rename_obs(datasets, batch, typ):
     for ds, bat, lab in zip(datasets, batch, typ):
@@ -14,7 +14,8 @@ def load_scib(path, datasets = False):
     if not datasets:
         datasets = "Immune_ALL_hum_mou Immune_ALL_human Lung_atlas_public human_pancreas_norm_complexBatch".split()
 
-    datasets = [sc.read(path+data+".h5ad") for data in datasets]
+    #datasets = [sc.read_h5ad(path+data+".h5ad") for data in datasets]
+    datasets = [ann.read_h5ad(path+data+".h5ad") for data in datasets]
     batch,typ = Transpose (Map(lambda x:x.split(), 'batch final_annotation#batch final_annotation#batch cell_type#tech celltype'.split("#")))
     # rename fields
     rename_obs(datasets,batch, typ)
@@ -31,7 +32,7 @@ def load_timeseries(path,datasets=False,remove_unassigned = True):
 
     if not datasets:
         datasets = "s5 509 1290 mousecortex water pancreatic cerebellum".split()
-    datasets = [sc.read(path+data+".h5ad") for data in datasets]
+    datasets = [sc.read_h5ad(path+data+".h5ad") for data in datasets]
 
     # datasets = [sc.read(path+data+".h5ad") for data in "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
 

@@ -1,6 +1,7 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib
 import pandas as pd
 from ubergauss import tools
 import numpy as np
@@ -8,7 +9,8 @@ from scipy.optimize import linear_sum_assignment as lsa
 
 from scalp.data.align import align
 
-col = plt.cm.get_cmap('tab20').colors
+# col = plt.cm.get_cmap('tab20').colors
+col = matplotlib.colormaps['tab20'].colors
 col = col + col + col + ((0, 0, 0),)
 
 
