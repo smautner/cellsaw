@@ -129,3 +129,36 @@ def graph_tsvd(adatas, distance_adjacency_matrix,
     return attach_stack(adatas, res, label)
 
 
+improt bbknn
+def umap_last_experiment(adata,adjacencymatrix, base = 'pca40', label = 'lastexpo',
+                         batchindicator = 'batch', n_components = 2):
+    '''
+    the idea is to use bbknn stuff to do out umap emebdding
+    '''
+    # adata = transform.stack(adatas)
+    knn_indices, knn_distances= graphumap.make_knn( csr_matrix(adjacencymatrix))
+    dist, cnts = bbknn.matrix.compute_connectivities_umap(knn_indices, knn_distances,
+                                             knn_indices.shape[0],
+                                             knn_indices.shape[1],
+                                             set_op_mix_ratio=1,
+                                             local_connectivity=1)
+
+
+    p_dict = {'n_neighbors': knn_distances.shape[1], 'method': 'umap'}
+                          # 'metric': params['metric'], 'n_pcs': params['n_pcs'],
+                          # 'bbknn': {'trim': params['trim'], 'computation': params['computation']}}
+    key_added = 'neighbors'
+    conns_key = 'connectivities'
+    dists_key = 'distances'
+    adata.uns[key_added] = {}
+
+    adata.uns[key_added]['params'] = p_dict
+    adata.uns[key_added]['params']['use_rep'] = base
+    #adata.uns[key_added]['params']['bbknn']['batch_key'] = batchindicator
+
+    adata.obsp[dists_key] = dist
+    adata.obsp[conns_key] = cnts
+    adata.uns[key_added]['distances_key'] = dists_key
+    adata.uns[key_added]['connectivities_key'] = conns_key
+    sc.tl.umap(adata,n_components=n_components)
+    return adata #transform.split_by_obs(adata)
