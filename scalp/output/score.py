@@ -1,9 +1,11 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 from  sklearn.neighbors import KNeighborsClassifier
-
+import pandas as pd
 from ubergauss import tools as ut
+from ubergauss.optimization import pareto_scores
 import numpy as np
 from sklearn.metrics import  silhouette_score
+from scalp.data import transform
 
 def repeat_as_column(a,n):
     return np.tile(a,(n,1)).T
@@ -49,6 +51,9 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import balanced_accuracy_score, accuracy_score
 
 
+
+
+
 def score_lin(dataset, projection = 'umap'):
     y = dataset.obs['label']
     X = dataset.obsm[projection]
@@ -68,10 +73,6 @@ def score_lin_batch(dataset, projection = 'umap'):
         return balanced_accuracy_score(y , prediction, adjusted=True )
 
     return np.nanmean([1-acc(l) for l in np.unique(dataset.obs['label'])])
-
-
-def scalp_scores(ds, projection = 'umap'):
-    return {'batch': score_lin_batch(ds,projection), 'label':score_lin(ds,projection)}
 
 
 from scib.metrics import metrics
@@ -111,5 +112,101 @@ def scib_scores(ds, projection = 'umap'):
     sc = score_scib_metrics(ds)
     bio, batch = split_scib_scores(sc)
     return {'batch': batch,  'label':bio}
+
+
+# def scalp_scores(ds, projection = 'umap'):
+#     return {'batch': score_lin_batch(ds,projection), 'label':score_lin(ds,projection)}
+
+
+
+
+def scalp_scores(data, projection ='methods', cv=5):
+    dataset = data # if type(data)!= list else transform.stack(data)
+    y = dataset.obs['label']
+    ybatch = dataset.obs['batch']
+    ret= {}
+    for projection2 in dataset.uns[projection]:
+        X = dataset.obsm[projection2]
+        ret[projection2] = getscores(X,y,ybatch,cv)
+    return ret
+
+def getscores(X,y,ybatch, cv):
+    r={}
+    m,s = knn_cross_validation(X,y,cv)
+    r['label_mean'] =m
+    r['label_std'] =s
+
+    m,s = knn_cross_validation(X,ybatch,cv,invert=True)
+    r['batch_mean'] =m
+    r['batch_std'] =s
+    return r
+
+
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_score
+
+def knn_cross_validation(X, y, cv, invert=False):
+    # Initialize the 1-Nearest Neighbor classifier
+    knn = KNeighborsClassifier(n_neighbors=5)
+    # Perform cross-validation
+    scores = cross_val_score(knn, X, y, cv=cv, scoring='balanced_accuracy')
+    # Calculate mean and standard deviation of the scores
+    if invert:
+        scores = 1-scores
+    mean_accuracy = np.mean(scores)
+    std_accuracy = np.std(scores)
+    return mean_accuracy, std_accuracy
+
+
+def pareto_avg(datadicts):
+    # collect scores for all the methods
+    d = []
+    for i, dataset in enumerate(datadicts.keys()):
+        for method, domcount in pareto_sample(datadicts[dataset]):
+            d.append({'method':method,'dataset':i,'domcount':domcount})
+
+    return calculate_average_rank(pd.DataFrame(d),'dataset','domcount','method'), pd.DataFrame(d)
+
+def calculate_average_rank(df, group_column, rank_column, name_column):
+    """
+    Groups the DataFrame by `group_column`, assigns ranks within each group
+    based on `rank_column`, and returns the overall average rank for each name in `name_column`.
+
+    Parameters:
+    - df: pd.DataFrame - The input DataFrame.
+    - group_column: str - The column name to group by.
+    - rank_column: str - The column name to rank within each group.
+    - name_column: str - The column name that contains the names of the attributes being ranked.
+
+    Returns:
+    - pd.DataFrame - A DataFrame with the overall average rank for each unique name.
+    """
+
+    # Step 1: Group by `group_column` and assign rank within each group
+    df['rank'] = df.groupby(group_column)[rank_column].rank()
+
+    # Step 2: Calculate the average rank within each group for each name
+    group_avg_rank = df.groupby([group_column, name_column])['rank'].mean().reset_index()
+
+    # Step 3: Calculate the overall average rank for each name across all groups
+    overall_avg_rank = group_avg_rank.groupby(name_column)['rank'].mean().reset_index()
+
+    # Step 4: Rename columns for clarity
+    overall_avg_rank.columns = [name_column, 'overall_average_rank']
+
+    return overall_avg_rank
+
+
+def pareto_sample(datadict,scorenames=['label','batch']):
+    methods = datadict.keys()
+    sample = lambda method,name,repeats: [{'method': method, 'scoretype':name, 'score': score, 'measureid':i}\
+                            for i, score in enumerate(np.random.normal(loc=datadict[method][name+'_mean'], scale=datadict[method][name+'_std'], size=repeats))]
+
+    data =  [ sample(method,name,1000)   for method in methods for name in scorenames]
+    data = Flatten(data)
+    df = pd.DataFrame(data)
+    # {'method': '0', 'scoretype': 'label', 'score': 0.8031946991682309}
+    return [(a[0],b) for a,b in pareto_scores(df, data= 'measureid', scoretype='scoretype')]
+
 
 
