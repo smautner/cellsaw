@@ -143,13 +143,18 @@ def getscores(X,y,ybatch, cv):
 
 
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+
 
 def knn_cross_validation(X, y, cv, invert=False):
+    '''
+    Perform cross-validation with a Nearest Neighbor classifier.
+    '''
     # Initialize the 1-Nearest Neighbor classifier
     knn = KNeighborsClassifier(n_neighbors=5)
     # Perform cross-validation
-    scores = cross_val_score(knn, X, y, cv=cv, scoring='balanced_accuracy')
+    stratified_kfold = StratifiedKFold(n_splits=cv, shuffle=True)
+    scores = cross_val_score(knn, X, y, cv=stratified_kfold, scoring='balanced_accuracy')
     # Calculate mean and standard deviation of the scores
     if invert:
         scores = 1-scores
@@ -159,6 +164,10 @@ def knn_cross_validation(X, y, cv, invert=False):
 
 
 def pareto_avg(datadicts):
+    '''
+    datadicts: a dictionary of datasets, each containing a dictionary of methods with their scores
+    returns: a DataFrame with the average rank of each method across all datasets
+    '''
     # collect scores for all the methods
     d = []
     for i, dataset in enumerate(datadicts.keys()):
@@ -198,6 +207,11 @@ def calculate_average_rank(df, group_column, rank_column, name_column):
 
 
 def pareto_sample(datadict,scorenames=['label','batch']):
+    '''
+    datadict: a dictionary of methods with their scores
+    scorenames: the names of the scores to consider
+    returns a list of tuples (method,domcount) where domcount is the number of times the method is dominated
+    '''
     methods = datadict.keys()
     sample = lambda method,name,repeats: [{'method': method, 'scoretype':name, 'score': score, 'measureid':i}\
                             for i, score in enumerate(np.random.normal(loc=datadict[method][name+'_mean'], scale=datadict[method][name+'_std'], size=repeats))]
