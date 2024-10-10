@@ -28,9 +28,10 @@ def loaddata_scib(path, datasets = False, maxcells= 1000, maxdatasets = -1, **pp
     return ssdata
 
 
-
+from scalp import pca
 def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10, **preprocessing_args):
     ssdata = [[subsample(i,maxcells,31443) for i in series[:maxdatasets]] for series in datasets]
+    ssdata = Map( pca.pca, ssdata, dim = 40, label = 'pca40')
     return Map(preprocess, ssdata, **preprocessing_args)
 
 

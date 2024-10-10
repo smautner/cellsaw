@@ -18,8 +18,8 @@ def mkgraph( adatas ,pre_pca = 40,
     this does our embedding,
     written such that the optimizer can do its thing
     '''
-    adatas = pca.pca(adatas,dim = pre_pca, label = 'pca')
-    matrix = graph.linear_assignment_integrate(adatas,base = 'pca',
+    adatas = pca.pca(adatas,dim = pre_pca, label = 'pca40')
+    matrix = graph.linear_assignment_integrate(adatas,base = 'pca40',
                                                 neighbors_total=neighbors_total,
                                                 neighbors_intra_fraction=neighbors_intra_fraction,
                                                   intra_neighbors_mutual=intra_neighbors_mutual,
