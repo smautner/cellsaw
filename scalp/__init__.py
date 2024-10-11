@@ -53,7 +53,7 @@ def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
 
 def test_scalp():
     n_cells = 100
-    a = data.loaddata_scib(test_config.scib_datapath, maxdatasets=3,
+    a = data.scib(test_config.scib_datapath, maxdatasets=3,
                            maxcells = n_cells, datasets = ["Immune_ALL_hum_mou"])[0]
     # print("=============== mnn ===============")
     # mnn and scanvi are no longer maintained, scanoram is second on the nature method ranking
