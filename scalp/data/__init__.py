@@ -7,6 +7,8 @@ import scanpy as sc
 from scalp.data import load
 import numpy as np
 
+from scalp.data import transform
+
 # def loaddata_timeseries(path,maxcells= 1000, maxdatasets = -1, **ppargs):
 #     datasets = load.load_timeseries(path )
 #     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
@@ -16,17 +18,50 @@ import numpy as np
 #     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
 #     return ssdata
 
+
+
+
+
+
+
+
+datasets_scib = "Immune_ALL_hum_mou Immune_ALL_human Lung_atlas_public human_pancreas_norm_complexBatch".split()
+datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum".split()
+
+
+####################
+# dont use theese, too much memory is required and they return the non-stacked datasets
+###############
 def loaddata_timeseries(path,datasets=False,maxcells= 1000, maxdatasets = -1, **ppargs):
     datasets = load.load_timeseries(path , datasets= datasets)
     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
     return ssdata
-
-
 def loaddata_scib(path, datasets = False, maxcells= 1000, maxdatasets = -1, **ppargs):
     datasets = load.load_scib(path, datasets= datasets)
     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets,pretransformed = True, **ppargs)
     return ssdata
 
+
+################################
+# use these instead
+##########################
+def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+    if not datasets:
+        datasets = datasets_scib
+    for dataset in datasets:
+        data = load.load_scib(path, datasets = [dataset])
+        data = subsample_preprocess(data,maxcells=1000,maxdatasets=-1, **other)[0]
+        data = transform.stack(data)
+        yield data
+
+def timeseries(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+    if not datasets:
+        datasets = datasets_ts
+    for dataset in datasets:
+        data = load.load_timeseries(path, datasets = [dataset])
+        data = subsample_preprocess(data,maxcells=1000,maxdatasets=-1, **other)[0]
+        data = transform.stack(data)
+        yield data
 
 from scalp import pca
 def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10, **preprocessing_args):
@@ -35,10 +70,36 @@ def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10, **preproce
     return Map(preprocess, ssdata, **preprocessing_args)
 
 
+
+
+
+
+
+####################
+# a test
+#####################
+
+
 def test_load():
     from scalp import test_config
     a = loaddata_scib(test_config.scib_datapath)
     b = loaddata_timeseries(test_config.timeseries_datapath)
+
+
+
+
+
+
+
+
+
+
+
+
+##################
+# BLOB stuff
+########################
+
 
 from sklearn.datasets import make_blobs
 def create_anndata(matrix, labels, batch_string):
