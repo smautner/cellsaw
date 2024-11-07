@@ -3,12 +3,49 @@ from scalp.data import transform
 import ubergauss.tools as ut
 import scanpy.external.pp as sep
 import scanpy as sc
+import scalp
 
-def scanorama(adatas, base = 'pca40', batchindicator = 'batch', label =  'scanorama'):
+
+
+
+
+
+
+'''
+the methods here work like this:
+
+function(adata_stacked, base = 'pca40', batchindicator = 'batch', label =  'function', dim=10)
+-> set adata_stacked.obsm[label] = the new stuff
+-> adata_stacked.uns['integrated'].append(label)
+
+'''
+
+import umap
+
+
+
+def _scanorama(adatas, base = 'pca40', batchindicator = 'batch', label =  'scanorama'):
     adata = transform.stack(adatas)
     # sep.scanorama_integrate(adata, batchindicator, basis = base, adjusted_basis = label)
     sep.scanorama_integrate(adata, batchindicator, basis = base, adjusted_basis = label)
     return transform.split_by_obs(adata)
+
+def scanorama(adata, base = 'pca40',dim=10, batchindicator = 'batch', label =  'scanorama'):
+    # adata = transform.stack(adatas)
+    # sep.scanorama_integrate(adata, batchindicator, basis = base, adjusted_basis = label)
+    assert base in adata.obsm
+
+    sep.scanorama_integrate(adata, batchindicator, basis = base)
+
+    res = umap.UMAP(n_components = dim).fit_transform(adata.obsm['X_scanorama'])
+
+    adata.obsm[label]=res
+    adata.uns.setdefault('integrated',[])
+    adata.uns['integrated'].append(label)
+
+    return adata
+
+
 
 def combat(adatas, base = 'pca40', batchindicator = 'batch', label =  'combat'):
     adata = transform.stack(adatas)

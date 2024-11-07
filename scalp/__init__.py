@@ -5,6 +5,7 @@ from scalp import diffuse
 from scalp.output import score
 from scalp.data.align import align
 from scalp.output.draw import snsplot
+import scanpy as sc
 
 
 def mkgraph( adatas ,pre_pca = 40,
@@ -49,6 +50,10 @@ def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
     snsplot(dataset,coordinate_label=embed_label,**snskwargs)
     return dataset
 
+
+def plot(adata,embedding,**plotargs):
+    adata.obsm['X_umap']=adata.obsm[embedding]
+    sc.pl.umap(adata,**plotargs)
 
 
 def test_scalp():
