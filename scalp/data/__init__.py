@@ -46,20 +46,28 @@ def loaddata_scib(path, datasets = False, maxcells= 1000, maxdatasets = -1, **pp
 # use these instead
 ##########################
 def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+    '''
+    this function is a generator that yields the preprocessed datasets
+    '''
     if not datasets:
         datasets = datasets_scib
     for dataset in datasets:
-        data = load.load_scib(path, datasets = [dataset])
-        data = subsample_preprocess(data,maxcells=1000,maxdatasets=-1, **other)[0]
+        data = load.load_scib(path,  datasets = [dataset])
+        data = subsample_preprocess(data,maxcells=maxcells,maxdatasets=maxdatasets, **other)[0]
         data = transform.stack(data)
         yield data
 
+
+
 def timeseries(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+    '''
+    this function is a generator that yields the preprocessed datasets
+    '''
     if not datasets:
         datasets = datasets_ts
     for dataset in datasets:
-        data = load.load_timeseries(path, datasets = [dataset])
-        data = subsample_preprocess(data,maxcells=1000,maxdatasets=-1, **other)[0]
+        data = load.load_timeseries(path,  datasets = [dataset])
+        data = subsample_preprocess(data,maxcells=maxcells,maxdatasets=maxdatasets, **other)[0]
         data = transform.stack(data)
         yield data
 
