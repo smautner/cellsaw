@@ -120,7 +120,7 @@ def scib_scores(ds, projection = 'umap'):
 
 
 
-def scalp_scores(data, projection ='methods', cv=5):
+def scalp_scores(data, projection ='integrated', cv=5):
     dataset = data # if type(data)!= list else transform.stack(data)
     y = dataset.obs['label']
     ybatch = dataset.obs['batch']

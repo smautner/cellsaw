@@ -8,6 +8,11 @@ from ubergauss import graphumap
 from ubergauss import csrjax as cj
 from scipy.sparse import csr_matrix
 
+
+
+
+
+
 def adatas_umap(adatas, dim = 10, label = 'umap10', from_obsm = 'pca40', **umapargs):
 
     if label in adatas[0].obsm:
@@ -132,12 +137,11 @@ def graph_tsvd(adatas, distance_adjacency_matrix,
 import bbknn
 import scanpy as sc
 from scalp.data import transform
-def umap_last_experiment(adatas,adjacencymatrix, base = 'pca40', label = 'lastexpo',
+def umap_last_experiment(adata,adjacencymatrix, base = 'pca40', label = 'lastexpo',
                          batchindicator = 'batch', n_components = 2):
     '''
     the idea is to use bbknn stuff to do out umap emebdding
     '''
-    adata = transform.stack(adatas)
     adata.obsm.pop('umap',None)
     adata.obsm.pop('X_umap',None)
     knn_indices, knn_distances= graphumap.make_knn( csr_matrix(adjacencymatrix))
@@ -165,4 +169,5 @@ def umap_last_experiment(adatas,adjacencymatrix, base = 'pca40', label = 'lastex
     adata.uns[key_added]['distances_key'] = dists_key
     adata.uns[key_added]['connectivities_key'] = conns_key
     sc.tl.umap(adata,n_components=n_components)
-    return transform.split_by_obs(adata)
+    adata.uns.pop('umap')
+    return adata.obsm.pop('X_umap')

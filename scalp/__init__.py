@@ -8,18 +8,32 @@ from scalp.output.draw import snsplot
 import scanpy as sc
 
 
-def mkgraph( adatas ,pre_pca = 40,
+
+mkgraphParameters = '''
+neighbors_total 15 45 1
+neighbors_intra_fraction .3 .7
+inter_outlier_threshold .60 .97
+inter_outlier_probabilistic_removal 0 1 1
+intra_neighbors_mutual 0 1 1
+copy_lsa_neighbors 0 1 1
+add_tree 0 1 1
+'''
+# scaling_num_neighbors does nothing in the code????????
+
+def mkgraph( adata ,pre_pca = 40,
             neighbors_total = 20, neighbors_intra_fraction = .5,
               scaling_num_neighbors = 2, inter_outlier_threshold = .9,
                 inter_outlier_probabilistic_removal= False,
             epsilon = 1e-6,
                 intra_neighbors_mutual = False, copy_lsa_neighbors = False,
-              add_tree= False, dataset_adjacency = None ):
+              add_tree= False, dataset_adjacency = None, **kwargs ):
     '''
     this does our embedding,
     written such that the optimizer can do its thing
     '''
-    adatas = pca.pca(adatas,dim = pre_pca, label = 'pca40')
+    # adatas = pca.pca(adatas,dim = pre_pca, label = 'pca40')
+    assert 'pca40' in adata.obsm
+    adatas = data.transform.split_by_obs(adata)
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca40',
                                                 neighbors_total=neighbors_total,
                                                 neighbors_intra_fraction=neighbors_intra_fraction,
@@ -39,7 +53,7 @@ def mkgraph( adatas ,pre_pca = 40,
         vals = [ len(x.data) for x in matrix2]
         print(f"will plot the number of neighbors for each item... {min(vals)=},{max(vals)=}")
         so.lprint(vals)
-    return adatas, matrix
+    return  matrix
 
 
 
