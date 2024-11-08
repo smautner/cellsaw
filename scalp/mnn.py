@@ -6,11 +6,6 @@ import scanpy as sc
 import scalp
 
 
-
-
-
-
-
 '''
 the methods here work like this:
 
@@ -30,16 +25,19 @@ def _scanorama(adatas, base = 'pca40', batchindicator = 'batch', label =  'scano
     sep.scanorama_integrate(adata, batchindicator, basis = base, adjusted_basis = label)
     return transform.split_by_obs(adata)
 
-def scanorama(adata, base = 'pca40',dim=10, batchindicator = 'batch', label =  'scanorama'):
+
+
+
+def scanorama(adata, base = 'pca40', batchindicator = 'batch', label =  'scanorama'):
     # adata = transform.stack(adatas)
     # sep.scanorama_integrate(adata, batchindicator, basis = base, adjusted_basis = label)
     assert base in adata.obsm
 
     sep.scanorama_integrate(adata, batchindicator, basis = base)
 
-    res = umap.UMAP(n_components = dim).fit_transform(adata.obsm['X_scanorama'])
+    # res = umap.UMAP(n_components = dim).fit_transform(adata.obsm['X_scanorama'])
 
-    adata.obsm[label]=res
+    adata.obsm[label] = adata.obsm.pop('X_scanorama')
     adata.uns.setdefault('integrated',[])
     adata.uns['integrated'].append(label)
 

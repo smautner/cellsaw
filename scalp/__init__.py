@@ -50,10 +50,13 @@ def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
     snsplot(dataset,coordinate_label=embed_label,**snskwargs)
     return dataset
 
-
+import umap
 def plot(adata,embedding,**plotargs):
-    adata.obsm['X_umap']=adata.obsm[embedding]
-    sc.pl.umap(adata,**plotargs)
+    # adata.obsm['X_umap']=adata.obsm[embedding]
+    # sc.pl.umap(adata,basis= embedding, **plotargs)
+
+    adata.obsm['newlayer'] =  umap.UMAP(n_components = 2).fit_transform(adata.obsm[embedding])
+    sc.pl.embedding(adata, basis= 'newlayer', **plotargs)
 
 
 def test_scalp():
