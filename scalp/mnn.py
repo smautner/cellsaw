@@ -45,15 +45,20 @@ def scanorama(adata, base = 'pca40', batchindicator = 'batch', label =  'scanora
 
 
 
-def combat(adatas, base = 'pca40', batchindicator = 'batch', label =  'combat'):
+def _combat(adatas, base = 'pca40', batchindicator = 'batch', label =  'combat'):
     adata = transform.stack(adatas)
     r = sc.pp.combat(adata,batchindicator, inplace=False)
     adata.obsm[label] = r
     return transform.split_by_obs(adata)
 
+def combat(adata, base = 'pca40', batchindicator = 'batch', label =  'combat'):
+    # adata = transform.stack(adatas)
+    r = sc.pp.combat(adata,batchindicator, inplace=False)
+    adata.obsm[label] = r
+    return adata
+
 import bbknn
-def bbknnwrap(adatas, base = 'pca40',
-          batchindicator = 'batch', dim = 2):
+def _bbknnwrap(adatas, base = 'pca40', batchindicator = 'batch', dim = 2):
     adata = transform.stack(adatas)
     # sc.external.pp.bbknn(adata, batchindicator, use_rep=base)
     bbknn.bbknn(adata, use_rep = base)
@@ -62,6 +67,16 @@ def bbknnwrap(adatas, base = 'pca40',
 
     # use this to do umap to a speciffic dim:
     # https://scanpy.readthedocs.io/en/latest/generated/scanpy.tl.umap.html#scanpy-tl-umap
+
+def bbknnwrap(adata, base = 'pca40',label = 'bbknn', batchindicator = 'batch', dim = 10):
+    # sc.external.pp.bbknn(adata, batchindicator, use_rep=base)
+    bbknn.bbknn(adata, use_rep = base, batch_key= batchindicator)
+    sc.tl.umap(adata,n_components=dim)
+
+    adata.obsm[label] = adata.obsm.pop('X_umap')
+    adata.uns.setdefault('integrated',[])
+    adata.uns['integrated'].append(label)
+    return adata
 
 def mnn(adata, label = 'mnn'):
 
