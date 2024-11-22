@@ -12,7 +12,7 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.neighbors import NearestNeighbors
 import structout as so
 import ubergauss.tools as ut
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, lil_matrix
 from scipy.stats import rankdata
 from collections import defaultdict
 from sklearn import preprocessing as skprep
@@ -87,10 +87,10 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold,
     # remove worst 25% hits
     sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
 
-    if outlier_probabilistic_removal:
+    if outlier_probabilistic_removal and outlier_threshold > 0:
         ij_lsa_distances[cdf_remove(ij_lsa_distances,outlier_threshold/2)] = 0
 
-    elif  outlier_threshold is not None:
+    elif  outlier_threshold > 0:
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
@@ -213,6 +213,7 @@ def average_knn_distance(I,J,i_ids,j_ids,numneigh):
 
 def linear_assignment_integrate(Xlist, base = 'pca',
                                 neighbors_total = 20,
+                                horizonCutoff = 0,
                                 neighbors_intra_fraction = .5,
                                 intra_neigh=15,
                                 inter_neigh = 1,
@@ -293,7 +294,9 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                             z = np.random.choice(targets,1)[0]
                             res[i,z] = 0
 
-                if epsilon > -1:
+
+
+                if epsilon > 0:
                     res[res > 0] = epsilon
 
 
@@ -326,6 +329,10 @@ def linear_assignment_integrate(Xlist, base = 'pca',
             else:
                 distance_matrix = row[j][i].T
             col.append(distance_matrix)
+
+        if horizonCutoff > 0:
+            col = list(removeInstancesFartherThanHorizon(col[i],col,horizonCutoff))
+
         row.append(col)
 
 
@@ -336,6 +343,38 @@ def linear_assignment_integrate(Xlist, base = 'pca',
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
 
     return  distance_matrix
+
+from matplotlib import pyplot as plt
+
+import heapq
+def removeInstancesFartherThanHorizon(reference:lil_matrix, targets :list, nthNeighbor:int):
+    '''
+    remove instances that are farther than the nth neighbor in the reference in all matrixes contained in targets
+    '''
+    # cutoffs = np.partition(reference,nthNeighbor,axis=1)[:,nthNeighbor]
+    cutoffs =  [heapq.nlargest(nthNeighbor,values)[-1] for values in reference.data]
+    plt.hist(cutoffs)
+    plt.show()
+    print(f"{cutoffs[0]=} {targets[0][0].data=} {targets[1][0].data=}")
+    for target in targets:
+        # values larger than cutoffs (per row) are set to zero
+        for i,cut in enumerate(cutoffs):
+            badind = [ind for ind,val in zip(target.rows[i], target.data[i]) if val > cut]
+            target[i,badind] = 0
+        yield target
+
+def testHorizonCutOff():
+    random = np.random.random((5,5))
+    print(random)
+    cutoffs = np.partition(random,3 ,axis=1)[:,3]
+    print(cutoffs)
+    random= lil_matrix(random)
+    for i,cut in enumerate(cutoffs):
+        badind = [ind for ind,val in zip(random.rows[i], random.data[i]) if val > cut]
+        random[i,badind] = 0
+    breakpoint()
+
+# testHorizonCutOff()
 
 
 

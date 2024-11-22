@@ -9,6 +9,7 @@ import scanpy as sc
 
 
 
+# horizonCutoff 4 10 1 # the idea is flawed
 mkgraphParameters = '''
 neighbors_total 15 45 1
 neighbors_intra_fraction .3 .7
@@ -18,24 +19,24 @@ intra_neighbors_mutual 0 1 1
 copy_lsa_neighbors 0 1 1
 add_tree 0 1 1
 '''
-# scaling_num_neighbors does nothing in the code????????
 
 def mkgraph( adata ,pre_pca = 40,
+            horizonCutoff = 0,
             neighbors_total = 20, neighbors_intra_fraction = .5,
-              scaling_num_neighbors = 2, inter_outlier_threshold = .9,
+              scaling_num_neighbors = 2, inter_outlier_threshold = -1,
                 inter_outlier_probabilistic_removal= False,
             epsilon = 1e-6,
                 intra_neighbors_mutual = False, copy_lsa_neighbors = False,
               add_tree= False, dataset_adjacency = None, **kwargs ):
     '''
     this does our embedding,
-    written such that the optimizer can do its thing
     '''
     # adatas = pca.pca(adatas,dim = pre_pca, label = 'pca40')
     assert 'pca40' in adata.obsm
     adatas = data.transform.split_by_obs(adata)
     matrix = graph.linear_assignment_integrate(adatas,base = 'pca40',
                                                 neighbors_total=neighbors_total,
+                            horizonCutoff = horizonCutoff,
                                                 neighbors_intra_fraction=neighbors_intra_fraction,
                                                   intra_neighbors_mutual=intra_neighbors_mutual,
                                                   outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
