@@ -9,23 +9,87 @@ import scanpy as sc
 
 
 
+
+def construct_sparse_adjacency_matrix_multiple(matrices, k, h):
+    """
+    Constructs a sparse adjacency matrix based on k-NN within each matrix,
+    adds cross-edges using linear assignment pairwise between matrices,
+    and filters edges based on horizon h.
+
+    Parameters:
+    - matrices: list of numpy arrays, each of shape (n_i, d)
+    - k: int, number of nearest neighbors within each matrix
+    - h: int, horizon parameter for filtering edges
+
+    Returns:
+    - adjacency: scipy.sparse.csr_matrix of shape (total_instances, total_instances)
+    """
+    from scipy.sparse import csr_matrix
+    from scipy.spatial import cKDTree
+    from scipy.spatial.distance import cdist
+    from scipy.optimize import linear_sum_assignment
+    import numpy as np
+    # Construct k-NN within each matrix
+    knn = []
+    for matrix in matrices:
+        tree = cKDTree(matrix)
+        dists, neighs = tree.query(matrix, k=k+1)
+        knn.append(neighs[:,1:])
+    # Construct cross-edges using linear assignment pairwise between matrices
+    n = sum([len(neighs) for neighs in knn])
+    row, col, data = [], [], []
+    for i, neighs1 in enumerate(knn):
+        for j, neighs2 in enumerate(knn):
+            if i == j:
+                continue
+            cost = cdist(matrices[i], matrices[j][neighs2.flatten()])
+            row_ind, col_ind = linear_sum_assignment(cost)
+            for r, c in zip(row_ind, col_ind):
+                row.append(neighs1[r] + i)
+                col.append(neighs2[c] + j)
+                data.append(1)
+    row = np.concatenate(row)
+    col = np.concatenate(col)
+    data = np.concatenate(data)
+    # Construct adjacency matrix
+    adjacency = csr_matrix((data, (row, col)), shape=(n, n))
+    # Filter edges based on horizon h
+    for i in range(n):
+        row = adjacency[i].indices
+        col = adjacency[:,i].indices
+        row = row[np.abs(row - i) <= h]
+        col = col[np.abs(col - i) <= h]
+        adjacency[i, row] = 1
+        adjacency[col, i] = 1
+    return adjacency
+
+
+
+
+
 # horizonCutoff 4 10 1 # the idea is flawed
 mkgraphParameters = '''
 neighbors_total 15 45 1
-neighbors_intra_fraction .3 .7
-inter_outlier_threshold .60 .97
-inter_outlier_probabilistic_removal 0 1 1
+neighbors_intra_fraction .2 .5
 intra_neighbors_mutual 0 1 1
 copy_lsa_neighbors 0 1 1
 add_tree 0 1 1
+horizonCutoff 50 100 1
+standardize 0 1 1
 '''
+# distance_metric ['euclidean', 'sqeuclidean' ]
+# inter_outlier_threshold .60 .97
+# inter_outlier_probabilistic_removal 0 1 1
+
+from sklearn.preprocessing import StandardScaler
 
 def mkgraph( adata ,pre_pca = 40,
             horizonCutoff = 0,
             neighbors_total = 20, neighbors_intra_fraction = .5,
               scaling_num_neighbors = 2, inter_outlier_threshold = -1,
+            distance_metric = 'euclidean',
                 inter_outlier_probabilistic_removal= False,
-            epsilon = 1e-6,
+            epsilon = 1e-6,standardize=0,
                 intra_neighbors_mutual = False, copy_lsa_neighbors = False,
               add_tree= False, dataset_adjacency = None, **kwargs ):
     '''
@@ -33,19 +97,39 @@ def mkgraph( adata ,pre_pca = 40,
     '''
     # adatas = pca.pca(adatas,dim = pre_pca, label = 'pca40')
     assert 'pca40' in adata.obsm
-    adatas = data.transform.split_by_obs(adata)
-    matrix = graph.linear_assignment_integrate(adatas,base = 'pca40',
-                                                neighbors_total=neighbors_total,
-                            horizonCutoff = horizonCutoff,
-                                                neighbors_intra_fraction=neighbors_intra_fraction,
-                                                  intra_neighbors_mutual=intra_neighbors_mutual,
-                                                  outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
-                                                  scaling_num_neighbors = scaling_num_neighbors,
-                                                  outlier_threshold = inter_outlier_threshold,
-                                                  dataset_adjacency =  dataset_adjacency,
-                                                  copy_lsa_neighbors=copy_lsa_neighbors,
-                                               epsilon=epsilon,
-                                              add_tree=add_tree)
+
+    if horizonCutoff:
+        inter_outlier_threshold = 0
+        inter_outlier_probabilistic_removal = False
+
+    if standardize == 0: # no standardization
+        adatas = data.transform.split_by_obs(adata)
+    elif standardize == 1: # joint
+        sc.pp.scale(adata)
+        adatas = data.transform.split_by_obs(adata)
+    elif standardize == 2: # separate
+        adatas = data.transform.split_by_obs(adata)
+        [sc.pp.scale(a) for a in adatas]
+    else:
+        assert False, f"unknown standardize value {standardize=}"
+
+
+    if False:#aislop
+        matrix = graph.aiSlopSolution(adatas, 20, 240)
+    else:
+        matrix = graph.linear_assignment_integrate(adatas,base = 'pca40',
+                                                    neighbors_total=neighbors_total,
+                                                distance_metric=distance_metric,
+                                horizonCutoff = horizonCutoff,
+                                                    neighbors_intra_fraction=neighbors_intra_fraction,
+                                                      intra_neighbors_mutual=intra_neighbors_mutual,
+                                                      outlier_probabilistic_removal= inter_outlier_probabilistic_removal,
+                                                      scaling_num_neighbors = scaling_num_neighbors,
+                                                      outlier_threshold = inter_outlier_threshold,
+                                                      dataset_adjacency =  dataset_adjacency,
+                                                      copy_lsa_neighbors=copy_lsa_neighbors,
+                                                   epsilon=epsilon,
+                                                  add_tree=add_tree)
     #data = umapwrap.graph_umap(data, matrix, label = 'graphumap')
     if False: # debug
         from scipy.sparse import csr_matrix
@@ -70,7 +154,10 @@ def plot(adata,embedding,**plotargs):
     # adata.obsm['X_umap']=adata.obsm[embedding]
     # sc.pl.umap(adata,basis= embedding, **plotargs)
 
-    adata.obsm['newlayer'] =  umap.UMAP(n_components = 2).fit_transform(adata.obsm[embedding])
+    if adata.obsm[embedding].shape[1] > 2:
+        adata.obsm['newlayer'] =  umap.UMAP(n_components = 2).fit_transform(adata.obsm[embedding])
+    else:
+        adata.obsm['newlayer'] =  adata.obsm[embedding]
     sc.pl.embedding(adata, basis= 'newlayer', **plotargs)
 
 

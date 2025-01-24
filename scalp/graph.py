@@ -52,7 +52,7 @@ def steal_neighbors(mlsa, mcopyfrom):
     # plt.show()
 
     # assert not np.isnan(res).any()
-    return res
+    return sparse.lil_matrix(res)
 
 
 
@@ -169,10 +169,11 @@ def spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = T
     check_symmetric(combinedgraph,raise_exception=True) # graph_umap needs a symmetic matrix
     return combinedgraph
 
-def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_mutual = True):
+def symmetric_spanning_tree_neighborgraph(distancemat, neighbors,add_tree=True, neighbors_mutual = True):
 
-    distancemat = metrics.euclidean_distances(x)
-    distancemat = skprep.normalize(distancemat, axis =0) # DOTO this should get a flag
+    # distancemat = metrics.euclidean_distances(x)
+    # distancemat = skprep.normalize(distancemat, axis =0) # DOTO this should get a flag
+
     #return fast_neighborgraph(distancemat, neighbors)
     # min spanning tree
     tree = minimum_spanning_tree(distancemat) if add_tree else np.zeros_like(distancemat)
@@ -193,6 +194,8 @@ def symmetric_spanning_tree_neighborgraph(x, neighbors,add_tree=True, neighbors_
     np.fill_diagonal(combinedgraph,0)
 
     check_symmetric(combinedgraph,raise_exception=True)
+
+
     return combinedgraph
 
 
@@ -218,6 +221,7 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 intra_neigh=15,
                                 inter_neigh = 1,
                                 scaling_num_neighbors = 2,
+                                distance_metric = 'euclidean',
                                 outlier_threshold = .8,
                                 dataset_adjacency = False,intra_neighbors_mutual = True,
                                 copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
@@ -253,16 +257,21 @@ def linear_assignment_integrate(Xlist, base = 'pca',
             i,j = ij
             if i == j:
                 # use the maximum between neighborgraph and min spanning tree to make sure all is connected
-                r = symmetric_spanning_tree_neighborgraph(Xlist[i], intra_neigh,
+                distances = metrics.pairwise_distances(Xlist[i],metric = distance_metric)
+
+                r = symmetric_spanning_tree_neighborgraph(distances, intra_neigh,
                                                           add_tree = add_tree,
                                                           neighbors_mutual=intra_neighbors_mutual)
                 r = sparse.lil_matrix(r)
-                return r
+
+                # cutoffs =  [heapq.nlargest(horizonCutoff,values) for values in r.data] if horizonCutoff else 0
+                cutoffs = np.partition(distances, horizonCutoff, axis=1)[:, horizonCutoff] if horizonCutoff else 0
+                return r, cutoffs
 
 
             elif not adjacent(i,j):
                 # just fill with zeros :)
-                return  sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
+                return  sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32) ,0
             else:
                 '''
                 based = hungdists/= .25
@@ -270,7 +279,12 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                 based*=dm
                 '''
                 # hungarian
-                ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
+                # ij_euclidian_distances= metrics.euclidean_distances(Xlist[i],Xlist[j])
+                ij_euclidian_distances= metrics.pairwise_distances(Xlist[i],Xlist[j],
+                                                                   metric=distance_metric)
+
+
+
                 res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
                 if inter_neigh==0:
                     return res
@@ -299,14 +313,17 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                 if epsilon > 0:
                     res[res > 0] = epsilon
 
-
-                return res
+                # zero is the horizon cutoff. which we dont need here
+                return res,0
 
     n_datas = len(Xlist)
     tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
-    #parts = ut.xxmap( make_distance_matrix, tasks)
-    parts = Map( make_distance_matrix, tasks)
-    getpart = dict(zip(tasks,parts))
+    parts = ut.xxmap( make_distance_matrix, tasks)
+    # parts = Map( make_distance_matrix, tasks)
+    # select p[0] to rm horizon cutoff values
+    getpart = dict(zip(tasks,[p[0] for p in parts]))
+    getcuts = dict(zip(tasks,[p[1] for p in parts]))
+
 
     def steal_neigh(ij):
         i,j = ij
@@ -319,25 +336,37 @@ def linear_assignment_integrate(Xlist, base = 'pca',
             getpart[(i,j)]  = block
 
 
-    # then we built a row:
-    row = []
+    # then we built  rows:
+    rows = []
     for i in range(n_datas):
-        col = []
+        row = []
         for j in range(n_datas):
             if i <= j:
                 distance_matrix = getpart[(i,j)]
             else:
-                distance_matrix = row[j][i].T
-            col.append(distance_matrix)
+                distance_matrix = rows[j][i].T.copy()
+            row.append(distance_matrix)
 
-        if horizonCutoff > 0:
-            col = list(removeInstancesFartherThanHorizon(col[i],col,horizonCutoff))
-
-        row.append(col)
+        rows.append(row)
 
 
-    rows = [sparse.hstack(col) for col in row]
-    distance_matrix = sparse.vstack(rows)
+    if horizonCutoff > 0:
+        for i in range(n_datas):
+            # for c in row:
+            #     plt.matshow(c.todense())
+            #     plt.roworbar()
+            #     plt.show()
+            #plt.matshow(np.hstack([c.todense() for c in row]))
+            rows[i] = list(removeInstancesFartherThanHorizon(getcuts[(i,i)],rows[i],i,horizonCutoff))
+
+        # now we make it symmetric
+        for i in range(n_datas-1):
+            for j in range(i+1,n_datas):
+                rows[i][j]= rows[i][j].maximum(rows[j][i])
+                rows[j][i]= rows[i][j].T
+
+    rowss = [sparse.hstack(row) for row in rows]
+    distance_matrix = sparse.vstack(rowss)
 
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
@@ -345,22 +374,22 @@ def linear_assignment_integrate(Xlist, base = 'pca',
     return  distance_matrix
 
 from matplotlib import pyplot as plt
-
 import heapq
-def removeInstancesFartherThanHorizon(reference:lil_matrix, targets :list, nthNeighbor:int):
+def removeInstancesFartherThanHorizon(cutoffs, targets :list,rId:int, nthNeighbor:int):
     '''
     remove instances that are farther than the nth neighbor in the reference in all matrixes contained in targets
     '''
     # cutoffs = np.partition(reference,nthNeighbor,axis=1)[:,nthNeighbor]
-    cutoffs =  [heapq.nlargest(nthNeighbor,values)[-1] for values in reference.data]
-    plt.hist(cutoffs)
-    plt.show()
-    print(f"{cutoffs[0]=} {targets[0][0].data=} {targets[1][0].data=}")
-    for target in targets:
+    # cutoffs =  [heapq.nlargest(nthNeighbor,values)[-1] for values in reference.data]
+
+    #plt.hist(cutoffs);plt.show()
+    #print(f"{cutoffs[0]=} {targets[0][0].data=} {targets[1][0].data=}")
+    for j,target in enumerate(targets):
         # values larger than cutoffs (per row) are set to zero
-        for i,cut in enumerate(cutoffs):
-            badind = [ind for ind,val in zip(target.rows[i], target.data[i]) if val > cut]
-            target[i,badind] = 0
+        if j!=rId:
+            for i,cut in enumerate(cutoffs):
+                badind = [ind for ind,val in zip(target.rows[i], target.data[i]) if val > cut]
+                target[i,badind] = 0
         yield target
 
 def testHorizonCutOff():
@@ -423,3 +452,190 @@ def negstuff(Xlist,
     rows = [sparse.hstack(col) for col in row]
     distance_matrix = sparse.vstack(rows)
     return  csr_matrix(distance_matrix)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# import numpy as np
+# from scipy.optimize import linear_sum_assignment
+# from sklearn.neighbors import NearestNeighbors
+
+import itertools
+from scipy.spatial.distance import cdist
+from scipy.sparse import coo_matrix, csr_matrix
+
+def aiSlopSolution(matrices, k, h):
+    """
+    Constructs a sparse adjacency matrix based on k-NN within each matrix,
+    adds cross-edges using linear assignment pairwise between matrices,
+    and filters edges based on horizon h.
+
+    Parameters:
+    - matrices: list of numpy arrays or anndata, each of shape (n_i, d)
+    - k: int, number of nearest neighbors within each matrix
+    - h: int, horizon parameter for filtering edges
+
+    Returns:
+    - adjacency: scipy.sparse.csr_matrix of shape (total_instances, total_instances)
+    """
+
+    # fixing input
+    if 'anndata' in str(type(matrices[0])):
+        matrices = to_arrays(matrices, 'pca40')
+
+    num_matrices = len(matrices)
+    sizes = [mat.shape[0] for mat in matrices]
+    total = sum(sizes)
+
+    # Compute cumulative sizes for indexing
+    cum_sizes = np.cumsum([0] + sizes)
+
+    # Step 1: Find k-NN within each matrix
+    knn_info = []
+    h_distances = []
+
+    for idx, mat in enumerate(matrices):
+        nbrs = NearestNeighbors(n_neighbors=min(k, mat.shape[0]-1), algorithm='auto').fit(mat)
+        distances, indices = nbrs.kneighbors(mat)
+        knn_info.append((distances, indices))
+
+        # Compute h-th nearest neighbor distances
+        if h <= distances.shape[1]:
+            h_dist = distances[:, h-1]
+        else:
+            # Recompute with h neighbors if h > current neighbors
+            nbrs_h = NearestNeighbors(n_neighbors=min(h, mat.shape[0]-1), algorithm='auto').fit(mat)
+            distances_h, _ = nbrs_h.kneighbors(mat)
+            if h <= distances_h.shape[1]:
+                h_dist = distances_h[:, h-1]
+            else:
+                # If h is still larger, take the maximum distance
+                h_dist = distances_h[:, -1]
+        h_distances.append(h_dist)
+
+    # Prepare lists for adjacency matrix
+    row = []
+    col = []
+    data = []
+
+    # Add within-matrix edges
+    for matrix_idx, (distances, indices) in enumerate(knn_info):
+        base_idx = cum_sizes[matrix_idx]
+        for i in range(sizes[matrix_idx]):
+            for j in range(distances.shape[1]):
+                neighbor = indices[i, j]
+                row.append(base_idx + i)
+                col.append(base_idx + neighbor)
+                data.append(distances[i, j])
+
+    # Step 2: Linear Assignment between each unique pair of matrices
+    for (i, j) in itertools.combinations(range(num_matrices), 2):
+        A = matrices[i]
+        B = matrices[j]
+        n_A = sizes[i]
+        n_B = sizes[j]
+        base_A = cum_sizes[i]
+        base_B = cum_sizes[j]
+
+        # Compute cost matrix
+        cost_matrix = cdist(A, B, metric='euclidean')
+
+        # Determine the number of assignments (min(n_A, n_B))
+        num_assignments = min(n_A, n_B)
+
+        # Solve linear assignment problem
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        # If there are more assignments needed than min(n_A, n_B), limit them
+        if len(row_ind) > num_assignments:
+            row_ind = row_ind[:num_assignments]
+            col_ind = col_ind[:num_assignments]
+
+        # Add cross-edges
+        for a, b in zip(row_ind, col_ind):
+            distance = cost_matrix[a, b]
+            row.append(base_A + a)
+            col.append(base_B + b)
+            data.append(distance)
+            # Assuming undirected graph, add reverse edge
+            row.append(base_B + b)
+            col.append(base_A + a)
+            data.append(distance)
+
+    # Step 3: Horizon filtering
+    # Convert lists to arrays for processing
+    row = np.array(row)
+    col = np.array(col)
+    data = np.array(data)
+
+    # Identify cross-edges (between different matrices)
+    # A cross-edge exists if the source and target belong to different matrices
+    def find_matrix(idx):
+        # Binary search to find which matrix the index belongs to
+        matrix_idx = np.searchsorted(cum_sizes, idx, side='right') - 1
+        return matrix_idx
+
+    # Vectorized approach to find matrix indices
+    matrix_indices_row = np.searchsorted(cum_sizes, row, side='right') - 1
+    matrix_indices_col = np.searchsorted(cum_sizes, col, side='right') - 1
+
+    cross_mask = matrix_indices_row != matrix_indices_col
+
+    # Get indices of cross-edges
+    cross_indices = np.where(cross_mask)[0]
+
+    # Get the distances of cross-edges
+    cross_distances = data[cross_indices]
+
+    # Get endpoints for cross-edges
+    endpoints_row = row[cross_indices]
+    endpoints_col = col[cross_indices]
+
+    # Compute min(h_distance of endpoints)
+    # For each endpoint, determine which matrix it belongs to and fetch h_distance
+    # Create an array to store h_distances for each instance
+    # Initialize an array with total size
+    h_distance_all = np.zeros(total)
+    for m_idx in range(num_matrices):
+        start = cum_sizes[m_idx]
+        end = cum_sizes[m_idx + 1]
+        h_distance_all[start:end] = h_distances[m_idx]
+
+    # Get h_distances for endpoints
+    h_dist_row = h_distance_all[endpoints_row]
+    h_dist_col = h_distance_all[endpoints_col]
+
+    # Compute the minimum h_distance for each cross-edge
+    min_h_dist = np.minimum(h_dist_row, h_dist_col)
+
+    # Determine which cross-edges to keep
+    keep_mask = cross_distances <= min_h_dist
+
+    # Indices to remove (cross-edges not satisfying the condition)
+    remove_indices = cross_indices[~keep_mask]
+
+    # Remove these edges
+    row = np.delete(row, remove_indices)
+    col = np.delete(col, remove_indices)
+    data = np.delete(data, remove_indices)
+
+    # Step 4: Construct sparse adjacency matrix
+    adjacency = coo_matrix((data, (row, col)), shape=(total, total))
+
+    # Optionally, make the matrix symmetric (if not already)
+    adjacency = adjacency.maximum(adjacency.transpose())
+
+    # Convert to CSR format for efficient arithmetic and slicing
+    adjacency = adjacency.tocsr()
+
+    return adjacency

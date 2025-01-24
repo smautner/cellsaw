@@ -168,6 +168,9 @@ def umap_last_experiment(adata,adjacencymatrix, base = 'pca40', label = 'lastexp
     adata.obsp[conns_key] = cnts
     adata.uns[key_added]['distances_key'] = dists_key
     adata.uns[key_added]['connectivities_key'] = conns_key
+    adata.uns.pop('umap', None)
+    adata.obsm.pop('X_umap', None)
+
     sc.tl.umap(adata,n_components=n_components)
     adata.uns.pop('umap')
     return adata.obsm.pop('X_umap')

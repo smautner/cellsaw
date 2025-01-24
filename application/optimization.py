@@ -19,7 +19,7 @@ def eval_single(**kwargs):
     adata = ut.loadfile(f'garbage/{ss_id}.delme')
     matrix = scalp.mkgraph(adata, **kwargs)
 
-    embedding = umapwrap.umap_last_experiment(adata,matrix, n_components=10)
+    embedding = umapwrap.umap_last_experiment(adata,matrix, n_components=kwargs['dim'])
 
     adata.obsm['scalp'] = embedding
     adata.uns['integrated'] = ['scalp']
@@ -42,14 +42,14 @@ def experiment_setup(scib = False, ts = False,
     tspath = tspath or test_config.timeseries_datapath
 
     datasets = list(scalp.data.scib(scibpath,  maxdatasets=batches,  maxcells = maxcells )) if scib else []
-    datasets += list(scalp.data.timeseries(tspath,  maxdatasets=batches,  maxcells = maxcells )) if scib else []
+    datasets += list(scalp.data.timeseries(tspath,  maxdatasets=batches,  maxcells = maxcells )) if ts else []
 
     fnames= []
     for i,s in enumerate(datasets):
         fname = uuid.uuid4().hex
         ut.dumpfile(s, f'garbage/{fname}.delme')
         fnames.append(fname)
-
+    print(fnames)
     return fnames
 
 
@@ -64,8 +64,10 @@ def data_to_params(tasks, data):
 if __name__ == '__main__':
 
     # we make some dataset- ids
-    # ds_ids =  experiment_setup(batches = 5 , scib = True)
-    ds_ids = ['bbbd347dc44a47ed83bfd0cf58fd3e70', '6585a6689e35429bb5f4de93e56edbff', 'a4a801d88f004f34866167b118edb1dc', '01ac26cf8f7a4d7eb5c81f5b6cf07660', '3217529d9eb546e5a9390cf1cfe0da0c', '8adcaf34689e4c40a28cdf30ced6cd36', '9bbac99788474db7b33d2141b9dee733', 'f36b99f9627b4e36b759c511c42606d9', '5c261e9b7043435c981a49ae3f064b41', 'd6f871342a9944b8be3ba76b74abbadf', '5cd61c7e9f6d4ad4acc3e44f08d81482']
+
+    ds_ids =  experiment_setup(batches = 4,maxcells = 100, scib = True)
+
+    # ds_ids = ['b66774d7f379482d9bcc60e32fc961b5', '58fef6d785de49dd8dd75f714f1c1fb4', 'e9e3df848cf84aeea65bd9905e29ae4c', '0fbd407bbf384998b23748300e75146d']
 
     # for ds_id in ds_ids:
     #     adata = ut.loadfile(f'garbage/{ds_id}.delme')
@@ -73,14 +75,13 @@ if __name__ == '__main__':
     #     exit()
 
 
-    space3 = ho.spaceship(scalp.mkgraphParameters)
-    tasks = [space3.sample() for i in range(4)]
+    space3 = ho.spaceship(scalp.mkgraphParameters+'dim 10 15 1\n')
+    tasks = [space3.sample() for i in range(300)]
     tasks = list(data_to_params(tasks, ds_ids))
-    df = opti.gridsearch(eval_single, space3, tasks = tasks ,data= [])
+    df = opti.gridsearch(eval_single, space3, tasks = tasks ,data= [],mp=True)
 
 
     df.to_csv('out.csv', index=False)
-
 
 
 
