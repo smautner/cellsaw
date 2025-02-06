@@ -207,11 +207,11 @@ def avgdist(a,numneigh = 2):
     return np.mean(distances[:,1:], axis = 1)
 
 
-def average_knn_distance(I,J,i_ids,j_ids,numneigh):
-    d1  = avgdist(I,numneigh)[i_ids]
-    d2  = avgdist(J,numneigh)[j_ids]
-    stack = np.vstack((d1,d2))
-    return np.mean(stack, axis=0).T
+# def average_knn_distance(I,J,i_ids,j_ids,numneigh):
+#     d1  = avgdist(I,numneigh)[i_ids]
+#     d2  = avgdist(J,numneigh)[j_ids]
+#     stack = np.vstack((d1,d2))
+#     return np.mean(stack, axis=0).T
 
 
 def linear_assignment_integrate(Xlist, base = 'pca',

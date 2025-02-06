@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     # we make some dataset- ids
 
-    ds_ids =  experiment_setup(batches = 4,maxcells = 100, scib = True)
+    ds_ids =  experiment_setup(batches = 4,maxcells = 1000, scib = True)
 
     # ds_ids = ['b66774d7f379482d9bcc60e32fc961b5', '58fef6d785de49dd8dd75f714f1c1fb4', 'e9e3df848cf84aeea65bd9905e29ae4c', '0fbd407bbf384998b23748300e75146d']
 
