@@ -25,7 +25,7 @@ def adatas_umap(adatas, dim = 10, label = 'umap10', from_obsm = 'pca40', **umapa
 
 
 from sklearn.manifold import MDS
-def graph_umap(adatas, distance_adjacency_matrix,
+def graph_umap(adatas=False, distance_adjacency_matrix=None,
                label=f'lsa', n_neighbors = 10,
                n_components = 2, **kwargs):
     # res =  umap.UMAP(n_components=n_components,
@@ -33,6 +33,8 @@ def graph_umap(adatas, distance_adjacency_matrix,
     #                  **kwargs).fit_transform(distance_adjacency_matrix)
     distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
     res = graphumap.graphumap(distance_adjacency_matrix, n_dim=n_components)
+    if not adatas:
+        return res
     return attach_stack(adatas, res, label)
 
 def graph_mds(adatas, distance_adjacency_matrix,
@@ -69,7 +71,7 @@ def graph_xumap(adatas, distance_adjacency_matrix,
 
 
 
-def graph_pacmap(adatas, distance_adjacency_matrix,
+def graph_pacmap(adatas = False, distance_adjacency_matrix=None,
                label=f'pacmap',
                n_components = 2, neighbors = None, MN= .5, FP=2, **kwargs):
     # distance_adjacency_matrix = csr_matrix(distance_adjacency_matrix)
@@ -78,10 +80,11 @@ def graph_pacmap(adatas, distance_adjacency_matrix,
     res = pacmap.PaCMAP(n_components=n_components, n_neighbors=neighbors,
                         MN_ratio=MN, FP_ratio=FP).fit_transform(distance_adjacency_matrix)
 
-
+    if not adatas:
+        return res
     return attach_stack(adatas, res, label)
 
-def graph_pacmap2(adatas, distance_adjacency_matrix,label='pacmap2',n_components =2):
+def graph_pacmap2(adatas=False, distance_adjacency_matrix=None,label='pacmap2',n_components =2):
 
     X , di = graphumap.make_knn(csr_matrix(distance_adjacency_matrix))
     nbrs=X
@@ -96,13 +99,13 @@ def graph_pacmap2(adatas, distance_adjacency_matrix,label='pacmap2',n_components
                     scaled_dist.astype(np.float32), nbrs.astype(np.int32), np.int32(n_neighbors))
     # initializing the pacmap instance
     # feed the pair_neighbors into the instance
-    print(pair_neighbors)
     embedding = pacmap.PaCMAP(n_components=n_components, n_neighbors=n_neighbors,
                         MN_ratio=0.5, FP_ratio=2.0, pair_neighbors=pair_neighbors)
 
     # fit the data (The index of transformed data corresponds to the index of the original data)
     X_transformed = embedding.fit_transform(X, init="pca")
-
+    if not adatas:
+        return X_transformed
     return attach_stack(adatas, X_transformed, label)
 
 

@@ -95,8 +95,6 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold,
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
 
-
-
     return i_ids, j_ids, ij_lsa_distances
 
 def lsa_sample(distance_matrix, num_instances):
@@ -639,3 +637,173 @@ def aiSlopSolution(matrices, k, h):
     adjacency = adjacency.tocsr()
 
     return adjacency
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def mkblock(matrix, i,j):
+    '''
+    we return a new array, the size of matrix
+    row[i] of the new matrix, has the data of row[j] of the old matrix
+
+    matrix and res should be lil_matrix
+    '''
+
+    # res = np.zeros((matrix.shape[0],matrix.shape[0]),dtype=np.float32)
+
+    # print(f"{ res.shape=}")
+    # print(f"{ matrix.shape=}")
+    # print(f"{ i.shape=}")
+    # print(f"{ j.shape=}")
+
+    res = sparse.lil_matrix(matrix.shape)
+    # matrix = matrix.T
+    res[i] = matrix[j]
+    return res
+
+from scalp import transform
+import sklearn
+
+
+def stack_blocks(n_datas, getpart):
+    '''
+    getpart giges us the blocks, and we need to stack them into a matrix
+    '''
+    rows = []
+    for i in range(n_datas):
+        row = []
+        for j in range(n_datas):
+            if i <= j:
+                distance_matrix = getpart[(i,j)]
+            else:
+                distance_matrix = rows[j][i].T.copy()
+            row.append(distance_matrix)
+        rows.append(row)
+    rowss = [sparse.hstack(row) for row in rows]
+    return sparse.vstack(rowss)
+
+
+def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
+
+    # make sure the input is in the right format
+    # there are 3 options: adata, list of adata and list of np.array
+
+    # case 1:
+    if 'anndata' in str(type(adata)):
+        adata = transform.split_by_obs(adata)
+
+    # ok now we have a list... it could be in the wrong format
+    if 'anndata' in str(type(adata[0])):
+        adata = to_arrays(adata, base)
+
+    Xlist =adata
+
+
+    if len(Xlist) ==1:
+        assert False, 'why do you only provide 1 dataset?'
+
+
+    def adjacent(i,j):
+        if isinstance( dataset_adjacency, np.ndarray):
+            return  dataset_adjacency[i][j] == 1
+        else:
+            return True
+
+    def make_distance_matrix(ij):
+            i,j = ij
+            if i == j:
+                distances = metrics.pairwise_distances(Xlist[i],metric = 'euclidean')
+                # normalize colimn wise to remove hubs
+                # this actually helps!
+                if ls:
+                    distances = local_scaling(distances,6)
+                else:
+                    distances = sklearn.preprocessing.normalize(distances, axis= 0)
+
+                # distances = sklearn.preprocessing.StandardScaler().fit_transform(distances.T)
+                r = symmetric_spanning_tree_neighborgraph(distances,k , add_tree = False, neighbors_mutual=False)
+                r = sparse.lil_matrix(r)
+
+                # norm row wise to make them comparable
+                return sklearn.preprocessing.normalize(r)
+
+
+            elif not adjacent(i,j):
+                # just fill with zeros :)
+                return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
+            else:
+                ij_euclidian_distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric='euclidean')
+                # ij_euclidian_distances = sklearn.preprocessing.StandardScaler(ij_euclidian_distances, axis= 0)
+                #ij_euclidian_distances = sklearn.preprocessing.normalize(ij_euclidian_distances, axis= 0,)
+                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances, 1,.9, False)
+                # res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
+                # res[i_ids,j_ids] = ij_lsa_distances
+                return i_ids, j_ids
+
+    n_datas = len(Xlist)
+    tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
+    parts = Map( make_distance_matrix, tasks)
+    getpart = dict(zip(tasks,parts))
+
+
+    tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
+    for i,j in tasks:
+        getpart[(i,j)]  = mkblock( getpart[(j,j)] , *getpart[(i,j)])
+
+    # MAKE THE MATRIX
+    # check_symmetric(distance_matrix,raise_exception=True)
+    # so.heatmap(distance_matrix.todense(), dim = (100,100))
+
+    return  stack_blocks(n_datas, getpart)
+
+def test_integrate():
+    # make 2 random 10x10 matrices
+    # and run integrate on them
+    # import scalp.data as data
+    # a = data.scib(scalp.test_config.scib_datapath, maxdatasets=3, maxcells = 100, datasets = ["Immune_ALL_hum_mou"]).__next__()
+
+    a= (np.random.random((10,200)),np.random.random((10,200)))
+    integrate(a)
+
+
+
+def local_scaling(distance_matrix, k=6):
+    """
+    Local scaling method to reduce hubness
+
+    Parameters:
+    - distance_matrix: Original distance matrix
+    - k: Number of neighbors to consider
+
+    Returns:
+    - Scaled distance matrix
+    """
+    n = distance_matrix.shape[0]
+    scaled_distances = distance_matrix.copy()
+
+    # Compute local scaling factors
+    local_scale = np.sort(distance_matrix, axis=1)[:, k:k+1]
+
+    # Apply scaling
+    for i in range(n):
+        for j in range(n):
+            scaled_distances[i,j] /= (local_scale[i] * local_scale[j])
+
+    return scaled_distances

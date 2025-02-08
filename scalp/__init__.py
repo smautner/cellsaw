@@ -72,11 +72,11 @@ mkgraphParameters = '''
 neighbors_total 15 45 1
 neighbors_intra_fraction .2 .5
 intra_neighbors_mutual 0 1 1
-copy_lsa_neighbors 0 1 1
 add_tree 0 1 1
 horizonCutoff 50 100 1
 standardize 0 1 1
 '''
+# copy_lsa_neighbors 0 1 1
 # distance_metric ['euclidean', 'sqeuclidean' ]
 # inter_outlier_threshold .60 .97
 # inter_outlier_probabilistic_removal 0 1 1
@@ -164,7 +164,7 @@ def plot(adata,embedding,**plotargs):
 def test_scalp():
     n_cells = 100
     a = data.scib(test_config.scib_datapath, maxdatasets=3,
-                           maxcells = n_cells, datasets = ["Immune_ALL_hum_mou"])[0]
+                           maxcells = n_cells, datasets = ["Immune_ALL_hum_mou"]).__next__()
     # print("=============== mnn ===============")
     # mnn and scanvi are no longer maintained, scanoram is second on the nature method ranking
     # a = mnn.mnn(a)
@@ -186,7 +186,8 @@ def test_scalp():
     assert a[0].obsm['umap10'].shape == (n_cells,10)
 
     print("=============== make lina-graph ===============")
-    matrix = graph.linear_assignment_integrate(a, base ='pca40')
+    # matrix = graph.linear_assignment_integrate(a, base ='pca40')
+    matrix = graph.integrate(a, base ='pca40')
     print(f"{matrix.shape=}")
     assert matrix.shape== (n_cells*3,n_cells*3)
 
