@@ -78,18 +78,17 @@ def cdf_remove(data, bias):
 
 
 
-def lin_asi_thresh(ij_euclidian_distances,inter_neigh, outlier_threshold,
-                   outlier_probabilistic_removal, prune = 0):
+def lin_asi_thresh(ij_euclidian_distances,inter_neigh=1, outlier_threshold=.9,
+                   outlier_probabilistic_removal=False, prune = 0):
 
+    # get the (repeated) assignment
     i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(ij_euclidian_distances,inter_neigh)
     # i_ids,j_ids, ij_lsa_distances = repeated_subsample_linear_sum_assignment(ij_euclidian_distances,inter_neigh,100)
 
-    # remove worst 25% hits
+    # remote outliers
     sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
-
     if outlier_probabilistic_removal and outlier_threshold > 0:
         ij_lsa_distances[cdf_remove(ij_lsa_distances,outlier_threshold/2)] = 0
-
     elif  outlier_threshold > 0:
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
@@ -187,10 +186,10 @@ def symmetric_spanning_tree_neighborgraph(distancemat, neighbors,add_tree=True, 
 
     # combine and return
     #combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T, anti_neighborsgraph,anti_neighborsgraph.T), axis =2)
+
     combinedgraph = np.stack((neighborsgraph,neighborsgraph.T,tree,tree.T ), axis =2)
     combinedgraph = combinedgraph.max(axis=2)
     np.fill_diagonal(combinedgraph,0)
-
     check_symmetric(combinedgraph,raise_exception=True)
 
 
@@ -647,22 +646,10 @@ def aiSlopSolution(matrices, k, h):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 def mkblock(matrix, i,j):
     '''
     we return a new array, the size of matrix
     row[i] of the new matrix, has the data of row[j] of the old matrix
-
     matrix and res should be lil_matrix
     '''
 
@@ -715,10 +702,10 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
 
     Xlist =adata
 
+    print(f" ds sizes: {[x.shape for x in Xlist]}")
 
     if len(Xlist) ==1:
         assert False, 'why do you only provide 1 dataset?'
-
 
     def adjacent(i,j):
         if isinstance( dataset_adjacency, np.ndarray):
@@ -733,16 +720,22 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
                 # normalize colimn wise to remove hubs
                 # this actually helps!
                 if ls:
-                    distances = local_scaling(distances,6)
+                    distances = csls(distances,10)
                 else:
-                    distances = sklearn.preprocessing.normalize(distances, axis= 0)
+                    # we do this at the end anyway, is this needed?
+                    pass
 
-                # distances = sklearn.preprocessing.StandardScaler().fit_transform(distances.T)
-                r = symmetric_spanning_tree_neighborgraph(distances,k , add_tree = False, neighbors_mutual=False)
-                r = sparse.lil_matrix(r)
+                distances = sklearn.preprocessing.normalize(distances, axis= 0)
+                # we just take some neighbors, then make it symmetric, also setthe diagonal to 0
+                distances = symmetric_spanning_tree_neighborgraph(distances,k , add_tree = False, neighbors_mutual=False)
+
+
+                # distances = fast_neighborgraph(distances, k)
+                # np.fill_diagonal(distances,0)
+                distances = sparse.lil_matrix(distances)
 
                 # norm row wise to make them comparable
-                return sklearn.preprocessing.normalize(r)
+                return distances #sklearn.preprocessing.normalize(r)
 
 
             elif not adjacent(i,j):
@@ -750,8 +743,11 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
                 return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
             else:
                 ij_euclidian_distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric='euclidean')
+                # ij_euclidian_distances = sklearn.preprocessing.normalize(ij_euclidian_distances, axis= 0)
+                # ij_euclidian_distances =  csls( ij_euclidian_distances,10)
                 # ij_euclidian_distances = sklearn.preprocessing.StandardScaler(ij_euclidian_distances, axis= 0)
-                #ij_euclidian_distances = sklearn.preprocessing.normalize(ij_euclidian_distances, axis= 0,)
+
+                # just 1 round, remove the worst 10%
                 i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances, 1,.9, False)
                 # res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
                 # res[i_ids,j_ids] = ij_lsa_distances
@@ -783,6 +779,29 @@ def test_integrate():
     integrate(a)
 
 
+def csls(D, k=10):
+    """
+    Applies CSLS hubness reduction to a distance matrix.
+
+    Args:
+        D: (n_samples, n_samples) distance matrix (lower = more similar)
+        k: Number of nearest neighbors to consider for local scaling
+
+    Returns:
+        D_csls: Hubness-reduced distance matrix
+    """
+    n = D.shape[0]
+
+    # Find k-nearest neighbors for each point (excluding self)
+    knn = np.argpartition(D, k+1, axis=1)[:, :k+1]  # +1 to account for self
+
+    z = [row[row != i] for i, row in enumerate(knn)]
+
+    # Compute mean distance of each point's neighborhood r(x_i)
+    r = np.array([D[i, z[i]].mean() for i in range(n)])
+    D_csls = 2 * D + r[:, None] + r[None, :]
+    np.fill_diagonal(D_csls, 0)
+    return D_csls
 
 def local_scaling(distance_matrix, k=6):
     """
@@ -807,3 +826,5 @@ def local_scaling(distance_matrix, k=6):
             scaled_distances[i,j] /= (local_scale[i] * local_scale[j])
 
     return scaled_distances
+
+

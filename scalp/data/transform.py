@@ -29,7 +29,8 @@ def unique_nosort(items):
 def split_by_adatas(adatas, stack):
     # TODO
     batch_ids = np.hstack([ a.obs['batch'] for a in adatas])
-    return [ stack[batch_ids == batch].copy() for batch in unique_nosort(batch_ids)]
+    ret =  [ stack[batch_ids == batch].copy() for batch in unique_nosort(batch_ids)]
+    return ret
 
 
 def split_by_obs(adatas, obs=f'batch'):

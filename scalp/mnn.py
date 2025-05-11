@@ -55,6 +55,8 @@ def combat(adata, base = 'pca40', batchindicator = 'batch', label =  'combat'):
     # adata = transform.stack(adatas)
     r = sc.pp.combat(adata,batchindicator, inplace=False)
     adata.obsm[label] = r
+    adata.uns.setdefault('integrated',[])
+    adata.uns['integrated'].append(label)
     return adata
 
 import bbknn

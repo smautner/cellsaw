@@ -8,6 +8,8 @@ def subsample_iflarger(data, **kwargs):
 
 def subsample(data,num=1000, seed=None, copy = False):
     np.random.seed(seed)
+    if data.n_obs < num:
+        return data
     obs_indices = np.random.choice(data.n_obs, size=num, replace=True)
     r=  data[obs_indices]
     if copy:

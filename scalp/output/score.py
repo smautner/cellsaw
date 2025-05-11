@@ -220,7 +220,7 @@ def pareto_sample(datadict,scorenames=['label','batch']):
     data = Flatten(data)
     df = pd.DataFrame(data)
     # {'method': '0', 'scoretype': 'label', 'score': 0.8031946991682309}
-    return [(a[0],b) for a,b in pareto_scores(df, data= 'measureid', scoretype='scoretype')]
+    return [(a,b) for a,b in pareto_scores(df, data= 'measureid', scoretype='scoretype')]
 
 
 

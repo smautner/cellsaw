@@ -9,6 +9,8 @@ def check_adatas(adatas):
 
 
 def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', make_even = True, pretransformed = False):
+
+
     check_adatas(adatas)
     if hvg == 'cell_ranger':
         adatas = cell_ranger(adatas, pretransformed = pretransformed)
@@ -23,6 +25,7 @@ def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', m
     adatas = hvg_cut(adatas, selector(adatas,cut_ngenes,hvg_name=hvg))
     if make_even:
         adatas = subsample_to_min_cellcount(adatas)
+
     return adatas
 
 
@@ -67,9 +70,8 @@ def subsample_to_min_cellcount(adatas):
         smallest = min([e.X.shape[0] for e in adatas])
         for a in adatas:
             if a.X.shape[0] > smallest:
-                scalp.data.subsample.subsample(a, n_obs=smallest,
-                                               random_state=0,
-                                               copy=False)
+                sc.pp.subsample(a, n_obs=smallest, random_state=0, copy=False)
+                # adatas = scalp.data.subsample(a, num = smallest, seed=0, copy=False)
         return adatas
 
 

@@ -14,7 +14,7 @@ def pca(adatas, dim=40, label = 'pca40'):
     else:
         scaled = sc.pp.scale(data, zero_center=False, copy=True,max_value=10).X
         stackedPCA =  pca_on_scaled_data(scaled, dim)
-
+    # print(adatas, stackedPCA, label)
     return attach_stack(adatas, stackedPCA, label)
 
 

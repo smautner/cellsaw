@@ -4,7 +4,6 @@ import numpy as np
 
 
 
-
 def rename_obs(datasets, batch, typ):
     for ds, bat, lab in zip(datasets, batch, typ):
         if batch != 'batch':

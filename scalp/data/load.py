@@ -47,7 +47,7 @@ def load_scib(path, datasets = False):
 def load_timeseries(path,datasets=False,remove_unassigned = True):
 
     if not datasets:
-        datasets = "s5 509 1290 mousecortex water pancreatic cerebellum".split()
+        datasets = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris done_reprogramming_schiebinger".split()
     datasets = [sc.read_h5ad(path+data+".h5ad") for data in datasets]
 
     # datasets = [sc.read(path+data+".h5ad") for data in "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
