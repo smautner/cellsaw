@@ -677,7 +677,8 @@ def stack_blocks(n_datas, getpart):
     for i in range(n_datas):
         row = []
         for j in range(n_datas):
-            if i <= j:
+            # if i <= j:
+            if (i,j) in getpart:
                 distance_matrix = getpart[(i,j)]
             else:
                 distance_matrix = rows[j][i].T.copy()
@@ -687,7 +688,7 @@ def stack_blocks(n_datas, getpart):
     return sparse.vstack(rowss)
 
 
-def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
+def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False, outlier_threshold= .9):
 
     # make sure the input is in the right format
     # there are 3 options: adata, list of adata and list of np.array
@@ -702,7 +703,7 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
 
     Xlist =adata
 
-    print(f" ds sizes: {[x.shape for x in Xlist]}")
+    # print(f" ds sizes: {[x.shape for x in Xlist]}")
 
     if len(Xlist) ==1:
         assert False, 'why do you only provide 1 dataset?'
@@ -724,10 +725,10 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
                 else:
                     # we do this at the end anyway, is this needed?
                     pass
-
                 distances = sklearn.preprocessing.normalize(distances, axis= 0)
                 # we just take some neighbors, then make it symmetric, also setthe diagonal to 0
                 distances = symmetric_spanning_tree_neighborgraph(distances,k , add_tree = False, neighbors_mutual=False)
+                # distances = fast_neighborgraph(distances, k)
 
 
                 # distances = fast_neighborgraph(distances, k)
@@ -748,7 +749,7 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
                 # ij_euclidian_distances = sklearn.preprocessing.StandardScaler(ij_euclidian_distances, axis= 0)
 
                 # just 1 round, remove the worst 10%
-                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances, 1,.9, False)
+                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances, 1,outlier_threshold, False)
                 # res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
                 # res[i_ids,j_ids] = ij_lsa_distances
                 return i_ids, j_ids
@@ -759,15 +760,27 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False):
     getpart = dict(zip(tasks,parts))
 
 
+    blockdict = {(i,i): getpart[(i,i)] for i in range(n_datas)}
+
+    # the old way:
+
     tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
     for i,j in tasks:
-        getpart[(i,j)]  = mkblock( getpart[(j,j)] , *getpart[(i,j)])
+        blockdict[(i,j)]  = mkblock( getpart[(j,j)] , *getpart[(i,j)])
+
+
+    for i,j in tasks:
+        # ok so we fill the mirror too... breaking symmetry
+        # i,i is the reference now
+        imatch, jmatch  = getpart[(i,j)]
+        blockdict[(j,i)]  = mkblock( getpart[(i,i)] , jmatch, imatch )
+
 
     # MAKE THE MATRIX
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
 
-    return  stack_blocks(n_datas, getpart)
+    return  stack_blocks(n_datas, blockdict)
 
 def test_integrate():
     # make 2 random 10x10 matrices
@@ -800,8 +813,8 @@ def csls(D, k=10):
     # Compute mean distance of each point's neighborhood r(x_i)
     r = np.array([D[i, z[i]].mean() for i in range(n)])
     D_csls = 2 * D + r[:, None] + r[None, :]
-    np.fill_diagonal(D_csls, 0)
-    return D_csls
+    # np.fill_diagonal(D_csls, 0)
+    return D_csls + 20
 
 def local_scaling(distance_matrix, k=6):
     """
