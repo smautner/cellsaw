@@ -87,6 +87,7 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh=1, outlier_threshold=.9,
 
     # remote outliers
     sorted_ij_assignment_distances  = np.sort(ij_lsa_distances)
+
     if outlier_probabilistic_removal and outlier_threshold > 0:
         ij_lsa_distances[cdf_remove(ij_lsa_distances,outlier_threshold/2)] = 0
     elif  outlier_threshold > 0:
@@ -94,7 +95,9 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh=1, outlier_threshold=.9,
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
 
-    return i_ids, j_ids, ij_lsa_distances
+    mask = ij_lsa_distances != 0
+    return i_ids[mask], j_ids[mask], ij_lsa_distances[mask]
+    # return i_ids, j_ids, ij_lsa_distances
 
 def lsa_sample(distance_matrix, num_instances):
     # get random indices
@@ -688,11 +691,31 @@ def stack_blocks(n_datas, getpart):
     return sparse.vstack(rowss)
 
 
-def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False, outlier_threshold= .9):
+
+integrate_params = '''
+hub1_k 3 20 1
+hub2_k 3 20 1
+hub1_algo 1 5 1
+hub2_algo 1 5 1
+outlier_threshold .65 .8
+k 9 15 1
+'''
+
+# metric ['cosine']
+
+
+def integrate(adata, base = 'pca40',
+              k=13,
+              metric = 'cosine',
+              dataset_adjacency=False,
+              hub1_k = 5,
+              hub2_k = 5,
+              hub1_algo = 1,
+              hub2_algo = 2,
+              outlier_threshold= .76):
 
     # make sure the input is in the right format
     # there are 3 options: adata, list of adata and list of np.array
-
     # case 1:
     if 'anndata' in str(type(adata)):
         adata = transform.split_by_obs(adata)
@@ -702,8 +725,6 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False, ou
         adata = to_arrays(adata, base)
 
     Xlist =adata
-
-    # print(f" ds sizes: {[x.shape for x in Xlist]}")
 
     if len(Xlist) ==1:
         assert False, 'why do you only provide 1 dataset?'
@@ -716,70 +737,41 @@ def integrate(adata, base = 'pca40', k=5, dataset_adjacency=False, ls= False, ou
 
     def make_distance_matrix(ij):
             i,j = ij
-            if i == j:
-                distances = metrics.pairwise_distances(Xlist[i],metric = 'euclidean')
-                # normalize colimn wise to remove hubs
-                # this actually helps!
-                if ls:
-                    distances = csls(distances,10)
-                else:
-                    # we do this at the end anyway, is this needed?
-                    pass
-                distances = sklearn.preprocessing.normalize(distances, axis= 0)
-                # we just take some neighbors, then make it symmetric, also setthe diagonal to 0
-                distances = symmetric_spanning_tree_neighborgraph(distances,k , add_tree = False, neighbors_mutual=False)
-                # distances = fast_neighborgraph(distances, k)
 
-
-                # distances = fast_neighborgraph(distances, k)
-                # np.fill_diagonal(distances,0)
-                distances = sparse.lil_matrix(distances)
-
-                # norm row wise to make them comparable
-                return distances #sklearn.preprocessing.normalize(r)
-
-
-            elif not adjacent(i,j):
-                # just fill with zeros :)
+            if not adjacent(i,j):
                 return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
-            else:
-                ij_euclidian_distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric='euclidean')
-                # ij_euclidian_distances = sklearn.preprocessing.normalize(ij_euclidian_distances, axis= 0)
-                # ij_euclidian_distances =  csls( ij_euclidian_distances,10)
-                # ij_euclidian_distances = sklearn.preprocessing.StandardScaler(ij_euclidian_distances, axis= 0)
 
-                # just 1 round, remove the worst 10%
-                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(ij_euclidian_distances, 1,outlier_threshold, False)
-                # res = sparse.lil_matrix(ij_euclidian_distances.shape,dtype=np.float32)
-                # res[i_ids,j_ids] = ij_lsa_distances
-                return i_ids, j_ids
+            distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric=metric)
+            if i == j:
+                distances = hubness(distances, hub1_k, hub1_algo)
+                distances = fast_neighborgraph(distances, k)
+                distances = sparse.lil_matrix(distances)
+                return distances
+
+            distances = hubness(distances, hub2_k, hub2_algo)
+            i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distances, 1,outlier_threshold, False)
+            return i_ids, j_ids
 
     n_datas = len(Xlist)
     tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
     parts = Map( make_distance_matrix, tasks)
     getpart = dict(zip(tasks,parts))
 
-
     blockdict = {(i,i): getpart[(i,i)] for i in range(n_datas)}
 
-    # the old way:
 
     tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
     for i,j in tasks:
         blockdict[(i,j)]  = mkblock( getpart[(j,j)] , *getpart[(i,j)])
-
 
     for i,j in tasks:
         # ok so we fill the mirror too... breaking symmetry
         # i,i is the reference now
         imatch, jmatch  = getpart[(i,j)]
         blockdict[(j,i)]  = mkblock( getpart[(i,i)] , jmatch, imatch )
-
-
     # MAKE THE MATRIX
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
-
     return  stack_blocks(n_datas, blockdict)
 
 def test_integrate():
@@ -792,52 +784,65 @@ def test_integrate():
     integrate(a)
 
 
-def csls(D, k=10):
-    """
-    Applies CSLS hubness reduction to a distance matrix.
-
-    Args:
-        D: (n_samples, n_samples) distance matrix (lower = more similar)
-        k: Number of nearest neighbors to consider for local scaling
-
-    Returns:
-        D_csls: Hubness-reduced distance matrix
-    """
-    n = D.shape[0]
-
-    # Find k-nearest neighbors for each point (excluding self)
-    knn = np.argpartition(D, k+1, axis=1)[:, :k+1]  # +1 to account for self
-
-    z = [row[row != i] for i, row in enumerate(knn)]
-
-    # Compute mean distance of each point's neighborhood r(x_i)
-    r = np.array([D[i, z[i]].mean() for i in range(n)])
-    D_csls = 2 * D + r[:, None] + r[None, :]
-    # np.fill_diagonal(D_csls, 0)
-    return D_csls + 20
-
-def local_scaling(distance_matrix, k=6):
-    """
-    Local scaling method to reduce hubness
-
-    Parameters:
-    - distance_matrix: Original distance matrix
-    - k: Number of neighbors to consider
-
-    Returns:
-    - Scaled distance matrix
-    """
+def MP(distance_matrix, k=6):
     n = distance_matrix.shape[0]
-    scaled_distances = distance_matrix.copy()
+    k = int(np.sqrt(n))
+    nbrs = NearestNeighbors(n_neighbors=k).fit(distance_matrix)
+    distances, indices = nbrs.kneighbors(distance_matrix)  # Sorted by distance
 
-    # Compute local scaling factors
-    local_scale = np.sort(distance_matrix, axis=1)[:, k:k+1]
+    # Initialize rank matrix (high rank = less proximity)
+    ranks = np.zeros((n, n))
+    for i in range(n):
+        ranks[i, indices[i]] = np.arange(1, k + 1)  # Rank 1 is nearest
+
+    # Step 2: Convert ranks to empirical probabilities (P_i(x_j))
+    P = ranks / n  # P_i(x_j) = rank_i(x_j) / n
+
+    # Step 3: Compute MP as P_i(x_j) * P_j(x_i)
+    MP = P * P.T
+    return MP
+
+
+
+def hubness(distance_matrix, k=6, algo = 0):
+    """
+    0 -> do nothing
+    1 -> normalize by norm
+    2 -> csls
+    3 -> ls
+    4 -> nicdm
+    """
+    if algo == 0:
+        return distance_matrix
+    if algo == 1:
+        return sklearn.preprocessing.normalize(distance_matrix, axis = 0)
+
+    # if algo == 2:
+    #     return MP(distance_matrix, k + 15)
+
+    funcs = [csls_, ls, nicdm, ka, another]
+    f = funcs[algo-2]
+
+    n = distance_matrix.shape[0]
+    # scaled_distances = distance_matrix.copy()
+    knn = np.partition(distance_matrix, k+1, axis=1)[:, :k+1]  # +1 to account for self
+    knn = np.sort(knn, axis = 1)
+    knn = knn[:,1:].mean(axis = 1)
 
     # Apply scaling
     for i in range(n):
         for j in range(n):
-            scaled_distances[i,j] /= (local_scale[i] * local_scale[j])
+            v = distance_matrix[i,j]
+            distance_matrix[i,j]  =  f(v,knn[i],knn[j])
+    return distance_matrix
 
-    return scaled_distances
-
-
+def csls_(v,i,j):
+    return v*2 -i -j
+def ls(v,i,j):
+    return 1- np.exp(- v**2/(i*j) )
+def nicdm(v,i,j):
+    return v /  np.sqrt(i*j)
+def ka(v,i,j):
+    return v / i +  v/j
+def another(v,i,j):
+    return v * j ** .5
