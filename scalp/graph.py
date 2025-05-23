@@ -697,14 +697,14 @@ hub1_k 3 20 1
 hub2_k 3 20 1
 hub1_algo 1 5 1
 hub2_algo 1 5 1
-outlier_threshold .65 .8
-k 9 15 1
+outlier_threshold .65 .9
+k 7 17 1
 '''
 
 # metric ['cosine']
 
 
-def integrate(adata, base = 'pca40',
+def integrate(adata,*, base = 'pca40',
               k=13,
               metric = 'cosine',
               dataset_adjacency=False,
@@ -742,12 +742,13 @@ def integrate(adata, base = 'pca40',
                 return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
 
             distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric=metric)
+
             if i == j:
                 distances = hubness(distances, hub1_k, hub1_algo)
                 distances = fast_neighborgraph(distances, k)
                 distances = sparse.lil_matrix(distances)
                 return distances
-
+            # this is a case for k-start :) from ug.hubness
             distances = hubness(distances, hub2_k, hub2_algo)
             i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distances, 1,outlier_threshold, False)
             return i_ids, j_ids

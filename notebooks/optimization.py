@@ -94,7 +94,8 @@ def makespace():
     return ho.spaceship(scalp.graph.integrate_params)
 
 def getdata():
-    return  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=4, maxcells=500))
+    return  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=3, maxcells=300))
+
 
 def main():
     # load data.. first a little bit to check!
@@ -106,8 +107,8 @@ def main():
     # df = [opti.gridsearch(eval_fast, data= (ds,0),  tasks =copy.deepcopy( tasks) ,mp=True) for ds in datasets]
     # df = pd.concat(df)
     df = opti.gridsearch(ho_eval, data_list= [datasets],  tasks =copy.deepcopy( tasks) ,mp=True)
-    df.to_csv('out_small.csv', index=False)
 
+    df.to_csv('out_small.csv', index=False)
 
 def hyp():
     x = getdata()
@@ -115,14 +116,25 @@ def hyp():
     tr = ho.run(x,ho_eval,space = s, max_evals = 100)
     breakpoint()
 
-def ho_eval(data, **kwargs):
-    r = [eval_fast(d,0,**kwargs) for d in data]
-    v = 1
-    for di in r:
-        v *= di['label_mean']
-        v *= di['batch_mean']
-    return v
 
-if __name__ == '__main__':
-    main()
+
+def ho_eval(data, **kwargs):
+    for k,v in kwargs.items():
+        if k.endswith('k'):
+            kwargs[k] = int(v)
+    r = eval_fast(data,0,**kwargs)
+    return r['label_mean'] * r['batch_mean']
+
+
+
+# if __name__ == '__main__': main()
+space = '''
+k 7 17
+hub1_k 3 20
+hub2_k 3 20
+hub1_algo 1 5 1
+hub2_algo 1 5 1
+outlier_threshold .65 .9
+'''
+
 
