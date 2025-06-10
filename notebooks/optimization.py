@@ -80,10 +80,11 @@ import pandas as pd
 
 
 def eval_fast(X,y, **kwargs):
+    n_comp = kwargs.pop('n_comp', None)
     grap = scalp.graph.integrate(X, **kwargs)
-    grap = grap!=0
-    proj = umap.UMAP(n_neighbors=10).fit_transform(grap)
-    return scalp.score.getscores(proj,X.obs['label'], X.obs['batch'], 5)
+    grap = grap!=0 # way faster and better
+    # proj = umap.UMAP(n_neighbors=10, n_components=2).fit_transform(grap)
+    return scalp.score.getscores(grap,X.obs['label'], X.obs['batch'], 5)
 
 import copy
 
@@ -93,8 +94,12 @@ import copy
 def makespace():
     return ho.spaceship(scalp.graph.integrate_params)
 
-def getdata():
-    return  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=3, maxcells=300))
+def getdata(cells = 750, data  = 4, src= 'batch'):
+    if src == 'batch':
+        r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells))
+    else:
+        r= list(scalp.data.timeseries(scalp.test_config.timeseries_datapath, maxdatasets=data, maxcells=cells))
+    return [[rr] for rr in r]
 
 
 def main():
@@ -119,22 +124,113 @@ def hyp():
 
 
 def ho_eval(data, **kwargs):
+    if kwargs.get('k',0) <1: return 0
+    if kwargs.get('hub1_k',0) <1: return 0
+    if kwargs.get('hub2_k',0) <1: return 0
+    if kwargs.get('outlier_threshold',2) > 1: return 0
     for k,v in kwargs.items():
         if k.endswith('k'):
             kwargs[k] = int(v)
     r = eval_fast(data,0,**kwargs)
-    return r['label_mean'] * r['batch_mean']
+    return r['label_mean']
 
 
 
 # if __name__ == '__main__': main()
 space = '''
-k 7 17
-hub1_k 3 20
-hub2_k 3 20
-hub1_algo 1 5 1
-hub2_algo 1 5 1
-outlier_threshold .65 .9
+hub1_algo [0,1,2,3,4]
+hub1_k 3 20 1
+hub2_algo [0,1,2,3,4]
+hub2_k 3 20 1
+k 10 30 1
+outlier_threshold .2 1
+hub1_k -> hub1_algo
+hub2_k -> hub2_algo
 '''
+from ubergauss.optimization import nutype, gatype, grid1type
+def arun(d,typ):
+    if typ == 'ga':
+        o= gatype.nutype(space,ho_eval, d, numsample= 64, hyperband=[])
+    if typ == 'rd':
+        o= nutype.nutype(space,ho_eval, d, numsample= 32*6, hyperband=[])
+        o.opti()
+        return o.getmax()
+    if typ == 'nu':
+        o= nutype.nutype(space,ho_eval, d, numsample= 32, hyperband=[])
+    o.opti();o.numsample = 32; o.nuParams();
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+    o.opti()
+
+    # o.opti()
+    #for i in range(5):o.opti()
+    # o.print()
+
+    return o.getmax()
+
+def arun2(d,typ):
+    if typ == 'ga':
+        o= gatype.nutype(space,ho_eval, d, numsample= 16, hyperband=[])
+    if typ == 'rd':
+        o= gatype.nutype(space,ho_eval, d, numsample= 64, hyperband=[])
+        o.opti()
+        return o.getmax()
+    if typ == 'nu':
+        o= nutype.nutype(space,ho_eval, d, numsample= 16, hyperband=[])
+    o.opti()
+    o.opti()
+    o.opti()
+    # o.opti()
+    #for i in range(5):o.opti()
+    # o.print()
+    return o.getmax()
+# 4      20          1      15  15           0.521994          0  1.776236  0.576978
+
+
+tmpparams= [
+
+        {'hub1_algo': 1.0,
+ 'hub1_k': 16.0,
+ 'hub2_algo': 1.0,
+ 'hub2_k': 6.0,
+ 'k': 14.0,
+ 'outlier_threshold': 0.5},
+
+        {'hub1_algo': 1,
+ 'hub1_k': 16.0,
+ 'hub2_algo': 1.0,
+ 'hub2_k': 6.0,
+ 'k': 14.0,
+ 'outlier_threshold': 0.75},
+
+
+        {'hub1_algo': 1.0,
+ 'hub1_k': 16.0,
+ 'hub2_algo': 1.0,
+ 'hub2_k': 6.0,
+ 'k': 14.0,
+ 'outlier_threshold': 1},
+
+
+        {'hub1_algo': 0.0,
+ 'hub1_k': 16.0,
+ 'hub2_algo': 1,
+ 'hub2_k': 6.0,
+ 'k': 14.0,
+ 'outlier_threshold': 0.5562591518941061}
+]
+
+
+
+
+
 
 

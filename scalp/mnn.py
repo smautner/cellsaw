@@ -73,9 +73,12 @@ def _bbknnwrap(adatas, base = 'pca40', batchindicator = 'batch', dim = 2):
 def bbknnwrap(adata, base = 'pca40',label = 'bbknn', batchindicator = 'batch', dim = 10):
     # sc.external.pp.bbknn(adata, batchindicator, use_rep=base)
     bbknn.bbknn(adata, use_rep = base, batch_key= batchindicator)
-    sc.tl.umap(adata,n_components=dim)
 
+    sc.tl.umap(adata,n_components=dim)
     adata.obsm[label] = adata.obsm.pop('X_umap')
+
+    # adata.obsm[label] = adata.obsp.pop('connectivities')
+
     adata.uns.setdefault('integrated',[])
     adata.uns['integrated'].append(label)
     return adata

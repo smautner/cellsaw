@@ -38,7 +38,8 @@ datasets_scmark = ['external_azizi_cell_2018_29961579.h5ad',
 
 datasets_scib = "Immune_ALL_hum_mou Immune_ALL_human Lung_atlas_public human_pancreas_norm_complexBatch".split()
 # datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum".split()
-datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris done_reprogramming_schiebinger".split()
+# datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris done_reprogramming_schiebinger".split()
+datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris".split()
 
 
 

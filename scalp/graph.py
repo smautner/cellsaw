@@ -90,7 +90,7 @@ def lin_asi_thresh(ij_euclidian_distances,inter_neigh=1, outlier_threshold=.9,
 
     if outlier_probabilistic_removal and outlier_threshold > 0:
         ij_lsa_distances[cdf_remove(ij_lsa_distances,outlier_threshold/2)] = 0
-    elif  outlier_threshold > 0:
+    elif  0< outlier_threshold < 1:
         lsa_outlier_thresh = sorted_ij_assignment_distances[int(len(ij_lsa_distances)*outlier_threshold)]
         outlier_ids = ij_lsa_distances >  lsa_outlier_thresh
         ij_lsa_distances[outlier_ids] = 0
@@ -803,9 +803,11 @@ def MP(distance_matrix, k=6):
     MP = P * P.T
     return MP
 
+from ubergauss import hubness as uhub
+def hubness(d,k,algo):
+    return uhub.transform_experiments(d,k,algo)
 
-
-def hubness(distance_matrix, k=6, algo = 0):
+def hubness_old(distance_matrix, k=6, algo = 0):
     """
     0 -> do nothing
     1 -> normalize by norm

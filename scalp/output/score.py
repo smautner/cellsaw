@@ -127,12 +127,13 @@ def scalp_scores(data, projection ='integrated', cv=5):
     ret= {}
     for projection2 in dataset.uns[projection]:
         X = dataset.obsm[projection2]
+        print(X.shape, projection2)
         ret[projection2] = getscores(X,y,ybatch,cv)
     return ret
 
 def getscores(X,y,ybatch, cv):
     r={}
-    m,s = knn_cross_validation(X,y,cv)
+    m,s = knn_cross_validation(X,y,cv, splitby = ybatch)
     r['label_mean'] =m
     r['label_std'] =s
 
@@ -146,15 +147,27 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 
 
-def knn_cross_validation(X, y, cv, invert=False):
+def knn_cross_validation(X, y, cv, invert=False, splitby = None):
     '''
     Perform cross-validation with a Nearest Neighbor classifier.
     '''
     # Initialize the 1-Nearest Neighbor classifier
     knn = KNeighborsClassifier(n_neighbors=5)
     # Perform cross-validation
-    stratified_kfold = StratifiedKFold(n_splits=cv, shuffle=True)
-    scores = cross_val_score(knn, X, y, cv=stratified_kfold, scoring='balanced_accuracy')
+    if splitby is None:
+        kfold = StratifiedKFold(n_splits=cv, shuffle=True)
+    else:
+        # split by splitby, such that each label  in splitby is in turn the test set
+        unique_groups = np.unique(splitby)
+        kfold = []
+        for group in unique_groups:
+            test_indices = np.where(splitby == group)[0]
+            train_indices = np.where(splitby != group)[0]
+            # Ensure test set is not empty
+            if len(test_indices) > 0:
+                kfold.append((train_indices, test_indices))
+
+    scores = cross_val_score(knn, X, y, cv=kfold, scoring='balanced_accuracy')
     # Calculate mean and standard deviation of the scores
     if invert:
         scores = 1-scores

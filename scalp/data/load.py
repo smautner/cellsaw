@@ -47,22 +47,47 @@ def load_scib(path, datasets = False):
 def load_timeseries(path,datasets=False,remove_unassigned = True):
 
     if not datasets:
-        datasets = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris done_reprogramming_schiebinger".split()
-    datasets = [sc.read_h5ad(path+data+".h5ad") for data in datasets]
+        #datasets = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris done_reprogramming_schiebinger".split()
+        datasets = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_marrow done_lung done_pancreas done_reprogramming_morris".split()
+
+    datasetsd = [sc.read_h5ad(path+data+".h5ad") for data in datasets]
 
     # datasets = [sc.read(path+data+".h5ad") for data in "s5 509 1290 mousecortex water pancreatic cerebellum".split()]
 
     if remove_unassigned:
         okcells =  lambda ds: [ l not in ['-1','Unassigned','nan'] for l in ds.obs['label']]
-        datasets = [ds[okcells(ds)] for ds in datasets]
+        datasetsd = [ds[okcells(ds)] for ds in datasetsd]
 
-    datasets =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()]
-                 for z in datasets]
-    for batchlist in datasets:
+    datasetsd =  [[z[z.obs['batch']==i] for i in z.obs['batch'].unique()]
+                 for z in datasetsd]
+    for batchlist in datasetsd:
         for batch in batchlist:
             batch.uns['timeseries'] = True
-    return datasets
+    datasetsd = fix(datasetsd,datasets)
+    return datasetsd
 
+def fix(ds,names):
+    tgt = 'done_reprogramming_schiebinger'
+
+    if tgt in names:
+        adataa= ds[names.index(tgt)]
+        adataa = adataa[2:]
+        return ds
+        for adata in adataa:
+            candidate_keys = [
+                'MEF.identity', 'Neural.identity', 'Placental.identity', 'XEN',
+                'Trophoblast', 'Trophoblast progenitors', 'Spiral Artery Trophpblast Giant Cells',
+                'Spongiotrophoblasts', 'Oligodendrocyte precursor cells (OPC)', 'Astrocytes',
+                'Cortical Neurons', 'RadialGlia-Id3', 'RadialGlia-Gdf10', 'RadialGlia-Neurog2',
+                'Long-term MEFs', 'Embryonic mesenchyme', 'Cxcl12 co-expressed',
+                'Ifitm1 co-expressed', 'Matn4 co-expressed'
+            ]
+            # Subset the relevant columns from .obs
+            score_df = adata.obs[candidate_keys]
+            # For each cell, get the name of the column (i.e., cell type) with the highest score
+            adata.obs['label'] = score_df.idxmax(axis=1)
+
+    return ds
 
 def test_ts():
     ds = load_timeseries()
