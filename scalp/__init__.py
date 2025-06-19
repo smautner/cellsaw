@@ -150,6 +150,8 @@ def graph_embed_plot(dataset,matrix, embed_label= 'embedding', snskwargs={}):
     return dataset
 
 import umap
+import matplotlib.pyplot as plt
+import seaborn as sns
 def plot(adata,embedding,**plotargs):
     # adata.obsm['X_umap']=adata.obsm[embedding]
     # sc.pl.umap(adata,basis= embedding, **plotargs)
@@ -158,7 +160,54 @@ def plot(adata,embedding,**plotargs):
         adata.obsm['newlayer'] =  umap.UMAP(n_components = 2).fit_transform(adata.obsm[embedding])
     else:
         adata.obsm['newlayer'] =  adata.obsm[embedding]
-    sc.pl.embedding(adata, basis= 'newlayer', **plotargs)
+
+
+    title =  adata.uns.get('name','no name found in adata')
+    # ax = sc.pl.embedding(adata, basis= 'newlayer' , show = False,**plotargs)
+    plot_embedding_with_labels(adata, basis='newlayer', title=title)
+
+
+
+def plot_embedding_with_labels(adata, basis='', title = ''):
+    X = adata.obsm[basis]
+    batch = adata.obs['batch'].astype(str)
+    label = adata.obs['label'].astype(str)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 6)) # Increased figure width for legend
+
+    # First scatterplot: color by 'group'
+    sns.scatterplot(x=X[:,0], y=X[:,1], hue=batch, ax=ax1, s=16) # 's' controls marker size
+    ax1.set_title('Batch')
+    ax1.set_xlabel('') # Remove x-axis label
+    ax1.set_ylabel('') # Remove y-axis label
+    ax1.set_xticks([]) # Remove x-axis ticks
+    ax1.set_yticks([]) # Remove y-axis ticks
+    ax1.spines['top'].set_visible(False) # Remove top spine (box)
+    ax1.spines['right'].set_visible(False) # Remove right spine
+    ax1.spines['bottom'].set_visible(False) # Remove bottom spine
+    ax1.spines['left'].set_visible(False) # Remove left spine
+    leg1 = ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='') # Legend to the right
+    leg1.get_frame().set_linewidth(0.0) # Remove box around legend
+
+    # Second scatterplot: color by 'label'
+    sns.scatterplot(x=X[:,0], y=X[:,1], hue=label, ax=ax2, s=16) # 's' controls marker size
+    ax2.set_title('Label')
+    ax2.set_xlabel('') # Remove x-axis label
+    ax2.set_ylabel('') # Remove y-axis label
+    ax2.set_xticks([]) # Remove x-axis ticks
+    ax2.set_yticks([]) # Remove y-axis ticks
+    ax2.spines['top'].set_visible(False) # Remove top spine (box)
+    ax2.spines['right'].set_visible(False) # Remove right spine
+    ax2.spines['bottom'].set_visible(False) # Remove bottom spine
+    ax2.spines['left'].set_visible(False) # Remove left spine
+    leg2 = ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='') # Legend to the right
+    leg2.get_frame().set_linewidth(0.0) # Remove box around legend
+
+    plt.suptitle(title, y=0.95, fontsize = 16) # Adjust suptitle position if needed
+    plt.tight_layout(rect=[0, 0, 0.9, 1]) # Adjust layout to make space for legends
+    plt.show()
+
+
 
 
 def test_scalp():

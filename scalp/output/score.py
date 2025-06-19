@@ -120,7 +120,7 @@ def scib_scores(ds, projection = 'umap'):
 
 
 
-def scalp_scores(data, projection ='integrated', cv=5):
+def scalp_scores(data, projection ='integrated', cv=5,label_batch_split= False):
     dataset = data # if type(data)!= list else transform.stack(data)
     y = dataset.obs['label']
     ybatch = dataset.obs['batch']
@@ -128,12 +128,12 @@ def scalp_scores(data, projection ='integrated', cv=5):
     for projection2 in dataset.uns[projection]:
         X = dataset.obsm[projection2]
         print(X.shape, projection2)
-        ret[projection2] = getscores(X,y,ybatch,cv)
+        ret[projection2] = getscores(X,y,ybatch,cv, label_batch_split)
     return ret
 
-def getscores(X,y,ybatch, cv):
+def getscores(X,y,ybatch, cv, label_batch_split =False):
     r={}
-    m,s = knn_cross_validation(X,y,cv, splitby = ybatch)
+    m,s = knn_cross_validation(X,y,cv, splitby = ybatch if label_batch_split else None)
     r['label_mean'] =m
     r['label_std'] =s
 

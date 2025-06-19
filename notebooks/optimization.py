@@ -128,11 +128,12 @@ def ho_eval(data, **kwargs):
     if kwargs.get('hub1_k',0) <1: return 0
     if kwargs.get('hub2_k',0) <1: return 0
     if kwargs.get('outlier_threshold',2) > 1: return 0
+    kwargs.pop('config_id',None)
     for k,v in kwargs.items():
         if k.endswith('k'):
             kwargs[k] = int(v)
     r = eval_fast(data,0,**kwargs)
-    return r['label_mean']
+    return r['label_mean'] * r['batch_mean']
 
 
 
@@ -148,52 +149,31 @@ hub1_k -> hub1_algo
 hub2_k -> hub2_algo
 '''
 from ubergauss.optimization import nutype, gatype, grid1type
+import structout as so
 def arun(d,typ):
+    runs = 10
     if typ == 'ga':
-        o= gatype.nutype(space,ho_eval, d, numsample= 64, hyperband=[])
+        o= gatype.nutype(space,ho_eval, d, numsample= 32, hyperband=[])
     if typ == 'rd':
-        o= nutype.nutype(space,ho_eval, d, numsample= 32*6, hyperband=[])
+        o= nutype.nutype(space,ho_eval, d, numsample= 32*runs, hyperband=[])
         o.opti()
         return o.getmax()
     if typ == 'nu':
         o= nutype.nutype(space,ho_eval, d, numsample= 32, hyperband=[])
-    o.opti();o.numsample = 32; o.nuParams();
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
-    o.opti()
 
-    # o.opti()
-    #for i in range(5):o.opti()
-    # o.print()
+    [o.opti() for i in range(runs)]
 
-    return o.getmax()
-
-def arun2(d,typ):
-    if typ == 'ga':
-        o= gatype.nutype(space,ho_eval, d, numsample= 16, hyperband=[])
-    if typ == 'rd':
-        o= gatype.nutype(space,ho_eval, d, numsample= 64, hyperband=[])
-        o.opti()
-        return o.getmax()
-    if typ == 'nu':
-        o= nutype.nutype(space,ho_eval, d, numsample= 16, hyperband=[])
-    o.opti()
-    o.opti()
-    o.opti()
+    z= pd.concat(o.runs)
+    so.lprint(z.score)
     # o.opti()
     #for i in range(5):o.opti()
     # o.print()
     return o.getmax()
+
+
 # 4      20          1      15  15           0.521994          0  1.776236  0.576978
-
+# 4       9          1      10  15           0.549294          0  1.799206  0.578037
+# 3      20          1      12  15           0.521006          0  1.809666  0.579953
 
 tmpparams= [
 
@@ -234,3 +214,5 @@ tmpparams= [
 
 
 
+        # 2      13          0      20  11           1.000000               2.11
+        # 4      20          4      11  20           0.999917           2.086836

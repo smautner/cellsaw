@@ -66,13 +66,17 @@ def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
     '''
     if not datasets:
         datasets = datasets_scib
-    for dataset in datasets:
+
+    def load(dataset):
         data = load.load_scib(path,  datasets = [dataset])
         data = subsample_preprocess(data,maxcells=maxcells,maxdatasets=maxdatasets, **other)[0]
         data = transform.stack(data)
         data.uns['timeseries'] = False
-        yield data
+        data.uns['name'] = dataset
+        return data
 
+    for dataset in datasets:
+        yield(load(dataset))
 
 
 def timeseries(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
@@ -86,6 +90,7 @@ def timeseries(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
         data = subsample_preprocess(data,maxcells=maxcells,maxdatasets=maxdatasets, **other)[0]
         data = transform.stack(data)
         data.uns['timeseries'] = True
+        data.uns['name'] = dataset
         yield data
 
 
@@ -112,6 +117,7 @@ def scmark(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
         data = data[0]
         data = transform.stack(data)
         data.uns['timeseries'] = False
+        data.uns['name'] = dataset
         yield data
 
 
