@@ -237,3 +237,126 @@ def pareto_sample(datadict,scorenames=['label','batch']):
 
 
 
+import anndata
+from scipy.stats import mode
+from sklearn.neighbors import NearestNeighbors
+from typing import Dict, List, Optional
+
+
+def kni_scores(data, projection ='integrated', cv=5,label_batch_split= False):
+    dataset = data # if type(data)!= list else transform.stack(data)
+    ret= {}
+    for projection2 in dataset.uns[projection]:
+        ret[projection2] = kni_score(data,projection2)['kni_score']
+    return ret
+
+def kni_score(
+    adata: anndata.AnnData,
+    embedding_key: str,
+    label_key: str = 'label',
+    batch_key: str = 'batch',
+    n_neighbors: int = 10,
+    exclude_labels: Optional[List[str]] = None,
+) -> Dict[str, float]:
+    """
+    Calculates a k-nearest-neighbor based integration score (KNI).
+
+    The score measures how well cell types are mixed across batches. It is the
+    accuracy of a k-NN classifier where, for each cell, the label is predicted
+    using only neighbors from different batches. A high score indicates that
+    cells of the same type are close to each other, regardless of their batch.
+
+    Args:
+        adata:
+            AnnData object with embeddings, labels, and batches.
+        embedding_key:
+            Key in `adata.obsm` where the embedding is stored.
+        label_key:
+            Key in `adata.obs` for cell type labels.
+        batch_key:
+            Key in `adata.obs` for batch labels.
+        n_neighbors:
+            Number of neighbors to consider for each cell.
+        exclude_labels:
+            A list of labels to exclude from the calculation (e.g., ['Unknown']).
+
+    Returns:
+        A dictionary with the following scores:
+        - 'kni_score': The primary integration score (0 to 1, higher is better).
+        - 'label_accuracy': k-NN classification accuracy using all neighbors.
+        - 'mean_proportion_same_batch': Average proportion of neighbors from the
+          same batch (0 to 1, lower is better).
+    """
+    # 1. Filter and extract data
+    adata_view = adata
+    if exclude_labels:
+        keep_mask = ~adata_view.obs[label_key].isin(exclude_labels)
+        # Use .copy() to avoid SettingWithCopyWarning on a view
+        adata_view = adata_view[keep_mask, :].copy()
+
+    if embedding_key not in adata_view.obsm:
+        raise KeyError(f"Embedding key '{embedding_key}' not found in adata.obsm.")
+    if not all(k in adata_view.obs for k in [label_key, batch_key]):
+        raise KeyError(f"Label or batch key not found in adata.obs.")
+
+    embeddings = adata_view.obsm[embedding_key]
+    # Use pd.Categorical to handle any data type and convert to integer codes
+    labels = pd.Categorical(adata_view.obs[label_key]).codes
+    batches = pd.Categorical(adata_view.obs[batch_key]).codes
+    n_cells = embeddings.shape[0]
+
+    if n_cells < n_neighbors + 1:
+        return {
+            'kni_score': np.nan,
+            'label_accuracy': np.nan,
+            'mean_proportion_same_batch': np.nan
+        }
+
+    # 2. Find nearest neighbors (excluding the cell itself)
+    X = embeddings.astype(np.float32)
+    nn = NearestNeighbors(n_neighbors=n_neighbors + 1, algorithm='auto')
+    nn.fit(X)
+    _, neighbor_indices = nn.kneighbors(X)
+    neighbor_indices = neighbor_indices[:, 1:]  # Exclude self (the first neighbor)
+
+    # 3. Get labels and batches of neighbors using the indices
+    neighbor_labels = labels[neighbor_indices]
+    neighbor_batches = batches[neighbor_indices]
+
+    # 4. Calculate overall label accuracy using all neighbors
+    # scipy.stats.mode finds the most frequent label for each cell's neighborhood
+    predicted_labels = mode(neighbor_labels, axis=1, keepdims=False)[0]
+    label_accuracy = np.mean(predicted_labels == labels)
+
+    # 5. Calculate KNI score and batch mixing
+    # Reshape original cell's batch array for broadcasting against neighbor_batches
+    cell_batches = batches.reshape(-1, 1)
+    is_different_batch = neighbor_batches != cell_batches
+
+    # Calculate the average proportion of neighbors from the same batch
+    proportion_same_batch = (~is_different_batch).sum(axis=1) / n_neighbors
+    mean_proportion_same_batch = proportion_same_batch.mean()
+
+    # Calculate KNI score (accuracy using only different-batch neighbors)
+    kni_correct_predictions = 0
+    cells_with_foreign_neighbors = 0
+
+    for i in range(n_cells):
+        # Filter for neighbors from different batches
+        foreign_neighbor_labels = neighbor_labels[i, is_different_batch[i]]
+
+        if foreign_neighbor_labels.size > 0:
+            cells_with_foreign_neighbors += 1
+            # Predict label from these "foreign" neighbors
+            foreign_predicted_label = mode(foreign_neighbor_labels, keepdims=False)[0]
+            if foreign_predicted_label == labels[i]:
+                kni_correct_predictions += 1
+
+    # Avoid division by zero if no cells have neighbors from other batches
+    kni_score = kni_correct_predictions / cells_with_foreign_neighbors if cells_with_foreign_neighbors > 0 else 0.0
+
+    return {
+        'kni_score': kni_score,
+        'label_accuracy': label_accuracy,
+        'mean_proportion_same_batch': mean_proportion_same_batch,
+    }

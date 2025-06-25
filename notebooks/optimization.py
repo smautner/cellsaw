@@ -108,11 +108,9 @@ def main():
     # make my spaceship :
     space3 = makespace()
     tasks = [space3.sample() for i in range(500)]
-
     # df = [opti.gridsearch(eval_fast, data= (ds,0),  tasks =copy.deepcopy( tasks) ,mp=True) for ds in datasets]
     # df = pd.concat(df)
     df = opti.gridsearch(ho_eval, data_list= [datasets],  tasks =copy.deepcopy( tasks) ,mp=True)
-
     df.to_csv('out_small.csv', index=False)
 
 def hyp():
@@ -174,45 +172,94 @@ def arun(d,typ):
 # 4      20          1      15  15           0.521994          0  1.776236  0.576978
 # 4       9          1      10  15           0.549294          0  1.799206  0.578037
 # 3      20          1      12  15           0.521006          0  1.809666  0.579953
-
-tmpparams= [
-
-        {'hub1_algo': 1.0,
- 'hub1_k': 16.0,
- 'hub2_algo': 1.0,
- 'hub2_k': 6.0,
- 'k': 14.0,
- 'outlier_threshold': 0.5},
-
-        {'hub1_algo': 1,
- 'hub1_k': 16.0,
- 'hub2_algo': 1.0,
- 'hub2_k': 6.0,
- 'k': 14.0,
- 'outlier_threshold': 0.75},
-
-
-        {'hub1_algo': 1.0,
- 'hub1_k': 16.0,
- 'hub2_algo': 1.0,
- 'hub2_k': 6.0,
- 'k': 14.0,
- 'outlier_threshold': 1},
-
-
-        {'hub1_algo': 0.0,
- 'hub1_k': 16.0,
- 'hub2_algo': 1,
- 'hub2_k': 6.0,
- 'k': 14.0,
- 'outlier_threshold': 0.5562591518941061}
-]
+# 2      13          0      20  11           1.000000               2.11
+# 4      20          4      11  20           0.999917           2.086836
 
 
 
+space2 = '''
+neighbors_total 2 30 1
+horizonCutoff [0, 5, 10, 20]
+neighbors_intra_fraction .1 .9
+distance_metric ['euclidean', 'cosine']
+outlier_threshold .1 1
+dataset_adjacency [False, True]
+intra_neighbors_mutual [True, False]
+copy_lsa_neighbors [True, False]
+outlier_probabilistic_removal [True, False]
+add_tree [True, False]
+'''
+
+def eval_old_system(data, **kwargs):
+    kwargs.pop('config_id',None)
+    kwargs.pop('n_comp', None)
+    grap = scalp.graph.linear_assignment_integrate(
+        [d.obsm['pca40'] for d in scalp.data.transform.split_by_obs(data)],
+        **kwargs)
+    grap = grap!=0 # way faster and better
+    # proj = umap.UMAP(n_neighbors=10, n_components=2).fit_transform(grap)
+    r=  scalp.score.getscores(grap,data.obs['label'], data.obs['batch'], 5)
+    return r['label_mean'] * r['batch_mean']
+
+def oldrun(d,typ):
+    runs = 10
+    if typ == 'ga':
+        o= gatype.nutype(space2,eval_old_system, d, numsample= 32, hyperband=[])
+    if typ == 'rd':
+        o= nutype.nutype(space2,eval_old_system, d, numsample= 32*runs, hyperband=[])
+        o.opti()
+        return o.getmax()
+    if typ == 'nu':
+        o= nutype.nutype(space2,eval_old_system, d, numsample= 32, hyperband=[])
+
+    [o.opti() for i in range(runs)]
+
+    z= pd.concat(o.runs)
+    so.lprint(z.score)
+    # o.opti()
+    #for i in range(5):o.opti()
+    o.print()
+    return o.getmax()
+
+'''
+OLD GA
+add_tree                            False
+copy_lsa_neighbors                  False
+dataset_adjacency                    True
+distance_metric                    cosine
+horizonCutoff                           0
+intra_neighbors_mutual              False
+neighbors_intra_fraction         0.205861
+neighbors_total                        17
+outlier_probabilistic_removal       False
+outlier_threshold                     1.0
+config_id                              18
+score                            1.887756
+time                              5.25035
+'''
 
 
 
 
-        # 2      13          0      20  11           1.000000               2.11
-        # 4      20          4      11  20           0.999917           2.086836
+
+def test_ga():
+    ut.nuke()
+    def example_function(data, x=None, y=None, some_boolean=None,**kwargs):
+        score_from_x = - (x - 0.5)**2  # Max at x=0.5
+        score_from_y = - (y - 10)**2 / 100.0 # Max at y=10
+        score_from_bool = .1*some_boolean
+        score_noise = np.random.normal(0, .1)
+        return score_noise + score_from_x + score_from_y + score_from_bool
+
+    example_space = """
+    x 0.0 1.0
+    y 1 20 1
+    some_boolean [1, 0]
+    """
+    o = gatype.nutype(example_space,
+                      example_function,
+                      data=[[0]],
+                      numsample=16)
+    [o.opti() for _ in range(5)]
+    o.print()
+    # o.print_more()

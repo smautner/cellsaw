@@ -43,18 +43,17 @@ datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_mar
 
 
 
-####################
-# dont use theese, too much memory is required and they return the non-stacked datasets
-###############
-def loaddata_timeseries(path,datasets=False,maxcells= 1000, maxdatasets = -1, **ppargs):
-    datasets = load.load_timeseries(path , datasets= datasets)
-    ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
-    return ssdata
-
-def loaddata_scib(path, datasets = False, maxcells= 1000, maxdatasets = -1, **ppargs):
-    datasets = load.load_scib(path, datasets= datasets)
-    ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets,pretransformed = True, **ppargs)
-    return ssdata
+# ####################
+# # dont use theese, too much memory is required and they return the non-stacked datasets
+# ###############
+# def loaddata_timeseries(path,datasets=False,maxcells= 1000, maxdatasets = -1, **ppargs):
+#     datasets = load.load_timeseries(path , datasets= datasets)
+#     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets, **ppargs)
+#     return ssdata
+# def loaddata_scib(path, datasets = False, maxcells= 1000, maxdatasets = -1, **ppargs):
+#     datasets = load.load_scib(path, datasets= datasets)
+#     ssdata = subsample_preprocess(datasets, maxcells= maxcells, maxdatasets = maxdatasets,pretransformed = True, **ppargs)
+#     return ssdata
 
 
 ################################
@@ -67,7 +66,7 @@ def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
     if not datasets:
         datasets = datasets_scib
 
-    def load(dataset):
+    def loader(dataset):
         data = load.load_scib(path,  datasets = [dataset])
         data = subsample_preprocess(data,maxcells=maxcells,maxdatasets=maxdatasets, **other)[0]
         data = transform.stack(data)
@@ -76,7 +75,7 @@ def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
         return data
 
     for dataset in datasets:
-        yield(load(dataset))
+        yield(loader(dataset))
 
 
 def timeseries(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
@@ -124,12 +123,50 @@ def scmark(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
 
 
 from scalp import pca
-def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10,random_datasets = False, **preprocessing_args):
+from ubergauss import tools as ut
 
+
+
+
+def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10,random_datasets = False,
+                          **preprocessing_args):
+
+
+    filter_clusters = preprocessing_args.pop('filter_clusters', 0)
     def select_slices(series):
         if random_datasets:
             random.shuffle(series)
-        return series[:maxdatasets]
+        ret = series[:maxdatasets]
+
+        if filter_clusters > 0:
+            # remove rare clusters... but we need to make sure that no dataset is affected disproportionally
+            # so each item in ret is an anndata object. we extract obs['labels'] and rank each label for each dataset
+            # if a label is not in all datasets, we remove it
+            # for the rest we calculate the average rank and select the filter_cluster top ones :)
+
+            all_labels = set()
+            for s in ret:all_labels.update(s.obs['label'].unique())
+            labels = [dict(s.obs['label'].value_counts(dropna=False)) for s in ret]
+
+            # make a numpy array all_labels x all_labels
+            array = np.zeros((len(ret), len(all_labels)))
+            # populate with the labels
+            sm = ut.spacemap(all_labels)
+            for i, d in enumerate(labels):
+                array[i,sm.encode(d.keys())] = list(d.values())
+            # remove columns that contain 0 from array
+            array = array[:, np.any(array != 0, axis=0)]
+            # turn the numbers into ranks
+            ranks = array.argsort(axis=0).argsort(axis=0)
+            # calculate the average rank for each label across datasets
+            avg_ranks = np.mean(ranks, axis=0)
+            # get the labels corresponding to the smallest average ranks
+            top_labels_indices = np.argsort(avg_ranks)[:filter_clusters]
+            # map back to original label names
+            top_labels = sm.decode(top_labels_indices)
+            # filter each series in ret
+            ret = [  s[s.obs['label'].isin(top_labels)] for s in ret]
+        return ret
 
     ssdata = [[subsample(i,maxcells,31443) for i in select_slices(series)] for series in datasets]
     ssdata = Map( pca.pca, ssdata, dim = 40, label = 'pca40')
@@ -137,17 +174,14 @@ def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10,random_data
     return ret
 
 
-
-
 ####################
 # a test
 #####################
 
-
 def test_load():
     from scalp import test_config
-    a = loaddata_scib(test_config.scib_datapath)
-    b = loaddata_timeseries(test_config.timeseries_datapath)
+    a = list(scib(test_config.scib_datapath, filter_clusters = 10))
+    # b = timeseries(test_config.timeseries_datapath, filter_clusters=10)
 
 
 

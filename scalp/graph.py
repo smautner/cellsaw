@@ -214,7 +214,7 @@ def avgdist(a,numneigh = 2):
 #     return np.mean(stack, axis=0).T
 
 
-def linear_assignment_integrate(Xlist, base = 'pca',
+def linear_assignment_integrate(Xlist, base = 'pca40',
                                 neighbors_total = 20,
                                 horizonCutoff = 0,
                                 neighbors_intra_fraction = .5,
@@ -223,9 +223,12 @@ def linear_assignment_integrate(Xlist, base = 'pca',
                                 scaling_num_neighbors = 2,
                                 distance_metric = 'euclidean',
                                 outlier_threshold = .8,
-                                dataset_adjacency = False,intra_neighbors_mutual = True,
-                                copy_lsa_neighbors = True,outlier_probabilistic_removal = True,
-                                add_tree = True, epsilon = 1e-4 ):
+                                dataset_adjacency = False,
+                                intra_neighbors_mutual = True,
+                                copy_lsa_neighbors = True,
+                                outlier_probabilistic_removal = True,
+                                add_tree = True,
+                                epsilon = 1e-4 ):
 
     if 'anndata' in str(type(Xlist[0])):
         Xlist = to_arrays(Xlist, base)
@@ -364,7 +367,6 @@ def linear_assignment_integrate(Xlist, base = 'pca',
             for j in range(i+1,n_datas):
                 rows[i][j]= rows[i][j].maximum(rows[j][i])
                 rows[j][i]= rows[i][j].T
-
     rowss = [sparse.hstack(row) for row in rows]
     distance_matrix = sparse.vstack(rowss)
 

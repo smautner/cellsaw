@@ -176,7 +176,7 @@ def plot_embedding_with_labels(adata, basis='', title = ''):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 6)) # Increased figure width for legend
 
     # First scatterplot: color by 'group'
-    sns.scatterplot(x=X[:,0], y=X[:,1], hue=batch, ax=ax1, s=16) # 's' controls marker size
+    sns.scatterplot(x=X[:,0], y=X[:,1], hue=batch,palette = 'viridis' , ax=ax1, s=16) # 's' controls marker size
     ax1.set_title('Batch')
     ax1.set_xlabel('') # Remove x-axis label
     ax1.set_ylabel('') # Remove y-axis label
