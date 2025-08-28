@@ -8,6 +8,8 @@ def check_adatas(adatas):
         assert all([a.X.shape[1] == adatas[0].X.shape[1] for a in adatas])
 
 
+
+
 def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', make_even = True, pretransformed = False):
 
 
@@ -17,7 +19,7 @@ def preprocess(adatas,cut_ngenes = 2000, cut_old = False, hvg = 'cell_ranger', m
     else:
         assert False
 
-    selector = hvg_ids_from_union if cut_old else hvg_ids_from_union_limit
+    selector = hvg_ids_from_union if cut_old else hvg_ids_from_union_limit_binsearch
 
     for a in adatas: # saving this info to be able to calculate similarity
         a.uns[hvg] = a.var[hvg]
@@ -41,7 +43,7 @@ def hvg_ids_from_union(adatas, numGenes, hvg_name= 'cell_ranger'):
     return hvg_ids
 
 
-def hvg_ids_from_union_limit(adatas,numgenes,hvg_name = 'cell_ranger'):
+def hvg_ids_from_union_limit_binsearch(adatas,numgenes,hvg_name = 'cell_ranger'):
 
     scores = [a.var[hvg_name] for a in adatas]
     ar = np.array(scores)
@@ -64,6 +66,41 @@ def hvg_ids_from_union_limit(adatas,numgenes,hvg_name = 'cell_ranger'):
 
     indices = findcutoff(0,numgenes)
     return indices
+
+
+import pandas as pd
+def hvg_ids_from_union_limit_additive(
+    adatas,
+    numgenes: int,
+    hvg_name: str = 'cell_ranger'
+) -> np.ndarray:
+    """
+
+    """
+    if not adatas:
+        return np.array([], dtype=int)
+
+    # 1. Get indices sorted by score for each dataset.
+    #    The `[:, ::-1]` reverses each row so columns rank from most to least variable.
+    sorted_indices = np.argsort(
+        np.array([a.var[hvg_name].values for a in adatas])
+    )[:, ::-1]
+
+    # 2. Flatten the indices rank-by-rank.
+    #    .T transposes so that rows represent ranks (rank 1, rank 2, ...).
+    #    .flatten() creates a single array: [d1_rank1, d2_rank1, ..., d1_rank2, d2_rank2, ...]
+    #    This ensures we process all top-ranked genes before any second-ranked genes.
+    ordered_indices = sorted_indices.T.flatten()
+
+    # 3. Get the first `numgenes` unique indices from this ordered list.
+    #    `pd.Series.unique()` is highly optimized and preserves order of appearance.
+    #    We then slice to get exactly the number of genes we need.
+    unique_indices = pd.Series(ordered_indices).unique()[:numgenes]
+
+    # 4. Sort for a deterministic output, as the order from `unique` depends
+    #    on the order of datasets in the input list.
+    return np.sort(unique_indices)
+
 
 
 def subsample_to_min_cellcount(adatas):

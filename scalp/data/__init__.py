@@ -59,10 +59,11 @@ datasets_ts = "s5 509 1290 mousecortex water pancreatic cerebellum done_bone_mar
 ################################
 # use these instead
 ##########################
-def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+def scib(path,datasets=False,maxcells=1000,slow=0,maxdatasets=-1,**other):
     '''
     this function is a generator that yields the preprocessed datasets
     '''
+    print('loading scib datasets..')
     if not datasets:
         datasets = datasets_scib
 
@@ -72,41 +73,58 @@ def scib(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
         data = transform.stack(data)
         data.uns['timeseries'] = False
         data.uns['name'] = dataset
+        if find_duplicate_csr(csr_matrix(data.X)): print (':(')
         return data
+    if slow:
+        return Map(loader, datasets)
+        # for dataset in datasets: yield(loader(dataset))
+    else:
+        return ut.xxmap(loader,datasets)
 
-    for dataset in datasets:
-        yield(loader(dataset))
 
-
-def timeseries(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+def timeseries(path,datasets=False,maxcells=1000,slow=0,maxdatasets=-1,**other):
     '''
     this function is a generator that yields the preprocessed datasets
     '''
+    print('loading timeseries datasets..')
     if not datasets:
         datasets = datasets_ts
-    for dataset in datasets:
+    def loader(dataset):
         data = load.load_timeseries(path,  datasets = [dataset])
+        if False:
+            counts = {id:e.X.shape[0]for id,e in enumerate(data[0])}
+            print(f"{dataset=} {counts=}")
+
         data = subsample_preprocess(data,maxcells=maxcells,maxdatasets=maxdatasets, **other)[0]
         data = transform.stack(data)
         data.uns['timeseries'] = True
         data.uns['name'] = dataset
-        yield data
+        if find_duplicate_csr(csr_matrix(data.X)): print (':(')
+        return data
+    if slow:
+        return Map(loader, datasets)
+        # for dataset in datasets: yield(loader(dataset))
+    else:
+        return ut.xxmap(loader,datasets)
 
 
-def scmark(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
+
+def scmark(path,datasets=False,maxcells=1000,slow=0,maxdatasets=-1,**other):
     '''
     this function is a generator that yields the preprocessed datasets
     '''
+    print('loading scmark datasets..')
     if not datasets:
         datasets = datasets_scmark
-    for dataset in datasets:
+
+    def l(dataset):
         data = sc.read_h5ad('/home/ubuntu/data/scmark/scmark_v2/' + dataset)
         data.X.data = data.X.data.astype(int) - 1
         data.X.eliminate_zeros()
         data.obs['batch'] = data.obs['sample_name']
         data.obs['label'] = data.obs['standard_true_celltype']
-        data = transform.split_by_obs(data)
 
+        data = transform.split_by_obs(data)
 
         data = [d for d in data if d.X.shape[0] > 99]
 
@@ -117,7 +135,33 @@ def scmark(path,datasets=False,maxcells=1000,maxdatasets=-1,**other):
         data = transform.stack(data)
         data.uns['timeseries'] = False
         data.uns['name'] = dataset
-        yield data
+        if find_duplicate_csr(csr_matrix(data.X)): print (':(')
+        return data
+
+    if slow:
+        return Map(l, datasets)
+        # for dataset in datasets: yield l(dataset)
+    else:
+        return ut.xxmap(l,datasets)
+
+# for e in ds: print(demo.find_duplicate_rows(e.X))
+from scipy.sparse import csr_matrix
+def find_duplicate_rows(adl):
+    for x in adl:
+        mat=csr_matrix(x.X)
+        if find_duplicate_csr(mat):
+            return True
+    return False
+
+def find_duplicate_csr(mat):
+    di = {}
+    for i, row in enumerate(mat):
+        h = hash(tuple(row.data) + tuple(row.indices))
+        if h in di:
+            # print(i, di[h])
+            return True
+        di[h] = i
+    return False
 
 
 
@@ -168,9 +212,13 @@ def subsample_preprocess(datasets, maxcells = 1000, maxdatasets = 10,random_data
             ret = [  s[s.obs['label'].isin(top_labels)] for s in ret]
         return ret
 
-    ssdata = [[subsample(i,maxcells,31443) for i in select_slices(series)] for series in datasets]
+    print(find_duplicate_rows(datasets[0]),end=' ->')
+    ssdata = [[subsample(i,maxcells,3143) for i in select_slices(series)] for series in datasets]
+    print(find_duplicate_rows(ssdata[0]),end=' ->')
     ssdata = Map( pca.pca, ssdata, dim = 40, label = 'pca40')
+    print(find_duplicate_rows(ssdata[0]),end=' ->')
     ret =  Map(preprocess, ssdata, **preprocessing_args)
+    print(find_duplicate_rows(ret[0]))
     return ret
 
 

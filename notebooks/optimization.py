@@ -14,6 +14,13 @@ import ubergauss.hyperopt as ho
 simplefilter(action='ignore', category=FutureWarning)
 
 
+'''
+import optimization as opt
+d= opt.getdata()
+opt.arun(d, 'nu')
+
+'''
+
 def eval_single(**kwargs):
     args = dict(kwargs)
     ss_id = kwargs.pop('dataset')
@@ -96,7 +103,7 @@ def makespace():
 
 def getdata(cells = 750, data  = 4, src= 'batch'):
     if src == 'batch':
-        r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells))
+        r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells,filter_clusters=15, slow=1))
     else:
         r= list(scalp.data.timeseries(scalp.test_config.timeseries_datapath, maxdatasets=data, maxcells=cells))
     return [[rr] for rr in r]

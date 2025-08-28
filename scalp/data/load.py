@@ -86,6 +86,10 @@ def fix(ds,names):
             score_df = adata.obs[candidate_keys]
             # For each cell, get the name of the column (i.e., cell type) with the highest score
             adata.obs['label'] = score_df.idxmax(axis=1)
+    # reprogramming morris contains bad batches with linke 11 or 75 cells...
+    # print(f"{ds=}")
+    fixlength = lambda x: [d for d in x if len(d) > 99]
+    ds = Map(fixlength, ds)
 
     return ds
 

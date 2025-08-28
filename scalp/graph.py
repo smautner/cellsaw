@@ -647,10 +647,6 @@ def aiSlopSolution(matrices, k, h):
 
 
 
-
-
-
-
 def mkblock(matrix, i,j):
     '''
     we return a new array, the size of matrix
@@ -705,6 +701,16 @@ k 7 17 1
 
 # metric ['cosine']
 
+def find_duplicate_rows(mat):
+
+    mat = csr_matrix(mat)
+    di = {}
+    for i, row in enumerate(mat):
+        h = hash(tuple(row.indices))
+        if h in di:
+            print(i, di[h])
+        di[h] = i
+
 
 def integrate(adata,*, base = 'pca40',
               k=13,
@@ -746,9 +752,13 @@ def integrate(adata,*, base = 'pca40',
             distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric=metric)
 
             if i == j:
+
+                assert distances.shape[0] > 50, 'very few cells in dataset, you messed up!'
                 distances = hubness(distances, hub1_k, hub1_algo)
                 distances = fast_neighborgraph(distances, k)
+                np.fill_diagonal(distances,1)
                 distances = sparse.lil_matrix(distances)
+                # if find_duplicate_rows(distances): breakpoint()# DEBUG, DELETE ME
                 return distances
             # this is a case for k-start :) from ug.hubness
             distances = hubness(distances, hub2_k, hub2_algo)
@@ -761,12 +771,9 @@ def integrate(adata,*, base = 'pca40',
     getpart = dict(zip(tasks,parts))
 
     blockdict = {(i,i): getpart[(i,i)] for i in range(n_datas)}
-
-
     tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
     for i,j in tasks:
         blockdict[(i,j)]  = mkblock( getpart[(j,j)] , *getpart[(i,j)])
-
     for i,j in tasks:
         # ok so we fill the mirror too... breaking symmetry
         # i,i is the reference now
@@ -775,7 +782,9 @@ def integrate(adata,*, base = 'pca40',
     # MAKE THE MATRIX
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
-    return  stack_blocks(n_datas, blockdict)
+    stack =  csr_matrix( stack_blocks(n_datas, blockdict))
+    for i in range(stack.shape[0]): stack[i,i] = 0
+    return stack
 
 def test_integrate():
     # make 2 random 10x10 matrices
@@ -787,67 +796,67 @@ def test_integrate():
     integrate(a)
 
 
-def MP(distance_matrix, k=6):
-    n = distance_matrix.shape[0]
-    k = int(np.sqrt(n))
-    nbrs = NearestNeighbors(n_neighbors=k).fit(distance_matrix)
-    distances, indices = nbrs.kneighbors(distance_matrix)  # Sorted by distance
+# def MP(distance_matrix, k=6):
+#     n = distance_matrix.shape[0]
+#     k = int(np.sqrt(n))
+#     nbrs = NearestNeighbors(n_neighbors=k).fit(distance_matrix)
+#     distances, indices = nbrs.kneighbors(distance_matrix)  # Sorted by distance
 
-    # Initialize rank matrix (high rank = less proximity)
-    ranks = np.zeros((n, n))
-    for i in range(n):
-        ranks[i, indices[i]] = np.arange(1, k + 1)  # Rank 1 is nearest
+#     # Initialize rank matrix (high rank = less proximity)
+#     ranks = np.zeros((n, n))
+#     for i in range(n):
+#         ranks[i, indices[i]] = np.arange(1, k + 1)  # Rank 1 is nearest
 
-    # Step 2: Convert ranks to empirical probabilities (P_i(x_j))
-    P = ranks / n  # P_i(x_j) = rank_i(x_j) / n
+#     # Step 2: Convert ranks to empirical probabilities (P_i(x_j))
+#     P = ranks / n  # P_i(x_j) = rank_i(x_j) / n
 
-    # Step 3: Compute MP as P_i(x_j) * P_j(x_i)
-    MP = P * P.T
-    return MP
+#     # Step 3: Compute MP as P_i(x_j) * P_j(x_i)
+#     MP = P * P.T
+#     return MP
 
 from ubergauss import hubness as uhub
 def hubness(d,k,algo):
     return uhub.transform_experiments(d,k,algo)
 
-def hubness_old(distance_matrix, k=6, algo = 0):
-    """
-    0 -> do nothing
-    1 -> normalize by norm
-    2 -> csls
-    3 -> ls
-    4 -> nicdm
-    """
-    if algo == 0:
-        return distance_matrix
-    if algo == 1:
-        return sklearn.preprocessing.normalize(distance_matrix, axis = 0)
+# def hubness_old(distance_matrix, k=6, algo = 0):
+#     """
+#     0 -> do nothing
+#     1 -> normalize by norm
+#     2 -> csls
+#     3 -> ls
+#     4 -> nicdm
+#     """
+#     if algo == 0:
+#         return distance_matrix
+#     if algo == 1:
+#         return sklearn.preprocessing.normalize(distance_matrix, axis = 0)
 
-    # if algo == 2:
-    #     return MP(distance_matrix, k + 15)
+#     # if algo == 2:
+#     #     return MP(distance_matrix, k + 15)
 
-    funcs = [csls_, ls, nicdm, ka, another]
-    f = funcs[algo-2]
+#     funcs = [csls_, ls, nicdm, ka, another]
+#     f = funcs[algo-2]
 
-    n = distance_matrix.shape[0]
-    # scaled_distances = distance_matrix.copy()
-    knn = np.partition(distance_matrix, k+1, axis=1)[:, :k+1]  # +1 to account for self
-    knn = np.sort(knn, axis = 1)
-    knn = knn[:,1:].mean(axis = 1)
+#     n = distance_matrix.shape[0]
+#     # scaled_distances = distance_matrix.copy()
+#     knn = np.partition(distance_matrix, k+1, axis=1)[:, :k+1]  # +1 to account for self
+#     knn = np.sort(knn, axis = 1)
+#     knn = knn[:,1:].mean(axis = 1)
 
-    # Apply scaling
-    for i in range(n):
-        for j in range(n):
-            v = distance_matrix[i,j]
-            distance_matrix[i,j]  =  f(v,knn[i],knn[j])
-    return distance_matrix
+#     # Apply scaling
+#     for i in range(n):
+#         for j in range(n):
+#             v = distance_matrix[i,j]
+#             distance_matrix[i,j]  =  f(v,knn[i],knn[j])
+#     return distance_matrix
 
-def csls_(v,i,j):
-    return v*2 -i -j
-def ls(v,i,j):
-    return 1- np.exp(- v**2/(i*j) )
-def nicdm(v,i,j):
-    return v /  np.sqrt(i*j)
-def ka(v,i,j):
-    return v / i +  v/j
-def another(v,i,j):
-    return v * j ** .5
+# def csls_(v,i,j):
+#     return v*2 -i -j
+# def ls(v,i,j):
+#     return 1- np.exp(- v**2/(i*j) )
+# def nicdm(v,i,j):
+#     return v /  np.sqrt(i*j)
+# def ka(v,i,j):
+#     return v / i +  v/j
+# def another(v,i,j):
+#     return v * j ** .5
