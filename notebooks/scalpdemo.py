@@ -14,21 +14,15 @@ if __name__ == "__main__":
 from matplotlib import pyplot as plt
 import warnings
 from collections import defaultdict
-
 import scalp
 from scalp.output import draw
 import lmz
 import numpy as np
-
-
 import pandas as pd
 import scanpy as sc
 import functools
 import time
 import seaborn as sns # Added for plotting
-
-
-
 import better_exceptions
 
 warnings.filterwarnings("ignore")
@@ -48,8 +42,8 @@ demo.Scalp(ds)
 
 
 conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
-conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 15, 'slow':0}
-# conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 0, 'slow':0}
+conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 10, 'slow':0}
+conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
 def get_data():
     if True:
         datasets = scalp.data.scmark(scalp.test_config.scmark_datapath,  **conf)
@@ -411,60 +405,149 @@ def mkscib_table(SCIB):
 
 ## In[ ]:
 
+def bluestar(scores2):
+    """
+    Generates and displays scatter plots of 'label_mean' vs 'batch_mean' scores
+    from the provided DataFrame, showing individual dataset points and
+    mean points with error bars.
 
-#palette = {
-#        "scanorama": "red",
-#    "bbknn": "green",
-#    "combat": "purple",
-#    "Scalp: 0.15": "#0b2b40",
-#    "Scalp: 0.25": "#0f3e5a",  # Original dark blue
-#    "Scalp: 0.35": "#165a87",  # Original dark blue
-#    "Scalp: 0.45": "#1f77b4",  # Original medium blue
-#    "Scalp: 0.55": "#4892c7",
-#    "Scalp: 0.65": "#73b0da",  # Mid-point light blue
-#    "Scalp: 0.75": "#a7cce5",  # Original lighter blue
-#    "Scalp: 0.85": "#dceefb",  # Original very light blue
-#    "Scalp: 0.95": "#f0f8ff"   # AliceBlue, almost white
-#}
-#z = pd.DataFrame(scores2)
-#z = z[z.method != 'scalp']
+    Args:
+        scores2_df (pd.DataFrame): DataFrame containing 'method', 'label_mean',
+                                  'batch_mean' (and optionally 'label_std', 'batch_std' for error bars).
+        palette (dict): Dictionary mapping method names to colors for plotting.
+    """
+    # Filter out 'scalp' method if it exists (assuming it's a generic name and specific Scalp: 0.XX are preferred)
+    scores2_df = pd.DataFrame(scores2)
+    z = scores2_df[scores2_df.method != 'scalp'].copy()
 
-#ax = sns.scatterplot(z,x='label_mean', y= 'batch_mean', hue = "method",palette = palette, legend=True)
-#ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-#plt.show()
-#z_avg = z.groupby("method", as_index=False)[["label_mean", "batch_mean"]].mean()
-#ax = sns.scatterplot(z_avg,x='label_mean', y= 'batch_mean', hue = "method",palette = palette, legend=True)
-#ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-#plt.show()
+    palette = {
+            "scanorama": "red",
+        "bbknn": "green",
+        "combat": "purple",
+        "Scalp: 0.15": "#0b2b40",
+        "Scalp: 0.25": "#0f3e5a",  # Original dark blue
+        "Scalp: 0.35": "#165a87",  # Original dark blue
+        "Scalp: 0.45": "#1f77b4",  # Original medium blue
+        "Scalp: 0.55": "#4892c7",
+        "Scalp: 0.65": "#73b0da",  # Mid-point light blue
+        "Scalp: 0.75": "#a7cce5",  # Original lighter blue
+        "Scalp: 0.85": "#dceefb",  # Original very light blue
+        "Scalp: 0.95": "#f0f8ff"   # AliceBlue, almost white
+    }
+    # Plot individual dataset points
+    plt.figure(figsize=(10, 8))
+    ax = sns.scatterplot(data=z, x='label_mean', y='batch_mean', hue="method", palette=palette, legend=True)
+    ax.set_title('Individual Dataset Scores (Label vs Batch Mean)')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
 
-#z_stats = z.groupby("method").agg({
-#    "label_mean": ["mean", "std"],
-#    "batch_mean": ["mean", "std"]
-#}).reset_index()
+    # Calculate mean scores per method
+    z_avg = z.groupby("method", as_index=False)[["label_mean", "batch_mean"]].mean()
 
-## Flatten MultiIndex columns
-#z_stats.columns = ["method", "label_mean", "label_std", "batch_mean", "batch_std"]
+    # Plot mean scores per method
+    plt.figure(figsize=(10, 8))
+    ax = sns.scatterplot(data=z_avg, x='label_mean', y='batch_mean', hue="method", palette=palette, legend=True, s=100, marker='o')
+    ax.set_title('Mean Scores per Method (Label vs Batch Mean)')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
 
-## Step 2: Plot with error bars
-#fig, ax = plt.subplots()
+    # Calculate mean and standard deviation for error bars
+    z_stats = z.groupby("method").agg(
+        label_mean=("label_mean", "mean"),
+        label_std=("label_mean", "std"),
+        batch_mean=("batch_mean", "mean"),
+        batch_std=("batch_mean", "std")
+    ).reset_index()
 
-## Scatter plot with error bars
-#for _, row in z_stats.iterrows():
-#    ax.errorbar(
-#        x=row["label_mean"],
-#        y=row["batch_mean"],
-#        xerr=row["label_std"],
-#        yerr=row["batch_std"],
-#        fmt='o',
-#        label=row["method"],
-#        color=palette[row["method"]] if row["method"] in palette else None
-#    )
+    # Plot mean scores with error bars
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.set_title('Mean Scores with Standard Deviation Error Bars')
 
-## Customize legend
-#ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.)
-#ax.set_xlabel("label_mean")
-#ax.set_ylabel("batch_mean")
+    # Scatter plot with error bars for each method
+    for _, row in z_stats.iterrows():
+        method_name = row["method"]
+        color = palette.get(method_name)
 
+        ax.errorbar(
+            x=row["label_mean"],
+            y=row["batch_mean"],
+            xerr=row["label_std"],
+            yerr=row["batch_std"],
+            fmt='o',  # format for the markers
+            label=method_name,
+            color=color,
+            capsize=5,  # size of the caps on the error bars
+            markersize=8
+        )
+
+    # Customize legend and labels
+    ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.)
+    ax.set_xlabel("Label Mean Score")
+    ax.set_ylabel("Batch Mean Score")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+'''
+
+palette = {
+        "scanorama": "red",
+    "bbknn": "green",
+    "combat": "purple",
+    "Scalp: 0.15": "#0b2b40",
+    "Scalp: 0.25": "#0f3e5a",  # Original dark blue
+    "Scalp: 0.35": "#165a87",  # Original dark blue
+    "Scalp: 0.45": "#1f77b4",  # Original medium blue
+    "Scalp: 0.55": "#4892c7",
+    "Scalp: 0.65": "#73b0da",  # Mid-point light blue
+    "Scalp: 0.75": "#a7cce5",  # Original lighter blue
+    "Scalp: 0.85": "#dceefb",  # Original very light blue
+    "Scalp: 0.95": "#f0f8ff"   # AliceBlue, almost white
+}
+z = pd.DataFrame(scores2)
+z = z[z.method != 'scalp']
+
+ax = sns.scatterplot(z,x='label_mean', y= 'batch_mean', hue = "method",palette = palette, legend=True)
+ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+plt.show()
+z_avg = z.groupby("method", as_index=False)[["label_mean", "batch_mean"]].mean()
+ax = sns.scatterplot(z_avg,x='label_mean', y= 'batch_mean', hue = "method",palette = palette, legend=True)
+ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+plt.show()
+
+z_stats = z.groupby("method").agg({
+    "label_mean": ["mean", "std"],
+    "batch_mean": ["mean", "std"]
+}).reset_index()
+
+# Flatten MultiIndex columns
+z_stats.columns = ["method", "label_mean", "label_std", "batch_mean", "batch_std"]
+
+# Step 2: Plot with error bars
+fig, ax = plt.subplots()
+
+# Scatter plot with error bars
+for _, row in z_stats.iterrows():
+    ax.errorbar(
+        x=row["label_mean"],
+        y=row["batch_mean"],
+        xerr=row["label_std"],
+        yerr=row["batch_std"],
+        fmt='o',
+        label=row["method"],
+        color=palette[row["method"]] if row["method"] in palette else None
+    )
+
+# Customize legend
+ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.)
+ax.set_xlabel("label_mean")
+ax.set_ylabel("batch_mean")
+
+'''
 
 ## In[ ]:
 
@@ -533,6 +616,34 @@ def mkscib_table(SCIB):
 #g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method)) # ha='right' is useful here too
 #plt.show()
 
+def barplot(geomean, datasets):
+
+    geomean.index.name = 'method'
+    df_melted = geomean.reset_index().melt(id_vars='method', var_name='dataset', value_name='score')
+    #df_melted['group'] = np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
+    df_melted['group'] = [ 'timeseries' if datasets[int(i)].uns['timeseries'] else 'batch'  for i in  df_melted.dataset] # np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
+    df_melted['size'] = [ len(np.unique(datasets[int(i)].obs['batch']) ) for i in  df_melted.dataset] # np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
+    # df_melted['group']=df_melted.dataset.astype(int) % 16
+
+    g = sns.catplot( data=df_melted, x="method", y="score", hue = 'group')# native_scale=True, zorder=1 )
+    # g = sns.catplot( data=df_melted, x="method", y="score", hue = 'dataset')# native_scale=True, zorder=1 )
+    #
+
+    # Calculate mean per category
+    means = df_melted.groupby("method")["score"].mean()
+
+    # Add markers for each category's mean
+    for i, day in enumerate(means.index):
+        plt.scatter(i, means[day], color='black', marker='x', s=50, label='Mean' if i == 0 else "")
+
+    g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method)) # ha='right' is useful here too
+    plt.show()
+
+
+
+    g = sns.boxplot( data=df_melted, x="method", y="score", hue ="group")# native_scale=True, zorder=1 )
+    g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method), ha = 'right') # ha='right' is useful here too
+    plt.show()
 
 ## In[ ]:
 
