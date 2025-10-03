@@ -1,3 +1,4 @@
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 '''
 so we exported scalp demo to a script... lets see what we can do
 '''
@@ -12,6 +13,7 @@ if __name__ == "__main__":
 
 from matplotlib import pyplot as plt
 import warnings
+from collections import defaultdict
 
 import scalp
 from scalp.output import draw
@@ -19,6 +21,11 @@ import lmz
 import numpy as np
 
 
+import pandas as pd
+import scanpy as sc
+import functools
+import time
+import seaborn as sns # Added for plotting
 
 
 
@@ -40,8 +47,9 @@ demo.Scalp(ds)
 # In[3]:
 
 
+conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
 conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 15, 'slow':0}
-
+# conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 0, 'slow':0}
 def get_data():
     if True:
         datasets = scalp.data.scmark(scalp.test_config.scmark_datapath,  **conf)
@@ -181,52 +189,85 @@ def do_the_data(ds):
 ##################
 ##   RUN EXPERIMENTS
 ###############
-#import ubergauss.tools as ut
-#from lmz import *
-#import functools
+import ubergauss.tools as ut
+import functools
+import time
+
+
+def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
+    funcs = [scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat]
+    for ot in scalpvalues:
+        funcs.append( functools.partial(Scalp, ot=ot))
+    fuid = Range(funcs)
+    dataid = Range(datasets)
+    tasks = [(f,d) for f in fuid for d in dataid]
+
+    def run(fd):
+        starttime = time.time()
+        f,d = fd
+        fun = funcs[f]
+        dat = datasets[d]
+        stack = fun(dat)
+        return stack, time.time()-starttime
+
+    mydata = ut.xxmap(run, tasks)
+    mydata, runtimes = Transpose(mydata)
+
+    fnames = 'scanorama bbknn combat'.split()
+    fnames+=[f'Scalp: {s}' for s in scalpvalues]
+    times = defaultdict(int)
+    for (fi, di), t in zip(tasks, runtimes):
+        times[fnames[fi]] += t
+    # datasets_stack = Map(scalp.transform.stack, datasets)
+    for (fu,da), result in zip(tasks, mydata):
+        method = fnames[fu]#result.uns['integrated'][0]
+        rmeth = method
+        if fu > 2:
+            rmeth = 'scalp'
+        # print(fu)
+        datasets[da].obsm[method] = result.obsm[rmeth]
+        datasets[da].uns.setdefault('methods', []).append(method)
+        datasets[da].uns.setdefault('integrated', []).append(method)
+    return datasets, fnames, times
 
 
 
-#funcs = [scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat]
-#scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]
-#for ot in scalpvalues:
-#    funcs.append( functools.partial(Scalp, ot=ot))
-#fuid = Range(funcs)
-#dataid = Range(datasets)
-#tasks = [(f,d) for f in fuid for d in dataid]
-
-#def run(fd):
-#    f,d = fd
-#    fun = funcs[f]
-#    dat = datasets[d]
-#    stack = fun(dat)
-#    return stack
-
-#mydata = ut.xxmap(run, tasks)
-
-
-## In[ ]:
-
-
-#################
-## UNIFY COLLECT DATA IN A SINGLE STRUCTURE
-#################
-#fnames = 'scanorama bbknn combat'.split()
-#fnames+=[f'Scalp: {s}' for s in scalpvalues]
-
-## datasets_stack = Map(scalp.transform.stack, datasets)
-#for (fu,da), result in zip(tasks, mydata):
-#    method = fnames[fu]#result.uns['integrated'][0]
-#    rmeth = method
-#    if fu > 2:
-#        rmeth = 'scalp'
-#    # print(fu)
-#    datasets[da].obsm[method] = result.obsm[rmeth]
-#    datasets[da].uns.setdefault('methods', []).append(method)
-#    datasets[da].uns.setdefault('integrated', []).append(method)
 
 
 
+def scib_score(fanmes, datasets):
+    tasks = [(f,d) for f in fanmes for d in Range(datasets)]
+    def f(item):
+        fn,ds = item
+        r = scalp.score.scib_scores(datasets[ds],fn)
+        r.update({'method':fn})
+        r.update({'dataset':ds})
+        return r
+
+    return pd.DataFrame(ut.xxmap(f,tasks))
+
+
+
+def mkscib_table(SCIB):
+    def geomean_row(row):
+        return np.sqrt(row['batch'] * row['label'])
+
+    SCIB['geomean'] = SCIB.apply(geomean_row, axis=1)
+
+    # rank within each group d
+    SCIB[['a_rank','b_rank','geomean_rank']] = ( SCIB.groupby('dataset')[['batch','label','geomean']]
+          .rank(method='average', ascending=False))
+
+    # average ranks by c
+    result = ( SCIB.groupby('method')[['a_rank','b_rank','geomean_rank']]
+          .mean()
+          .reset_index()
+          .rename(columns={
+              'a_rank': 'rank batch',
+              'b_rank': 'rank label',
+              'geomean_rank': 'rank geomean'
+          }))
+    return result
 
 ## In[ ]:
 
@@ -837,6 +878,195 @@ def do_the_data(ds):
 
 
 ## In[ ]:
+
+
+
+
+# def make_timetable(datasets):
+#     '''
+#     run_all gives back times for all the methods. we will only call it with datasets[13].; these are on the y axis of our new plot; the x axis contins 2x200, 3x300 ... 10x1000 (AxB in general); meaning we select A 'batch'es from the (anndata) dataset and subsample each to B cells.; then run_all to get the times, aggregate and plot; output a single, compact function.
+#     '''
+
+
+
+def subsample_adata_by_batches(adata, num_batches, cells_per_batch, random_state=42):
+    """
+    Subsamples an AnnData object by selecting a specified number of batches
+    and then sampling a specified number of cells from each selected batch.
+    """
+    rng = np.random.default_rng(random_state)
+    all_batches = adata.obs['batch'].unique().tolist()
+
+    if num_batches > len(all_batches):
+        print(f"Warning: Requested {num_batches} batches, but only {len(all_batches)} available. Using all available batches.")
+        selected_batches = all_batches
+    else:
+        selected_batches = rng.choice(all_batches, num_batches, replace=False)
+
+    sampled_adatas = []
+    for batch_id in selected_batches:
+        batch_adata = adata[adata.obs['batch'] == batch_id].copy()
+        if batch_adata.n_obs == 0:
+            continue
+
+        num_to_sample = min(cells_per_batch, batch_adata.n_obs)
+        if num_to_sample > 0:
+            indices = rng.choice(batch_adata.obs_names, num_to_sample, replace=False)
+            sampled_batch_adata = batch_adata[indices].copy()
+            sampled_adatas.append(sampled_batch_adata)
+        else:
+            print(f"Warning: No cells to sample for batch {batch_id} with {cells_per_batch} cells requested.")
+
+    if not sampled_adatas:
+        return None
+
+    # Concatenate the sampled AnnData objects
+    concatenated_adata = sc.concat(sampled_adatas, axis=0, join='outer', merge='unique')
+
+    # Preserve necessary original metadata (e.g., 'timeseries' flag for scoring)
+    concatenated_adata.uns = adata.uns.copy()
+    concatenated_adata.var = adata.var.copy()
+
+    return concatenated_adata
+
+
+def make_timetable(datasets):
+    '''
+    Generates and plots a timetable of integration method runtimes
+    for different dataset sizes based on varying number of batches and cells per batch.
+
+    The x-axis configurations are: (A=2, B=200), (A=3, B=300), ..., (A=10, B=1000)
+    where A is the number of batches and B is the number of cells sampled per batch.
+    '''
+    # The task specifies to use datasets[13] for this experiment
+    original_dataset = datasets[13]
+
+    # Define the (A, B) pairs as specified in the prompt
+    x_axis_configs = []
+    for A in Range(2, 11): # A ranges from 2 to 10
+        B = A * 100      # B ranges from 200 to 1000 (A*100)
+        x_axis_configs.append((A, B))
+
+    all_runtimes_data = []
+
+    for num_batches, cells_per_batch in x_axis_configs:
+        print(f"Processing config: {num_batches} batches x {cells_per_batch} cells/batch...")
+
+        # Create a subsampled AnnData object
+        sub_dataset = subsample_adata_by_batches(original_dataset, num_batches, cells_per_batch)
+        if sub_dataset is None:
+            print(f"Skipping config {num_batches}x{cells_per_batch} due to insufficient data after subsampling.")
+            continue
+
+        # Run all integration methods on the subsampled dataset
+        # run_all expects a list of datasets, so we wrap sub_dataset in a list
+        _, fnames, runtimes_dict = run_all([sub_dataset], [.55])
+
+        config_label = f"{num_batches}x{cells_per_batch}"
+
+        # Collect runtimes for all methods for the current configuration
+        for method_name in fnames:
+            runtime = runtimes_dict.get(method_name, 0) # Get runtime for this method
+            all_runtimes_data.append({
+                'config_label': config_label,
+                'num_batches': num_batches,
+                'cells_per_batch': cells_per_batch,
+                'method': method_name,
+                'runtime': runtime
+            })
+
+    if not all_runtimes_data:
+        print("No runtime data collected. Exiting timetable generation.")
+        return
+
+    # Convert collected data to a DataFrame for easy plotting
+    runtimes_df = pd.DataFrame(all_runtimes_data)
+
+    # Plot the results
+    plt.figure(figsize=(12, 7))
+    sns.lineplot(data=runtimes_df, x='config_label', y='runtime', hue='method', marker='o')
+    plt.title('Integration Method Runtimes Across Dataset Sizes')
+    plt.xlabel('Number of Batches x Cells per Batch')
+    plt.ylabel('Runtime (seconds)')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+    return runtimes_df # Optionally return the dataframe
+
+
+
+
+from scipy.stats import gmean
+
+def make_results_table(scores, datasets, chosen_scalp):
+    """
+    scores: dict of dataset_id -> {method: {'label_mean':..., 'batch_mean':...}}
+    datasets: list of AnnData or similar objects with .uns['timeseries']
+    chosen_scalp: string, the exact scalp variant name to include
+    """
+    # -------- Step 1: Build dataframe ----------
+    rows = []
+    for ds, methods_dict in scores.items():
+        for meth, vals in methods_dict.items():
+            label = vals['label_mean']
+            batch = vals['batch_mean']
+            geo = gmean([label, batch])
+            rows.append({'dataset': ds, 'method': meth,
+                         'label': label, 'batch': batch, 'geomean': geo})
+    full_df = pd.DataFrame(rows)
+
+    ts_ids = [str(i) for i, e in enumerate(datasets) if datasets[i].uns.get('timeseries', False)]
+    batch_ids = [str(i) for i, e in enumerate(datasets) if not datasets[i].uns.get('timeseries', False)]
+
+    # -------- Step 2: Filter methods to include only chosen scalp + all non-scalp ----------
+    allowed_methods = set(m for m in full_df['method'] if not m.startswith('Scalp'))
+    scalp_methods = [m for m in full_df['method'].unique() if m.startswith('Scalp')]
+        # If chosen_scalp is provided, filter for it
+    selected_scalp_methods = [m for m in scalp_methods if str(chosen_scalp) in m]
+    allowed_methods.add(selected_scalp_methods[0])
+
+
+    df = full_df[full_df['method'].isin(allowed_methods)].copy()
+
+    # -------- Step 3: Compute ranks ----------
+    ranks = df.groupby('dataset')[['label', 'batch', 'geomean']].rank(ascending=False)
+    df[['label_rank', 'batch_rank', 'geo_rank']] = ranks
+
+    # -------- Step 4: Compute mean ranks ----------
+    def mean_ranks(ids):
+        sub = df[df['dataset'].isin(ids)]
+        return sub.groupby('method')[['label_rank', 'batch_rank', 'geo_rank']].mean()
+
+    ts_ranks = mean_ranks(ts_ids)
+    batch_ranks = mean_ranks(batch_ids)
+    total_ranks = df.groupby('method')[['label_rank', 'batch_rank', 'geo_rank']].mean()
+
+    result = pd.concat([
+        ts_ranks.add_prefix('TS_'),
+        batch_ranks.add_prefix('Batch_'),
+        total_ranks.add_prefix('Total_')
+    ], axis=1)
+
+    # -------- Step 5: Transpose ----------
+    result_t = result.T
+
+    # -------- Step 6: Boldface best in each row ----------
+    latex_df = result_t.copy()
+    for row in latex_df.index:
+        vals = latex_df.loc[row]
+        minval = pd.to_numeric(vals, errors='coerce').min()
+        latex_df.loc[row] = [
+            f"\\textbf{{{float(v):.3f}}}" if np.isclose(float(v), minval) else f"{float(v):.3f}"
+            for v in vals
+        ]
+
+    latex_code = latex_df.to_latex(escape=False)
+
+    return result_t, latex_code
+
+
 
 
 

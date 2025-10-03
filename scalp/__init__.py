@@ -160,12 +160,9 @@ def plot(adata,embedding,**plotargs):
         adata.obsm['newlayer'] =  umap.UMAP(n_components = 2).fit_transform(adata.obsm[embedding])
     else:
         adata.obsm['newlayer'] =  adata.obsm[embedding]
-
-
     title =  adata.uns.get('name','no name found in adata')
     # ax = sc.pl.embedding(adata, basis= 'newlayer' , show = False,**plotargs)
     plot_embedding_with_labels(adata, basis='newlayer', title=title)
-
 
 
 def plot_embedding_with_labels(adata, basis='', title = ''):
@@ -206,6 +203,109 @@ def plot_embedding_with_labels(adata, basis='', title = ''):
     plt.suptitle(title, y=0.95, fontsize = 16) # Adjust suptitle position if needed
     plt.tight_layout(rect=[0, 0, 0.9, 1]) # Adjust layout to make space for legends
     plt.show()
+
+
+
+def plot2(adata, embedding1, embedding2, **plotargs):
+    """
+    Plots two embeddings horizontally, each with a 'batch' and 'label' subplot.
+    A single combined legend is placed below the entire figure.
+
+    Parameters:
+    - adata: AnnData object
+    - embedding1: str, name of the first embedding in adata.obsm
+    - embedding2: str, name of the second embedding in adata.obsm
+    - plotargs: additional arguments passed to seaborn.scatterplot
+    """
+    X1 = adata.obsm[embedding1]
+    X2 = adata.obsm[embedding2]
+
+    # Reduce to 2D if embeddings are higher dimension
+    if X1.shape[1] > 2:
+        X1 = umap.UMAP(n_components=2, random_state=42).fit_transform(X1)
+    if X2.shape[1] > 2:
+        X2 = umap.UMAP(n_components=2, random_state=42).fit_transform(X2)
+
+    batch_labels = adata.obs['batch'].astype(str)
+    cell_labels = adata.obs['label'].astype(str)
+
+    # Determine unique categories for combined legend
+    all_batches = sorted(batch_labels.unique())
+    all_labels = sorted(cell_labels.unique())
+    all_categories = all_batches + all_labels
+
+    # Create a custom palette for batch and label to ensure consistency
+    # using 'tab20' for labels and a custom viridis-like for batches
+    n_batches = len(all_batches)
+    n_labels = len(all_labels)
+
+    # Use seaborn's color palettes
+    batch_palette = sns.color_palette("viridis", n_batches)
+    label_palette = sns.color_palette("tab20", n_labels) if n_labels <= 20 else sns.color_palette("hls", n_labels)
+
+
+    # Map categories to colors
+    color_map = {}
+    for i, batch in enumerate(all_batches):
+        color_map[batch] = batch_palette[i]
+    for i, label in enumerate(all_labels):
+        color_map[label] = label_palette[i]
+
+    # Set up the figure and a GridSpec for plots and a shared legend
+    fig = plt.figure(figsize=(24, 8)) # Increased width, height adjusted for legend
+    gs = fig.add_gridspec(2, 4, height_ratios=[8, 1]) # 2 rows, 4 cols for plots, 2nd row for legend
+
+    axs = [fig.add_subplot(gs[0, i]) for i in range(4)] # First row for the four plots
+
+    def _plot_panel(ax, x_data, y_data, hue_data, title, current_palette):
+        sns.scatterplot(x=x_data, y=y_data, hue=hue_data, palette=current_palette, ax=ax, s=16, legend=False, **plotargs)
+        ax.set_title(title)
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+    # Plot 1: Embedding1 by Batch
+    _plot_panel(axs[0], X1[:, 0], X1[:, 1], batch_labels, f'{embedding1} - Batch', batch_palette)
+
+    # Plot 2: Embedding1 by Label
+    _plot_panel(axs[1], X1[:, 0], X1[:, 1], cell_labels, f'{embedding1} - Label', label_palette)
+
+    # Plot 3: Embedding2 by Batch
+    _plot_panel(axs[2], X2[:, 0], X2[:, 1], batch_labels, f'{embedding2} - Batch', batch_palette)
+
+    # Plot 4: Embedding2 by Label
+    _plot_panel(axs[3], X2[:, 0], X2[:, 1], cell_labels, f'{embedding2} - Label', label_palette)
+
+    # Create a dummy subplot for the combined legend
+    legend_ax = fig.add_subplot(gs[1, :]) # Span all columns in the second row
+    legend_ax.axis('off') # Hide this axes
+
+    # Create the combined legend
+    handles = []
+    labels = []
+
+    # Add batch categories to legend
+    for bid , batch in enumerate(all_batches):
+        handles.append(plt.Line2D([0], [0], marker='o', color='w', label=f'Batch: {bid}',
+                                  markerfacecolor=color_map[batch], markersize=10))
+        labels.append(f'Batch: {bid}')
+
+    # Add cell label categories to legend
+    for label in all_labels:
+        handles.append(plt.Line2D([0], [0], marker='o', color='w', label=f'Label: {label}',
+                                  markerfacecolor=color_map[label], markersize=10))
+        labels.append(f'Label: {label}')
+
+    legend_ax.legend(handles=handles, labels=labels, loc='center', ncol = 7,#ncol=max(1, len(all_batches + all_labels) // 5),
+                     fontsize='small', frameon=False)
+
+    plt.suptitle(adata.uns.get('name', 'Embedding Comparison'), y=0.98, fontsize=18)
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95]) # Adjust layout to make space for suptitle and legend
+    plt.show()
+
 
 
 

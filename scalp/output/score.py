@@ -76,11 +76,11 @@ def score_lin_batch(dataset, projection = 'umap'):
 
 
 from scib.metrics import metrics
-def score_scib_metrics(dataset):
+def score_scib_metrics(dataset, embed):
     # ds2 = dataset.copy()
     # ds2.X = ds2.obsm['umap']
     # https://scib.readthedocs.io/en/latest/api.html#biological-conservation-metrics
-    embed = 'umap' if 'umap' in dataset.obsm else 'X_umap'
+    # embed = 'umap' if 'umap' in dataset.obsm else 'X_umap'
     sc =  metrics(dataset, dataset, 'batch', 'label', embed = embed,
                        isolated_labels_asw_=True, silhouette_=True, hvg_score_=True, graph_conn_=True,
            pcr_=True,
@@ -109,16 +109,18 @@ def split_scib_scores(d):
 
 
 def scib_scores(ds, projection = 'umap'):
-    sc = score_scib_metrics(ds)
-    bio, batch = split_scib_scores(sc)
-    return {'batch': batch,  'label':bio}
+    try:
+        ds.X = ut.zehidense(ds.X)
+        ds.obsm[projection] = ds.obsm[projection].astype(float)
+        sc = score_scib_metrics(ds, projection)
+        bio, batch = split_scib_scores(sc)
+        return {'batch': batch,  'label':bio}
+    except:
+        return {'batch': -1,  'label':-1}
 
 
 # def scalp_scores(ds, projection = 'umap'):
 #     return {'batch': score_lin_batch(ds,projection), 'label':score_lin(ds,projection)}
-
-
-
 
 def scalp_scores(data, projection ='integrated', cv=5,label_batch_split= False):
     dataset = data # if type(data)!= list else transform.stack(data)
