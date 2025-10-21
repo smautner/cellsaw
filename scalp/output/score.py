@@ -99,7 +99,7 @@ def score_scib_metrics(dataset, embed):
 
 def split_scib_scores(d):
     batchwords = 'PCR_batch ASW_label/batch graph_conn'.split()
-
+    print(d.keys())
     def split(d):
         batch = np.mean([v for k,v in d.items() if k in batchwords ])
         bioconservation = np.mean([v for k,v in d.items() if not k in batchwords ])

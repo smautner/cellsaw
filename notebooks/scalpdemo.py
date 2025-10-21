@@ -1,4 +1,5 @@
 from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
+from lmz import Map,Zip,Filter,Grouper,Range,Transpose,Flatten
 '''
 so we exported scalp demo to a script... lets see what we can do
 '''
@@ -41,9 +42,9 @@ demo.Scalp(ds)
 # In[3]:
 
 
-conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
 conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 10, 'slow':0}
 conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
+
 def get_data():
     if True:
         datasets = scalp.data.scmark(scalp.test_config.scmark_datapath,  **conf)
@@ -80,7 +81,7 @@ def setup_grid(ax, dataset):
     ax.set_yticks(ticks)
     ax.grid(True, color='white', linestyle='--', linewidth=0.5)
 
-def Scalp(dataset, dim = 2, ot= .65):
+def Scalp(dataset, dim = 2, ot= .97):
     # if find_duplicate_rows(dataset.X): print("duplicates!"); return
     parm = {'neighbors_total': 60, 'intra_neighbors_mutual': False,
             'neighbors_intra_fraction': .33, 'add_tree': False, "epsilon":-1,
@@ -104,10 +105,15 @@ def Scalp(dataset, dim = 2, ot= .65):
     # stair =  sim.make_stairs(3,[0,1])
     # grap = scalp.graph.integrate(dataset, k=10, dataset_adjacency=stair, ls=False)
 
+    # hub1_algo  hub1_k  hub2_algo  hub2_k   k  outlier_threshold  config_id     score       time
+    #   0       9          3       9          19           0.970536    30  2.188789  15.822385
+    # 0      10          3       6  15
+    # grap = scalp.graph.integrate(dataset,hub1_algo = 0, hub1_k = 10,  hub2_algo=3, hub2_k=6,  k=15,  dataset_adjacency=None, outlier_threshold=ot)
 
-    grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2,
-                                 hub2_k=12,  k=12,  dataset_adjacency=None,
-                                 outlier_threshold=ot)
+
+
+
+    grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2, hub2_k=12,  k=12,  dataset_adjacency=None, outlier_threshold=ot)
     grap = grap != 0
 
 
@@ -188,8 +194,9 @@ import functools
 import time
 
 
-def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
-    funcs = [scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat]
+#def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
+def run_all(datasets, scalpvalues = [.15,.2, .25, .3, .35, .45,  .55, .7, .9]):
+    funcs = [scalp.mnn.harmony, scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat]
     for ot in scalpvalues:
         funcs.append( functools.partial(Scalp, ot=ot))
     fuid = Range(funcs)
@@ -207,19 +214,25 @@ def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95
     mydata = ut.xxmap(run, tasks)
     mydata, runtimes = Transpose(mydata)
 
-    fnames = 'scanorama bbknn combat'.split()
+    fnames = 'Harmony Scanorama BBKNN ComBat'.split()
     fnames+=[f'Scalp: {s}' for s in scalpvalues]
+
     times = defaultdict(int)
     for (fi, di), t in zip(tasks, runtimes):
         times[fnames[fi]] += t
     # datasets_stack = Map(scalp.transform.stack, datasets)
     for (fu,da), result in zip(tasks, mydata):
-        method = fnames[fu]#result.uns['integrated'][0]
+        method = fnames[fu]
+
+        # the method name is correct as i am having custom names for the methods
+        # but we dont pass the label to runner, all the scalp runs are called scalp
         rmeth = method
-        if fu > 2:
+        if "Scalp" in method:
             rmeth = 'scalp'
-        # print(fu)
-        datasets[da].obsm[method] = result.obsm[rmeth]
+        try:
+            datasets[da].obsm[method] = result.obsm[rmeth]
+        except:
+            breakpoint()
         datasets[da].uns.setdefault('methods', []).append(method)
         datasets[da].uns.setdefault('integrated', []).append(method)
     return datasets, fnames, times
@@ -227,9 +240,14 @@ def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95
 
 
 
+def scalpscore(datasets):
+    scr = lambda i: scalp.score.scalp_scores(datasets[i],projection = 'methods', label_batch_split=False)
+    res  = ut.xxmap(scr, Range(datasets))
+    return dict(zip(Range(datasets),res))
 
 
-def scib_score(fanmes, datasets):
+
+def scib_score(fanmes, datasets, saveas= 'scib.csv'):
     tasks = [(f,d) for f in fanmes for d in Range(datasets)]
     def f(item):
         fn,ds = item
@@ -238,11 +256,14 @@ def scib_score(fanmes, datasets):
         r.update({'dataset':ds})
         return r
 
-    return pd.DataFrame(ut.xxmap(f,tasks))
+    df =  pd.DataFrame(ut.xxmap(f,tasks))
+    df.to_csv(saveas)
+    return df
 
 
 
 def mkscib_table(SCIB):
+
     def geomean_row(row):
         return np.sqrt(row['batch'] * row['label'])
 
@@ -261,7 +282,8 @@ def mkscib_table(SCIB):
               'b_rank': 'rank label',
               'geomean_rank': 'rank geomean'
           }))
-    return result
+
+    return result.to_latex(index=False)
 
 ## In[ ]:
 
@@ -405,6 +427,15 @@ def mkscib_table(SCIB):
 
 ## In[ ]:
 
+fixed_color_methods = {
+    "Scanorama": "red",
+    "BBKNN": "green",
+    "ComBat": "purple",
+    "Harmony": "blue",
+}
+
+
+
 def bluestar(scores2):
     """
     Generates and displays scatter plots of 'label_mean' vs 'batch_mean' scores
@@ -420,40 +451,82 @@ def bluestar(scores2):
     scores2_df = pd.DataFrame(scores2)
     z = scores2_df[scores2_df.method != 'scalp'].copy()
 
+
+
     palette = {
-            "scanorama": "red",
-        "bbknn": "green",
-        "combat": "purple",
-        "Scalp: 0.15": "#0b2b40",
-        "Scalp: 0.25": "#0f3e5a",  # Original dark blue
-        "Scalp: 0.35": "#165a87",  # Original dark blue
-        "Scalp: 0.45": "#1f77b4",  # Original medium blue
-        "Scalp: 0.55": "#4892c7",
-        "Scalp: 0.65": "#73b0da",  # Mid-point light blue
-        "Scalp: 0.75": "#a7cce5",  # Original lighter blue
-        "Scalp: 0.85": "#dceefb",  # Original very light blue
-        "Scalp: 0.95": "#f0f8ff"   # AliceBlue, almost white
+            "Scanorama": "red",
+        "BBKNN": "green",
+        "ComBat": "purple",
+        "Harmony" : "orange",
+
+        # "Scalp: 0.15": "#f0f8ff",   # AliceBlue, almost white
+        # "Scalp: 0.25": "#dceefb",  # Original very light blue
+        # "Scalp: 0.35": "#a7cce5",  # Original lighter blue
+        # "Scalp: 0.45": "#73b0da",  # Mid-point light blue
+        # "Scalp: 0.55": "#4892c7",
+        # "Scalp: 0.65": "#1f77b4",  # Original medium blue
+        # "Scalp: 0.75": "#165a87",  # Original dark blue
+        # "Scalp: 0.85": "#0f3e5a",  # Original dark blue
+        # "Scalp: 0.95": "#0b2b40"    # Darkest blue
+
     }
+
+    # Define methods that should appear at the end with specific colors
+    # Get all unique methods present in the dataframe
+    all_methods = sorted(z['method'].unique())
+
+    # Separate fixed-color methods from others
+    other_methods = [m for m in all_methods if m not in fixed_color_methods]
+
+    # Create a Viridis colormap for the 'other_methods'
+    viridis_cmap = plt.get_cmap('copper')
+    # Generate colors, ensuring enough steps if many Scalp values exist
+    num_other_methods = len(other_methods)
+    viridis_colors = [viridis_cmap(i/max(1, num_other_methods -1)) for i in range(num_other_methods)]
+    viridis_colors.reverse()
+
+    # Sort Scalp methods if they are in 'other_methods' to ensure consistent color gradient
+    scalp_other_methods = sorted([m for m in other_methods if "Scalp:" in m],
+                                 key=lambda x: float(x.split(': ')[1]))
+    non_scalp_other_methods = [m for m in other_methods if "Scalp:" not in m]
+
+    # Combine them for consistent Viridis ordering (non-scalp first, then sorted scalp)
+    ordered_other_methods = non_scalp_other_methods + scalp_other_methods
+
+    # Map these ordered methods to viridis colors
+    viridis_palette = {method: viridis_colors[i] for i, method in enumerate(ordered_other_methods)}
+
+
+    # Combine the custom palette with the Viridis palette
+    palette = {**viridis_palette, **fixed_color_methods}
+
+    # Ensure the legend order shows fixed_color_methods last
+    legend_order = ordered_other_methods + list(fixed_color_methods.keys())
+
     # Plot individual dataset points
-    plt.figure(figsize=(10, 8))
-    ax = sns.scatterplot(data=z, x='label_mean', y='batch_mean', hue="method", palette=palette, legend=True)
-    ax.set_title('Individual Dataset Scores (Label vs Batch Mean)')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
-    plt.show()
+    if False:# plot real data:
+        plt.figure(figsize=(10, 8))
+        ax = sns.scatterplot(data=z, x='label_mean', y='batch_mean', hue="method",
+                             palette=palette, legend='full', hue_order=legend_order)
+        ax.set_title('Individual Dataset Scores (Label vs Batch Mean)')
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.show()
 
-    # Calculate mean scores per method
-    z_avg = z.groupby("method", as_index=False)[["label_mean", "batch_mean"]].mean()
+    if False: # plot without decoration
+        # Calculate mean scores per method
+        z_avg = z.groupby("method", as_index=False)[["label_mean", "batch_mean"]].mean()
 
-    # Plot mean scores per method
-    plt.figure(figsize=(10, 8))
-    ax = sns.scatterplot(data=z_avg, x='label_mean', y='batch_mean', hue="method", palette=palette, legend=True, s=100, marker='o')
-    ax.set_title('Mean Scores per Method (Label vs Batch Mean)')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
-    plt.show()
+        # Plot mean scores per method
+        plt.figure(figsize=(10, 8))
+        ax = sns.scatterplot(data=z_avg, x='label_mean', y='batch_mean', hue="method",
+                             palette=palette, legend='full', s=100, marker='o', hue_order=legend_order)
+        ax.set_title('Mean Scores per Method (Label vs Batch Mean)')
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.show()
 
     # Calculate mean and standard deviation for error bars
     z_stats = z.groupby("method").agg(
@@ -467,22 +540,24 @@ def bluestar(scores2):
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.set_title('Mean Scores with Standard Deviation Error Bars')
 
-    # Scatter plot with error bars for each method
-    for _, row in z_stats.iterrows():
-        method_name = row["method"]
-        color = palette.get(method_name)
+    # Scatter plot with error bars for each method, respecting the legend_order
+    for method_name in legend_order:
+        row = z_stats[z_stats['method'] == method_name]
+        if not row.empty:
+            row = row.iloc[0]
+            color = palette.get(method_name)
 
-        ax.errorbar(
-            x=row["label_mean"],
-            y=row["batch_mean"],
-            xerr=row["label_std"],
-            yerr=row["batch_std"],
-            fmt='o',  # format for the markers
-            label=method_name,
-            color=color,
-            capsize=5,  # size of the caps on the error bars
-            markersize=8
-        )
+            ax.errorbar(
+                x=row["label_mean"],
+                y=row["batch_mean"],
+                xerr=row["label_std"],
+                yerr=row["batch_std"],
+                fmt='o',  # format for the markers
+                label=method_name,
+                color=color,
+                capsize=5,  # size of the caps on the error bars
+                markersize=8
+            )
 
     # Customize legend and labels
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.)
@@ -491,6 +566,66 @@ def bluestar(scores2):
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
     plt.show()
+
+    return
+
+#     # Plot individual dataset points
+#     plt.figure(figsize=(10, 8))
+#     ax = sns.scatterplot(data=z, x='label_mean', y='batch_mean', hue="method", palette=palette, legend=True)
+#     ax.set_title('Individual Dataset Scores (Label vs Batch Mean)')
+#     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+#     plt.grid(True, linestyle='--', alpha=0.6)
+#     plt.tight_layout()
+#     plt.show()
+
+#     # Calculate mean scores per method
+#     z_avg = z.groupby("method", as_index=False)[["label_mean", "batch_mean"]].mean()
+
+#     # Plot mean scores per method
+#     plt.figure(figsize=(10, 8))
+#     ax = sns.scatterplot(data=z_avg, x='label_mean', y='batch_mean', hue="method", palette=palette, legend=True, s=100, marker='o')
+#     ax.set_title('Mean Scores per Method (Label vs Batch Mean)')
+#     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+#     plt.grid(True, linestyle='--', alpha=0.6)
+#     plt.tight_layout()
+#     plt.show()
+
+#     # Calculate mean and standard deviation for error bars
+#     z_stats = z.groupby("method").agg(
+#         label_mean=("label_mean", "mean"),
+#         label_std=("label_mean", "std"),
+#         batch_mean=("batch_mean", "mean"),
+#         batch_std=("batch_mean", "std")
+#     ).reset_index()
+
+#     # Plot mean scores with error bars
+#     fig, ax = plt.subplots(figsize=(10, 8))
+#     ax.set_title('Mean Scores with Standard Deviation Error Bars')
+
+#     # Scatter plot with error bars for each method
+#     for _, row in z_stats.iterrows():
+#         method_name = row["method"]
+#         color = palette.get(method_name)
+
+#         ax.errorbar(
+#             x=row["label_mean"],
+#             y=row["batch_mean"],
+#             xerr=row["label_std"],
+#             yerr=row["batch_std"],
+#             fmt='o',  # format for the markers
+#             label=method_name,
+#             color=color,
+#             capsize=5,  # size of the caps on the error bars
+#             markersize=8
+#         )
+
+#     # Customize legend and labels
+#     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.)
+#     ax.set_xlabel("Label Mean Score")
+#     ax.set_ylabel("Batch Mean Score")
+#     plt.grid(True, linestyle='--', alpha=0.6)
+#     plt.tight_layout()
+#     plt.show()
 
 '''
 
@@ -556,7 +691,6 @@ ax.set_ylabel("batch_mean")
 #sns.heatmap(sc22)
 
 
-## In[ ]:
 
 
 #geomean = np.sqrt(sc21*sc22)
@@ -568,27 +702,6 @@ ax.set_ylabel("batch_mean")
 
 #geomean.index.name = 'method'
 #df_melted = geomean.reset_index().melt(id_vars='method', var_name='dataset', value_name='score')
-
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
-
-#df_melted
-
-
-## In[ ]:
 
 
 ##df_melted['group'] = np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
@@ -616,6 +729,12 @@ ax.set_ylabel("batch_mean")
 #g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method)) # ha='right' is useful here too
 #plt.show()
 
+
+import matplotlib.transforms as mtrans
+
+
+
+
 def barplot(geomean, datasets):
 
     geomean.index.name = 'method'
@@ -625,47 +744,56 @@ def barplot(geomean, datasets):
     df_melted['size'] = [ len(np.unique(datasets[int(i)].obs['batch']) ) for i in  df_melted.dataset] # np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
     # df_melted['group']=df_melted.dataset.astype(int) % 16
 
-    g = sns.catplot( data=df_melted, x="method", y="score", hue = 'group')# native_scale=True, zorder=1 )
-    # g = sns.catplot( data=df_melted, x="method", y="score", hue = 'dataset')# native_scale=True, zorder=1 )
-    #
+    if False: # old plot
+        g = sns.catplot( data=df_melted, x="method", y="score", hue = 'group')# native_scale=True, zorder=1 )
+        # g = sns.catplot( data=df_melted, x="method", y="score", hue = 'dataset')# native_scale=True, zorder=1 )
+        #
+        # Calculate mean per category
+        means = df_melted.groupby("method")["score"].mean()
+        # Add markers for each category's mean
+        for i, day in enumerate(means.index):
+            plt.scatter(i, means[day], color='black', marker='x', s=50, label='Mean' if i == 0 else "")
+        g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method)) # ha='right' is useful here too
+        plt.show()
 
-    # Calculate mean per category
-    means = df_melted.groupby("method")["score"].mean()
+    palette = fixed_color_methods
 
-    # Add markers for each category's mean
-    for i, day in enumerate(means.index):
-        plt.scatter(i, means[day], color='black', marker='x', s=50, label='Mean' if i == 0 else "")
+    # custom colors like this:
+    # group_palette = {"timeseries": sns.color_palette("Blues")[2], "batch": sns.color_palette("Blues")[0]}
 
-    g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method)) # ha='right' is useful here too
+    order = sorted([m for m in df_melted['method'].unique() if 'Scalp' in m], key=lambda x: float(x.split(': ')[1])) + sorted([m for m in df_melted['method'].unique() if 'Scalp' not in m])
+    g = sns.boxplot( data=df_melted, x="method", y="score", hue ="group", palette= "Blues", order = order)
+
+    # Define a custom palette for the 'group' hue, e.g., using blues
+
+    g.set_xticklabels(rotation=45, labels = order, ha = 'right', x= 4)
+    #g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method), ha = 'right', x= 4)
+
+    for i, label in enumerate(g.get_xticklabels()):
+        label.set_x(i+ 0.6)
+
+    # Apply a translation to all x-tick labels
+    offset = mtrans.ScaledTranslation(.1, .90, g.figure.dpi_scale_trans)
+    for label in g.get_xticklabels():
+        label.set_transform(g.transData + offset)
+        #g.set_xticklabels(rotation=45, labels=np.unique(df_melted.method), ha='right')
+
+    # colors = [palette.get(label, 'gray') for label in np.unique(df_melted.method)]
+    # [t.set_color(i) for (i,t) in zip(colors,g.get_xticklabels())]
+    #print(g.get_xticklabels()[0].__dict__)
+    [i.set_color( palette.get(i._text,'gray')) for  i in g.get_xticklabels()]
+
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.gca().set_axisbelow(True)
+
+    legend = plt.legend(bbox_to_anchor=(.2, .25), loc='upper left', borderaxespad=0.)
+
     plt.show()
 
-
-
-    g = sns.boxplot( data=df_melted, x="method", y="score", hue ="group")# native_scale=True, zorder=1 )
-    g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method), ha = 'right') # ha='right' is useful here too
-    plt.show()
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
 
 
 #pd.set_option('display.max_rows', 1000)
 #df_melted
-
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
 
 #groupby = 'group' # 'dataset'
 #groupby = 'dataset' # 'dataset'
@@ -687,17 +815,8 @@ def barplot(geomean, datasets):
 #sp.critical_difference_diagram(avg_rank, test_results)
 
 
-## In[ ]:
-
-
-#avg_rank
-
-
-## In[ ]:
-
 
 #grp = 'dataset'
-
 
 ##dom['group']=  dom.dataset.astype(int) % 16
 #avg_rank = dom.groupby(grp).domcount.rank(pct=True).groupby(dom.method).mean()
@@ -800,61 +919,13 @@ def barplot(geomean, datasets):
 #df2 = pd.DataFrame(our_score)
 #df2
 
-
-## In[ ]:
-
-
 #from ubergauss.optimization import pareto_scores
 #pareto_scores(df)
-
-
-## In[ ]:
-
-
 #pareto_scores(df2) # this is pancreatic only  btw
 
 
-## In[ ]:
-
-
-#df
-
-
-## In[ ]:
-
-
-#results
-
-
-## In[ ]:
-
 
 #np.corrcoef(ours.batch.values, theirs.batch_scib_avg.values)[0,1], np.corrcoef(ours.label.values, theirs.bioconservation_scib_avg.values)[0,1]
-
-
-## In[ ]:
-
-
-#dom
-
-
-#avg_rank
-
-
-## In[ ]:
-
-
-#dom
-
-
-## In[ ]:
-
-
-#funcs
-
-
-## In[ ]:
-
 
 #avg_rank = dom.groupby('dataset').domcount.rank(pct=True).groupby(dom.method).mean()
 #import scikit_posthocs as sp
@@ -964,39 +1035,6 @@ def barplot(geomean, datasets):
 #plt.plot(data[0])
 
 
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
-
-
-
-
-## In[ ]:
-
-
-
-
-# def make_timetable(datasets):
-#     '''
-#     run_all gives back times for all the methods. we will only call it with datasets[13].; these are on the y axis of our new plot; the x axis contins 2x200, 3x300 ... 10x1000 (AxB in general); meaning we select A 'batch'es from the (anndata) dataset and subsample each to B cells.; then run_all to get the times, aggregate and plot; output a single, compact function.
-#     '''
 
 
 
@@ -1111,6 +1149,45 @@ def make_timetable(datasets):
 
 from scipy.stats import gmean
 
+def test_make_results_table():
+    print("Starting test_make_results_table...")
+
+    # 1. Get data
+    datasets, _ = get_data()
+    print(f"Loaded {len(datasets)} datasets for testing.")
+
+    # the later should be ts datasets... so we have a mix. and dont get nans :)
+    datasets = datasets[:2] + datasets[-10:-8]
+
+    # 2. Run all integration methods
+    # Using a small subset of scalpvalues to speed up the test
+    # And running on a single dataset for brevity
+    # datasets_after_run, fnames, times = run_all([datasets[0], datasets[1]], scalpvalues=[.55, .75])
+    datasets_after_run, fnames, times = run_all(datasets, scalpvalues=[.55, .75])
+
+    print(f"Finished running {len(fnames)} methods on {len(datasets_after_run)} datasets.")
+    print("Methods run:", fnames)
+
+    # 3. Calculate scalp scores
+    scores = scalpscore(datasets_after_run)
+    print("Calculated scalp scores.")
+    # print("Raw scores:", scores) # for debugging
+
+    # 4. Define the chosen_scalp value for the test
+    # This should match one of the 'Scalp: X.XX' strings in fnames
+    chosen_scalp_option = '0.55' # Or '0.75' if you prefer
+
+    # Filter fnames to get the exact Scalp method name
+    full_scalp_method_name = [name for name in fnames if f'Scalp: {chosen_scalp_option}' in name][0]
+    print(f"Chosen Scalp method for table: {full_scalp_method_name}")
+
+
+    # 5. Call make_results_table
+    results_df, latex_table = make_results_table(scores, datasets_after_run, chosen_scalp_option)
+    print(latex_table)
+
+
+
 def make_results_table(scores, datasets, chosen_scalp):
     """
     scores: dict of dataset_id -> {method: {'label_mean':..., 'batch_mean':...}}
@@ -1128,13 +1205,18 @@ def make_results_table(scores, datasets, chosen_scalp):
                          'label': label, 'batch': batch, 'geomean': geo})
     full_df = pd.DataFrame(rows)
 
-    ts_ids = [str(i) for i, e in enumerate(datasets) if datasets[i].uns.get('timeseries', False)]
-    batch_ids = [str(i) for i, e in enumerate(datasets) if not datasets[i].uns.get('timeseries', False)]
+    # check for nans
+    if full_df.isnull().any().any():
+        print("Warning: NaN values found in scores DataFrame. This might affect ranking.")
+        print(full_df[full_df.isnull().any(axis=1)])
+
+    ts_ids = [int(i) for i, e in enumerate(datasets) if datasets[i].uns.get('timeseries', False)]
+    batch_ids = [int(i) for i, e in enumerate(datasets) if not datasets[i].uns.get('timeseries', False)]
 
     # -------- Step 2: Filter methods to include only chosen scalp + all non-scalp ----------
     allowed_methods = set(m for m in full_df['method'] if not m.startswith('Scalp'))
     scalp_methods = [m for m in full_df['method'].unique() if m.startswith('Scalp')]
-        # If chosen_scalp is provided, filter for it
+    # If chosen_scalp is provided, filter for it
     selected_scalp_methods = [m for m in scalp_methods if str(chosen_scalp) in m]
     allowed_methods.add(selected_scalp_methods[0])
 
@@ -1144,6 +1226,11 @@ def make_results_table(scores, datasets, chosen_scalp):
     # -------- Step 3: Compute ranks ----------
     ranks = df.groupby('dataset')[['label', 'batch', 'geomean']].rank(ascending=False)
     df[['label_rank', 'batch_rank', 'geo_rank']] = ranks
+
+    # check nans
+    if df.isnull().any().any():
+        print("Warning: NaN values found in ranks DataFrame. df is clean 1250")
+        print(ranks[ranks.isnull().any(axis=1)])
 
     # -------- Step 4: Compute mean ranks ----------
     def mean_ranks(ids):
@@ -1159,6 +1246,16 @@ def make_results_table(scores, datasets, chosen_scalp):
         batch_ranks.add_prefix('Batch_'),
         total_ranks.add_prefix('Total_')
     ], axis=1)
+
+
+    # check nan
+    if result.isnull().any().any():
+        print("Warning: NaN values found in ranks DataFrame. This might affect mean ranks.")
+        print(ranks[ranks.isnull().any(axis=1)])
+        breakpoint()
+
+
+
 
     # -------- Step 5: Transpose ----------
     result_t = result.T

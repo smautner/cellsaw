@@ -101,7 +101,7 @@ import copy
 def makespace():
     return ho.spaceship(scalp.graph.integrate_params)
 
-def getdata(cells = 750, data  = 4, src= 'batch'):
+def getdata(cells = 750, data  = 8, src= 'batch'):
     if src == 'batch':
         r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells,filter_clusters=15, slow=1))
     else:
@@ -138,7 +138,7 @@ def ho_eval(data, **kwargs):
         if k.endswith('k'):
             kwargs[k] = int(v)
     r = eval_fast(data,0,**kwargs)
-    return r['label_mean'] * r['batch_mean']
+    return 1.5 * r['label_mean'] + r['batch_mean']
 
 
 
