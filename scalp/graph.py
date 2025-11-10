@@ -720,6 +720,7 @@ def integrate(adata,*, base = 'pca40',
               hub2_k = 5,
               hub1_algo = 1,
               hub2_algo = 2,
+               smartcut = False, # experimenting with looking up if neighbors are close in the projection
               outlier_threshold= .76):
 
     # make sure the input is in the right format
@@ -762,14 +763,26 @@ def integrate(adata,*, base = 'pca40',
                 return distances
             # this is a case for k-start :) from ug.hubness
             distances = hubness(distances, hub2_k, hub2_algo)
-            i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distances, 1,outlier_threshold, False)
+
+            if not smartcut:
+                i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distances, 1,outlier_threshold, False)
+            else:
+                i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(distances,1)
             return i_ids, j_ids
+
+
 
     n_datas = len(Xlist)
     tasks =  [(i,j) for i in range(n_datas) for j in range(i,n_datas)]
     parts = Map( make_distance_matrix, tasks)
     getpart = dict(zip(tasks,parts))
 
+
+    if smartcut:
+        neighDepLinAsiCut(getpart, outlier_threshold,k)
+
+
+    #
     blockdict = {(i,i): getpart[(i,i)] for i in range(n_datas)}
     tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
     for i,j in tasks:
@@ -779,6 +792,7 @@ def integrate(adata,*, base = 'pca40',
         # i,i is the reference now
         imatch, jmatch  = getpart[(i,j)]
         blockdict[(j,i)]  = mkblock( getpart[(i,i)] , jmatch, imatch )
+
     # MAKE THE MATRIX
     # check_symmetric(distance_matrix,raise_exception=True)
     # so.heatmap(distance_matrix.todense(), dim = (100,100))
@@ -786,14 +800,36 @@ def integrate(adata,*, base = 'pca40',
     for i in range(stack.shape[0]): stack[i,i] = 0
     return stack
 
+def neighDepLinAsiCut(blockdict, thresh, k):
+    # minhits = (1-thresh) * k
+
+    for (i,j) in list(blockdict.keys()):
+        if i!=j:
+            a = blockdict[(i,i)]
+            b = blockdict[(j,j)]
+            aaa = blockdict[(i,j)]
+            lookup = dict(zip(*aaa))
+            # lookup2 = dict(zip(*aaa[::-1])) back and forth should always be the same
+            # mask = np.ones(aaa[0].shape)
+            hit_score = []
+            for x,(k,v) in enumerate(zip(*aaa)): # all the connections
+                hits = sum ([lookup.get(e,-1) in b.rows[v]  for e in a.rows[k] ]) -1 # is my neighbor in the partner neighbor list?
+                hit_score.append(hits)
+                # if hits < (minhits*2): mask[x] = 0
+
+            cut  = np.sort(hit_score)[int(len(hit_score) * thresh)]
+            mask = np.array(hit_score) >= cut
+            blockdict[(i,j)] = (aaa[0][mask==1], aaa[1][mask==1])
+
+
 def test_integrate():
     # make 2 random 10x10 matrices
     # and run integrate on them
     # import scalp.data as data
     # a = data.scib(scalp.test_config.scib_datapath, maxdatasets=3, maxcells = 100, datasets = ["Immune_ALL_hum_mou"]).__next__()
 
-    a= (np.random.random((10,200)),np.random.random((10,200)))
-    integrate(a)
+    a= (np.random.random((100,200)),np.random.random((100,200)))
+    integrate(a, smartcut=True)
 
 
 # def MP(distance_matrix, k=6):

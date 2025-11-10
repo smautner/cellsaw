@@ -83,12 +83,11 @@ def score_scib_metrics(dataset, embed):
     # embed = 'umap' if 'umap' in dataset.obsm else 'X_umap'
     sc =  metrics(dataset, dataset, 'batch', 'label', embed = embed,
                        isolated_labels_asw_=True, silhouette_=True, hvg_score_=True, graph_conn_=True,
-           pcr_=True,
+           pcr_=False, #!!!!!!!!!
              isolated_labels_f1_=True,
              trajectory_=False,
              nmi_=True,
             ari_=True )
-
     res =  dict(dict(sc)[0])
     for k in list(res.keys()):
         if np.isnan(res[k]):

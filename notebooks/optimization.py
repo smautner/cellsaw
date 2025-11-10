@@ -15,10 +15,10 @@ simplefilter(action='ignore', category=FutureWarning)
 
 
 '''
+THIS IS THE REAL OPTIMIZER :)
 import optimization as opt
 d= opt.getdata()
 opt.arun(d, 'nu')
-
 '''
 
 def eval_single(**kwargs):
@@ -88,7 +88,7 @@ import pandas as pd
 
 def eval_fast(X,y, **kwargs):
     n_comp = kwargs.pop('n_comp', None)
-    grap = scalp.graph.integrate(X, **kwargs)
+    grap = scalp.graph.integrate(X,smartcut=False,**kwargs)
     grap = grap!=0 # way faster and better
     # proj = umap.UMAP(n_neighbors=10, n_components=2).fit_transform(grap)
     return scalp.score.getscores(grap,X.obs['label'], X.obs['batch'], 5)
@@ -162,6 +162,7 @@ def arun(d,typ):
     if typ == 'rd':
         o= nutype.nutype(space,ho_eval, d, numsample= 32*runs, hyperband=[])
         o.opti()
+        o.print()
         return o.getmax()
     if typ == 'nu':
         o= nutype.nutype(space,ho_eval, d, numsample= 32, hyperband=[])
@@ -172,7 +173,7 @@ def arun(d,typ):
     so.lprint(z.score)
     # o.opti()
     #for i in range(5):o.opti()
-    # o.print()
+    o.print()
     return o.getmax()
 
 
