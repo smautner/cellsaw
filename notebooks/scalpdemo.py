@@ -42,8 +42,8 @@ demo.Scalp(ds)
 
 
 conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 10, 'slow':0}
-conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
 conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 0, 'slow':0}
+conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
 
 def get_data():
     if True:

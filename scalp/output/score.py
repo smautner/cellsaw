@@ -95,13 +95,13 @@ def score_scib_metrics(dataset, embed):
     res.pop('hvg_overlap',0)
     return res
 
-
+from scipy.stats import gmean
 def split_scib_scores(d):
     batchwords = 'PCR_batch ASW_label/batch graph_conn'.split()
     print(d.keys())
     def split(d):
-        batch = np.mean([v for k,v in d.items() if k in batchwords ])
-        bioconservation = np.mean([v for k,v in d.items() if not k in batchwords ])
+        batch = gmean([v for k,v in d.items() if k in batchwords ])
+        bioconservation = gmean([v for k,v in d.items() if not k in batchwords ])
         return bioconservation,batch
 
     return split(d)

@@ -128,6 +128,8 @@ def hyp():
 
 
 
+from scipy.stats import gmean
+
 def ho_eval(data, **kwargs):
     if kwargs.get('k',0) <1: return 0
     if kwargs.get('hub1_k',0) <1: return 0
@@ -138,7 +140,8 @@ def ho_eval(data, **kwargs):
         if k.endswith('k'):
             kwargs[k] = int(v)
     r = eval_fast(data,0,**kwargs)
-    return 1.5 * r['label_mean'] + r['batch_mean']
+    #return 1.5 * r['label_mean'] + r['batch_mean']
+    return gmean([ r['label_mean'] , r['batch_mean']])
 
 
 
@@ -155,10 +158,10 @@ hub2_k -> hub2_algo
 '''
 from ubergauss.optimization import nutype, gatype, grid1type
 import structout as so
-def arun(d,typ):
+def arun(d,typ, T= True):
     runs = 10
     if typ == 'ga':
-        o= gatype.nutype(space,ho_eval, d, numsample= 32, hyperband=[])
+        o= gatype.nutype(space,ho_eval, d, numsample= 32, hyperband=[], T = T)
     if typ == 'rd':
         o= nutype.nutype(space,ho_eval, d, numsample= 32*runs, hyperband=[])
         o.opti()
@@ -176,12 +179,49 @@ def arun(d,typ):
     o.print()
     return o.getmax()
 
-
 # 4      20          1      15  15           0.521994          0  1.776236  0.576978
 # 4       9          1      10  15           0.549294          0  1.799206  0.578037
 # 3      20          1      12  15           0.521006          0  1.809666  0.579953
 # 2      13          0      20  11           1.000000               2.11
 # 4      20          4      11  20           0.999917           2.086836
+
+import copy
+def optimize_ga(d):
+    gaSpace= '''
+    numsample_factor 0.1 1
+    maxold .1 1
+    mutation_rate .02 .3
+    '''
+    def gaEval(o2,  **params):
+        o2.__dict__.update(params)
+        def get(o3):
+            # o= gatype.nutype(space, ho_eval, d, numsample= 10, **params)
+            o3.nuParams()
+            [o3.opti() for i in range(8)]
+            return o3.getmax()
+        return np.mean([get(copy.deepcopy(o2)) for e in range(3)])
+
+    o2= gatype.nutype(space, ho_eval, d, numsample= 20)
+    o2.opti()
+
+
+    o= gatype.nutype(gaSpace,gaEval, [[o2]], numsample= 50, mp = True)
+    o.opti()
+    print(o.runs[-1])
+
+    # o.opti()
+    # print(o.runs[-1])
+    # o.opti()
+    # print(o.runs[-1])
+    # o.print()
+    # print(o.runs[-1])
+    # o.print()
+
+    return o
+
+
+
+
 
 
 
@@ -271,3 +311,7 @@ def test_ga():
     [o.opti() for _ in range(5)]
     o.print()
     # o.print_more()
+
+
+
+
