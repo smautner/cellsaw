@@ -75,6 +75,7 @@ import scanpy as sc
 from scalp import graph as sgraph
 from scipy.sparse import csr_matrix
 import scalp.data.similarity as sim
+import scalp.data.transform as trans
 import umap
 import pandas as pd
 
@@ -106,15 +107,22 @@ def Scalp(dataset, dim = 2, ot= .97):
          'standardize': 0}
     # parm = {'add_tree': True, 'copy_lsa_neighbors': False, 'inter_outlier_probabilistic_removal': False,  'inter_outlier_threshold': 0.72, 'intra_neighbors_mutual': False, 'neighbors_intra_fraction': 0, 'neighbors_total': 1}
     # grap = scalp.mkgraph(dataset,**bestparm)
-    # stair =  sim.make_stairs(3,[0,1])
-    # grap = scalp.graph.integrate(dataset, k=10, dataset_adjacency=stair, ls=False)
+
+
+    # asd = trans.split_by_obs(dataset)
+    # for aa in asd:
+    #     z = np.var(ut.zehidense(aa.X),axis=0)
+    #     # print(z.A1.shape)
+    #     aa.var['myvar'] =z
+    # stair =  sim.dynamic_sim(asd, hvg='myvar')
+    # print(stair)
 
     # hub1_algo  hub1_k  hub2_algo  hub2_k   k  outlier_threshold  config_id     score       time
     #   0       9          3       9          19           0.970536    30  2.188789  15.822385
     # 0      10          3       6  15
     # grap = scalp.graph.integrate(dataset,hub1_algo = 0, hub1_k = 10,  hub2_algo=3, hub2_k=6,  k=15,  dataset_adjacency=None, outlier_threshold=ot)
 
-    grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2, hub2_k=12,  k=12,  dataset_adjacency=None, outlier_threshold=ot)
+    grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2, hub2_k=12,  k=12,  dataset_adjacency=False, outlier_threshold=ot)
     grap = grap != 0
 
 
@@ -420,6 +428,112 @@ def split_sc2(scores, datasets):
     return batch, timeseries
 
 
+import matplotlib.transforms as mtrans
+
+
+
+
+def barplot(geomean, datasets):
+    ax = plt.gca()
+
+    # --- 1. Data Preparation ---
+    geomean.index.name = 'method'
+    df_melted = geomean.reset_index().melt(id_vars='method', var_name='dataset', value_name='score')
+
+    # Logic for grouping
+    df_melted['group'] = ['timeseries' if datasets[int(i)].uns['timeseries'] else 'batch' for i in df_melted.dataset]
+    df_melted['size'] = [len(np.unique(datasets[int(i)].obs['batch'])) for i in df_melted.dataset]
+
+    # --- 2. Ordering & Palette ---
+    order = sorted([m for m in df_melted['method'].unique() if 'Scalp' in m],
+                   key=lambda x: float(x.split(': ')[1])) + \
+            sorted([m for m in df_melted['method'].unique() if 'Scalp' not in m])
+
+    palette = makepalette(order)
+
+    # --- 3. Plotting (Horizontal) ---
+    # orient='h' ensures bars run horizontally
+    sns.boxplot(data=df_melted, y="method", x="score", hue="group",
+                palette="Blues", order=order, ax=ax, orient='h')
+
+    # --- 4. Styling ---
+    ax.set_ylabel('') # Remove generic 'method' label
+    ax.set_xlabel('Score', fontsize=12)
+    ax.tick_params(axis='y', labelsize=11) # Method names
+    ax.tick_params(axis='x', labelsize=11) # Scores
+
+    # Apply colors to Y-tick labels (Method names)
+    [i.set_color(palette.get(i.get_text(), 'gray')) for i in ax.get_yticklabels()]
+
+    ax.grid(True, linestyle='--', alpha=0.6)
+    ax.set_axisbelow(True)
+
+    # --- 5. Legend (Upper Right) ---
+    # Moved to upper right as requested.
+    # framealpha adds transparency in case it overlaps with long bars.
+    ax.legend(loc='upper right', borderaxespad=0.5, fontsize=10, framealpha=0.9)
+    plt.show()
+
+
+def bluestar(scores2):
+    ax = plt.gca()
+
+    # --- 1. Data Preparation ---
+    scores2_df = pd.DataFrame(scores2)
+    z = scores2_df[scores2_df.method != 'scalp'].copy()
+
+    # Stats
+    z_stats = z.groupby("method").agg(
+        label_mean=("label_mean", "mean"),
+        label_std=("label_mean", "std"),
+        batch_mean=("batch_mean", "mean"),
+        batch_std=("batch_mean", "std")
+    ).reset_index()
+
+    # --- 2. Ordering & Palette ---
+    all_methods = sorted(z_stats['method'].unique())
+    palette = makepalette(all_methods)
+
+    scalp_methods = sorted([m for m in all_methods if "Scalp:" in m],
+                           key=lambda x: float(x.split(': ')[1]))
+    other_methods = [m for m in all_methods if "Scalp:" not in m]
+    legend_order = other_methods + scalp_methods
+
+    # --- 3. Plotting ---
+    for method_name in legend_order:
+        row = z_stats[z_stats['method'] == method_name]
+        if not row.empty:
+            row = row.iloc[0]
+            color = palette.get(method_name, 'gray')
+
+            ax.errorbar(
+                x=row["label_mean"],
+                y=row["batch_mean"],
+                xerr=row["label_std"],
+                yerr=row["batch_std"],
+                fmt='o',
+                label=method_name,
+                color=color,
+                alpha=1,
+                capsize=3,
+                markersize=8
+            )
+
+    # --- 4. Styling ---
+    ax.set_xlabel("Label Mean Score", fontsize=12)
+    ax.set_ylabel("Batch Mean Score", fontsize=12)
+    ax.tick_params(labelsize=11)
+    ax.grid(True, linestyle='--', alpha=0.6)
+
+    # --- 5. Legend (Tighter Layout) ---
+    # Adjusted bbox_to_anchor to reduce gap between axis and legend
+    # Moved from -0.15/-0.25 to -0.12 to sit closer to the labels
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
+              ncol=4, frameon=False, fontsize=10)
+
+    plt.show()
+'''
+
 
 def bluestar(scores2):
     """
@@ -441,18 +555,7 @@ def bluestar(scores2):
         "BBKNN": "green",
         "ComBat": "purple",
         "Harmony" : "orange",
-
-        # "Scalp: 0.15": "#f0f8ff",   # AliceBlue, almost white
-        # "Scalp: 0.25": "#dceefb",  # Original very light blue
-        # "Scalp: 0.35": "#a7cce5",  # Original lighter blue
-        # "Scalp: 0.45": "#73b0da",  # Mid-point light blue
-        # "Scalp: 0.55": "#4892c7",
-        # "Scalp: 0.65": "#1f77b4",  # Original medium blue
-        # "Scalp: 0.75": "#165a87",  # Original dark blue
-        # "Scalp: 0.85": "#0f3e5a",  # Original dark blue
-        # "Scalp: 0.95": "#0b2b40"    # Darkest blue
-
-    }
+   }
 
     # Define methods that should appear at the end with specific colors
     # Get all unique methods present in the dataframe
@@ -539,8 +642,9 @@ def bluestar(scores2):
                 fmt='o',  # format for the markers
                 label=method_name,
                 color=color,
-                capsize=5,  # size of the caps on the error bars
-                markersize=8
+                alpha = 1,
+                capsize=3,  # size of the caps on the error bars
+                markersize=5
             )
 
     # Customize legend and labels
@@ -553,7 +657,6 @@ def bluestar(scores2):
 
     return
 
-import matplotlib.transforms as mtrans
 
 
 def barplot(geomean, datasets):
@@ -602,7 +705,7 @@ def barplot(geomean, datasets):
 
 
     plt.show()
-
+'''
 
 def barplot_backup_delMe(geomean, datasets):
 

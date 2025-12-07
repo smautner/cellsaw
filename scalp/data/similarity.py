@@ -48,17 +48,51 @@ def make_star(size = 5, center =2):
     ret[:,center] = 1
     return ret
 
-
-def jaccard_distance(a,b, num_genes):
-    binarized_hvg = np.array([ ut.binarize(d,num_genes) for d in [a,b] ])
-    union = np.sum(np.any(binarized_hvg, axis=0))
-    intersect = np.sum(np.sum(binarized_hvg, axis=0) ==2)
-    return intersect/union
+# from ubergauss import tools as ut
+#  .,..
+# def jaccard_distance(a,b, num_genes):
+#     binarized_hvg = np.array([ ut.binarize(d,num_genes) for d in [a,b] ])
+#     union = np.sum(np.any(binarized_hvg, axis=0))
+#     intersect = np.sum(np.sum(binarized_hvg, axis=0) ==2)
+#     return intersect/union
+# def similarity(adatas, hvg_name = 'cell_ranger', num_genes = 2000):
+#     assert hvg_name in adatas[0].var, 'not annotated..'
+#     genescores = [a.var[hvg_name] for a in adatas]
+#     # genescores = [a.uns[hvg_name] for a in adatas]
+#     res = [[ jaccard_distance(a,b, num_genes = num_genes) for a in genescores] for b in genescores]
+#     return np.array(res)
 
 
 def similarity(adatas, hvg_name = 'cell_ranger', num_genes = 2000):
     assert hvg_name in adatas[0].var, 'not annotated..'
-    #genescores = [a.var[hvg_name] for a in adatas]
-    genescores = [a.uns[hvg_name] for a in adatas]
-    res = [[ jaccard_distance(a,b, num_genes = num_genes) for a in genescores] for b in genescores]
-    return np.array(res)
+    gs = np.array([a.var[hvg_name] for a in adatas])
+    # genescores = [a.uns[hvg_name] for a in adatas]
+    return gs @ gs.T
+
+
+
+
+
+
+
+
+from scipy.sparse.csgraph import connected_components
+from ubergauss import hubness
+def dynamic_sim(adatas, hvg = 'myvar'):
+    matrix = similarity(adatas, hvg_name= hvg)
+    fallback= np.ones_like(matrix) # Fallback fully connected
+    if matrix.shape[0] <=3 :
+        return fallback
+
+    k = int(matrix.shape[0]*.5)
+    matrix = hubness.justtransform(matrix,k = k)
+    # we see the matrix as an adjacency matrix, find the minimum  threshold such that all nodes are still connected
+    # its ok to just try all the tresholds
+    thresholds = np.sort(np.unique(matrix.flatten()))
+    for t in thresholds:
+        adj = (matrix <= t).astype(int)
+        # Check connectivity using BFS/DFS or scipy.sparse.csgraph.connected_components
+        asd = connected_components(adj, directed=False)
+        if asd[0] == 1:
+            return matrix <=  t
+    return fallback

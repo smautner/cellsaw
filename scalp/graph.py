@@ -16,6 +16,7 @@ from scipy.sparse import csr_matrix, lil_matrix
 from scipy.stats import rankdata
 from collections import defaultdict
 from sklearn import preprocessing as skprep
+from ubergauss import hubness as uhub
 
 # import matplotlib
 # matplotlib.use('module://matplotlib-backend-sixel')
@@ -747,22 +748,25 @@ def integrate(adata,*, base = 'pca40',
     def make_distance_matrix(ij):
             i,j = ij
 
-            if not adjacent(i,j):
-                return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
-
             distances= metrics.pairwise_distances(Xlist[i],Xlist[j], metric=metric)
 
             if i == j:
 
                 assert distances.shape[0] > 50, 'very few cells in dataset, you messed up!'
-                distances = hubness(distances, hub1_k, hub1_algo)
+                distances = uhub.justtransform(distances, hub1_k, hub1_algo)
                 distances = fast_neighborgraph(distances, k)
                 np.fill_diagonal(distances,1)
                 distances = sparse.lil_matrix(distances)
                 # if find_duplicate_rows(distances): breakpoint()# DEBUG, DELETE ME
                 return distances
             # this is a case for k-start :) from ug.hubness
-            distances = hubness(distances, hub2_k, hub2_algo)
+            # distances = hubness(distances, hub2_k, hub2_algo)
+            distances = uhub.justtransform(distances, hub1_k, hub1_algo,kstart = 0) # changing k-start since i != j
+
+
+
+            if not adjacent(i,j):
+                return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)
 
             if not smartcut:
                 i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distances, 1,outlier_threshold, False)
@@ -850,49 +854,7 @@ def test_integrate():
 #     MP = P * P.T
 #     return MP
 
-from ubergauss import hubness as uhub
 def hubness(d,k,algo):
     return uhub.transform_experiments(d,k,algo)
 
-# def hubness_old(distance_matrix, k=6, algo = 0):
-#     """
-#     0 -> do nothing
-#     1 -> normalize by norm
-#     2 -> csls
-#     3 -> ls
-#     4 -> nicdm
-#     """
-#     if algo == 0:
-#         return distance_matrix
-#     if algo == 1:
-#         return sklearn.preprocessing.normalize(distance_matrix, axis = 0)
 
-#     # if algo == 2:
-#     #     return MP(distance_matrix, k + 15)
-
-#     funcs = [csls_, ls, nicdm, ka, another]
-#     f = funcs[algo-2]
-
-#     n = distance_matrix.shape[0]
-#     # scaled_distances = distance_matrix.copy()
-#     knn = np.partition(distance_matrix, k+1, axis=1)[:, :k+1]  # +1 to account for self
-#     knn = np.sort(knn, axis = 1)
-#     knn = knn[:,1:].mean(axis = 1)
-
-#     # Apply scaling
-#     for i in range(n):
-#         for j in range(n):
-#             v = distance_matrix[i,j]
-#             distance_matrix[i,j]  =  f(v,knn[i],knn[j])
-#     return distance_matrix
-
-# def csls_(v,i,j):
-#     return v*2 -i -j
-# def ls(v,i,j):
-#     return 1- np.exp(- v**2/(i*j) )
-# def nicdm(v,i,j):
-#     return v /  np.sqrt(i*j)
-# def ka(v,i,j):
-#     return v / i +  v/j
-# def another(v,i,j):
-#     return v * j ** .5

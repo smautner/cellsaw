@@ -310,6 +310,85 @@ def plot2(adata, embedding1, embedding2, **plotargs):
 
 
 
+def plot4(adatas:list, label='label', embedding_key = 'scalp', headline = 'someplot', plotnames = 'ABCD'):
+    '''
+    plot the 4 adatas in a row, nothing fancy, legendplacement might be like plot2
+    '''
+
+    num_adatas = len(adatas)
+
+    # Collect all unique labels across all datasets for a combined legend
+    all_unique_labels = sorted(list(set(cat for adata in adatas for cat in adata.obs[label].astype(str).unique())))
+    n_labels = len(all_unique_labels)
+
+    # Use a consistent color palette
+    if n_labels <= 20:
+        label_palette = sns.color_palette("tab20", n_labels)
+    else:
+        label_palette = sns.color_palette("hls", n_labels)
+
+    label_to_color = {lbl: color for lbl, color in zip(all_unique_labels, label_palette)}
+
+    # Create figure and GridSpec for plots and a shared legend
+    fig_width_per_plot = 6
+    fig_height = 7 # Adjust height for legend below plots
+    fig = plt.figure(figsize=(num_adatas * fig_width_per_plot, fig_height))
+    gs = fig.add_gridspec(2, num_adatas, height_ratios=[8, 1])
+
+    # Plot each AnnData object
+    for i, adata in enumerate(adatas):
+        X = adata.obsm[embedding_key]
+        if X.shape[1] > 2:
+            # Reduce to 2D using UMAP if embedding is higher dimension
+            X_2d = umap.UMAP(n_components=2, random_state=42).fit_transform(X)
+        else:
+            X_2d = X
+
+        current_labels = adata.obs[label].astype(str)
+
+        ax = fig.add_subplot(gs[0, i]) # Plot in the first row
+        sns.scatterplot(x=X_2d[:, 0], y=X_2d[:, 1], hue=current_labels,
+                        palette=label_to_color, ax=ax, s=16, legend=False)
+
+        ax.set_title(plotnames[i])
+        # ax.set_title(adata.uns.get('name', f'Dataset {i+1}'))
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+    # Create a dummy subplot for the combined legend
+    legend_ax = fig.add_subplot(gs[1, :]) # Span all columns in the second row
+    legend_ax.axis('off') # Hide axes for the legend
+
+    # Create the combined legend handles and labels
+    handles = []
+    labels = []
+    # can we not display the acutal labels, but say cell type n"?  yust output the code that i need to put here!
+
+    for idx, lbl in enumerate(all_unique_labels):
+        handles.append(plt.Line2D([0], [0], marker='o', color='w',
+                                  markerfacecolor=label_to_color[lbl],
+                                  markersize=10))
+        labels.append(f"Cell Type {idx+1}") # Changed to "Cell Type n"
+
+
+    # for lbl in all_unique_labels:
+    #     handles.append(plt.Line2D([0], [0], marker='o', color='w',
+    #                               markerfacecolor=label_to_color[lbl],
+    #                               markersize=10))
+    #     labels.append(lbl)
+
+    legend_ax.legend(handles=handles, labels=labels, loc='center',
+                     ncol= 5,
+                     fontsize='small', frameon=False)
+
+    plt.suptitle(f"{headline}", y=0.98, fontsize=16) # Main title for the figure
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95]) # Adjust layout to make space for suptitle and legend
+    plt.show()
+
 def test_scalp():
     n_cells = 100
     a = data.scib(test_config.scib_datapath, maxdatasets=3,
