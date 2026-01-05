@@ -753,7 +753,8 @@ def integrate(adata,*, base = 'pca40',
             if i == j:
 
                 assert distances.shape[0] > 50, 'very few cells in dataset, you messed up!'
-                distances = uhub.justtransform(distances, hub1_k, hub1_algo)
+                # distances = uhub.justtransform(distances, hub1_k, hub1_algo)
+                distances = uhub.transform_experiments(distances, hub1_k, hub1_algo)
                 distances = fast_neighborgraph(distances, k)
                 np.fill_diagonal(distances,1)
                 distances = sparse.lil_matrix(distances)
@@ -761,7 +762,7 @@ def integrate(adata,*, base = 'pca40',
                 return distances
             # this is a case for k-start :) from ug.hubness
             # distances = hubness(distances, hub2_k, hub2_algo)
-            distances = uhub.justtransform(distances, hub1_k, hub1_algo,kstart = 0) # changing k-start since i != j
+            distances = uhub.transform_experiments(distances, hub2_k, hub2_algo, startfrom = 0) # changing k-start since i != j
 
 
 
@@ -791,6 +792,7 @@ def integrate(adata,*, base = 'pca40',
     tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]
     for i,j in tasks:
         blockdict[(i,j)]  = mkblock( getpart[(j,j)] , *getpart[(i,j)])
+
     for i,j in tasks:
         # ok so we fill the mirror too... breaking symmetry
         # i,i is the reference now

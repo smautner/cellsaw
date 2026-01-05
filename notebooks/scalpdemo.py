@@ -31,34 +31,34 @@ warnings.filterwarnings("ignore", module="anndata")
 
 
 '''
-HOWTO:
-import scalpdemo as demo
-ds,d = demo.get_data()
-demo.Scalp(ds)
+# use scalp env :)
+import scalpdemo    as sd
+datasets, dataset = sd.get_data()
+datasets = Map(sd.Scalp, datasets)
+scores = sd.scalpscore(datasets)
+sd.scalp.plot(datasets[3], 'scalp', color = ['label', 'batch'])
 '''
 
 
 # In[3]:
 
+configs  = [
+ {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}, # debug
+    {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 0, 'slow':0}, # real data
+ {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 10, 'slow':0} # plotting
+]
 
-conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 10, 'slow':0}
-conf = {'maxdatasets':10, 'maxcells':1000,'filter_clusters': 0, 'slow':0}
-conf = {'maxdatasets':4, 'maxcells':500,'filter_clusters': 10, 'slow':0}
+def get_data(config =0):
+    conf = configs[config]
 
-def get_data():
-    if True:
-        datasets = scalp.data.scmark(scalp.test_config.scmark_datapath,  **conf)
-        print(f"{len(datasets)=}")
-        datasets += scalp.data.timeseries(scalp.test_config.timeseries_datapath,**conf)
-        print(f"{len(datasets)=}")
-        datasets +=scalp.data.scib(scalp.test_config.scib_datapath,**conf)
-        print(f"{len(datasets)=}")
-        dataset = datasets[12]
-    else:
-        datasets = list(scalp.data.timeseries(scalp.test_config.timeseries_datapath,datasets = ['s5'],**conf))
-        dataset = datasets[0]
+    datasets = scalp.data.scmark(scalp.test_config.scmark_datapath,  **conf)
+    print(f"{len(datasets)=}")
+    datasets += scalp.data.timeseries(scalp.test_config.timeseries_datapath,**conf)
+    print(f"{len(datasets)=}")
+    datasets +=scalp.data.scib(scalp.test_config.scib_datapath,**conf)
+    print(f"{len(datasets)=}")
 
-    return datasets, dataset
+    return datasets, datasets[12]
 
 def get_is_ts(datasets):
     return [d.uns['timeseries'] for d in datasets]
@@ -105,6 +105,7 @@ def Scalp(dataset, dim = 2, ot= .97):
          'horizonCutoff': 60,
          'distance_metric': 'euclidean',
          'standardize': 0}
+
     # parm = {'add_tree': True, 'copy_lsa_neighbors': False, 'inter_outlier_probabilistic_removal': False,  'inter_outlier_threshold': 0.72, 'intra_neighbors_mutual': False, 'neighbors_intra_fraction': 0, 'neighbors_total': 1}
     # grap = scalp.mkgraph(dataset,**bestparm)
 
@@ -164,8 +165,10 @@ def Scalp(dataset, dim = 2, ot= .97):
     # projection = scalp.umapwrap.graph_umap(False,grap,label = 'umap', n_components = dim) # THIS IS WHAT WE WANT TO USE I GUESS
     # print("umap done")
     dataset.obsm['scalp']= grap
-    dataset.uns.setdefault('integrated',[])
-    dataset.uns['integrated'].append('scalp')
+    # dataset.uns.setdefault('integrated',[])
+    # dataset.uns['integrated'].append('scalp')
+    dataset.uns.setdefault('methods',[])
+    dataset.uns['methods'].append('scalp')
     return dataset
 
 
@@ -472,17 +475,18 @@ def barplot(geomean, datasets):
     # Moved to upper right as requested.
     # framealpha adds transparency in case it overlaps with long bars.
     ax.legend(loc='upper right', borderaxespad=0.5, fontsize=10, framealpha=0.9)
+    fig = plt.gcf()
     plt.show()
+    return fig
+
 
 
 def bluestar(scores2):
-    ax = plt.gca()
 
     # --- 1. Data Preparation ---
     scores2_df = pd.DataFrame(scores2)
     z = scores2_df[scores2_df.method != 'scalp'].copy()
 
-    # Stats
     z_stats = z.groupby("method").agg(
         label_mean=("label_mean", "mean"),
         label_std=("label_mean", "std"),
@@ -490,16 +494,20 @@ def bluestar(scores2):
         batch_std=("batch_mean", "std")
     ).reset_index()
 
-    # --- 2. Ordering & Palette ---
+    # --- 2. Ordering & Color Palette ---
     all_methods = sorted(z_stats['method'].unique())
     palette = makepalette(all_methods)
 
-    scalp_methods = sorted([m for m in all_methods if "Scalp:" in m],
-                           key=lambda x: float(x.split(': ')[1]))
+    scalp_methods = sorted([m for m in all_methods if "Scalp:" in m], key=lambda x: float(x.split(': ')[1]))
     other_methods = [m for m in all_methods if "Scalp:" not in m]
     legend_order = other_methods + scalp_methods
 
+
+    legend_order = legend_order[::-1]
+
     # --- 3. Plotting ---
+    ax = plt.gca()
+    sns.reset_defaults()
     for method_name in legend_order:
         row = z_stats[z_stats['method'] == method_name]
         if not row.empty:
@@ -515,23 +523,28 @@ def bluestar(scores2):
                 label=method_name,
                 color=color,
                 alpha=1,
-                capsize=3,
-                markersize=8
+                capsize=0,
+                markersize=0
             )
-
+    fontsize = 12
+    sns.set(rc={ 'xtick.labelsize': fontsize, 'ytick.labelsize': fontsize})
     # --- 4. Styling ---
-    ax.set_xlabel("Label Mean Score", fontsize=12)
-    ax.set_ylabel("Batch Mean Score", fontsize=12)
-    ax.tick_params(labelsize=11)
-    ax.grid(True, linestyle='--', alpha=0.6)
+    # ax.tick_params(labelsize=12)
+    ax.tick_params(axis='both', which='both', direction='out', length=4, width=1, colors='black', bottom=True, top=False, left=True, right=False)
+    ax.grid(True, linestyle='--', alpha=0.7)
 
+    ax.set_ylabel("Batch Mean Score", fontsize=fontsize)
+    ax.set_xlabel("Label Mean Score", fontsize=fontsize)
+    ax.tick_params(axis='both', labelsize=fontsize)
     # --- 5. Legend (Tighter Layout) ---
     # Adjusted bbox_to_anchor to reduce gap between axis and legend
     # Moved from -0.15/-0.25 to -0.12 to sit closer to the labels
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12),
-              ncol=4, frameon=False, fontsize=10)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=3, frameon=False, fontsize=fontsize)
 
+    fig = plt.gcf()
     plt.show()
+    return fig
+
 '''
 
 
@@ -657,55 +670,53 @@ def bluestar(scores2):
 
     return
 
+'''
 
 
-def barplot(geomean, datasets):
+def barplot_v2(geomean, datasets):
 
+    # make data
     geomean.index.name = 'method'
     df_melted = geomean.reset_index().melt(id_vars='method', var_name='dataset', value_name='score')
-    #df_melted['group'] = np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
     df_melted['group'] = [ 'timeseries' if datasets[int(i)].uns['timeseries'] else 'batch'  for i in  df_melted.dataset] # np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
     df_melted['size'] = [ len(np.unique(datasets[int(i)].obs['batch']) ) for i in  df_melted.dataset] # np.where(df_melted.dataset.astype(int) < 13 , 'timeseries', 'batch')
-    # df_melted['group']=df_melted.dataset.astype(int) % 16
 
+
+    # colors, fontsize  and label order
     palette = fixed_color_methods
-
-    # custom colors like this:
-    # group_palette = {"timeseries": sns.color_palette("Blues")[2], "batch": sns.color_palette("Blues")[0]}
-
+    size = 12
+    sns.set(rc={"font.size":size,"axes.titlesize":size,"axes.labelsize":size,   'xtick.labelsize': size, 'ytick.labelsize': size,},style="white")
     order = sorted([m for m in df_melted['method'].unique() if 'Scalp' in m],
                    key=lambda x: float(x.split(': ')[1])) + sorted([m for m in
             df_melted['method'].unique() if 'Scalp' not in m])
     palette  = makepalette(order)
-    # g = sns.boxplot( data=df_melted, x="method", y="score", hue ="group", palette= "Blues", order = order)
+
+    # PAINTING
     g = sns.boxplot( data=df_melted, x="method", y="score", hue ="group", palette= "Blues", order = order)
 
+    g.set_ylabel('Score')
+    g.set_xlabel(None)
 
 
+    # TICKS
     g.set_xticklabels(rotation=45, labels = order, ha = 'right', x= 4)
-    #g.set_xticklabels(rotation=45, labels = np.unique(df_melted.method), ha = 'right', x= 4)
-
     for i, label in enumerate(g.get_xticklabels()):
         label.set_x(i+ 0.6)
+    g.tick_params(axis='both', which='both', direction='out', length=4, width=1, colors='black', bottom=True, top=False, left=True, right=False)
     # Apply a translation to all x-tick labels
-    offset = mtrans.ScaledTranslation(.1, .90, g.figure.dpi_scale_trans)
+    offset = mtrans.ScaledTranslation(.1, 1.2, g.figure.dpi_scale_trans)
     for label in g.get_xticklabels():
         label.set_transform(g.transData + offset)
-        #g.set_xticklabels(rotation=45, labels=np.unique(df_melted.method), ha='right')
+    # THIS WOULD BRING THE COLORS BACK:
+    # [i.set_color( palette.get(i._text,'gray')) for  i in g.get_xticklabels()]
+    plt.grid(True, axis="y", linestyle="--", alpha=0.7)
 
-    # colors = [palette.get(label, 'gray') for label in np.unique(df_melted.method)]
-    # [t.set_color(i) for (i,t) in zip(colors,g.get_xticklabels())]
-    #print(g.get_xticklabels()[0].__dict__)
-    [i.set_color( palette.get(i._text,'gray')) for  i in g.get_xticklabels()]
-
-    plt.grid(True, linestyle='--', alpha=0.6)
+    # LEGEND + RETURN
     plt.gca().set_axisbelow(True)
-
-    plt.legend(bbox_to_anchor=(.2, .25), loc='upper left', borderaxespad=0.)
-
-
+    plt.legend(bbox_to_anchor=(.2, .25), loc='upper left', borderaxespad=0)
+    fig = plt.gcf()
     plt.show()
-'''
+    return fig
 
 def barplot_backup_delMe(geomean, datasets):
 
@@ -786,7 +797,7 @@ def subsample_adata_by_batches(adata, num_batches, cells_per_batch, random_state
     return concatenated_adata
 
 
-def make_timetable(datasets):
+def make_timetable(datasets, datapoints = 9):
     '''
     Generates and plots a timetable of integration method runtimes
     for different dataset sizes based on varying number of batches and cells per batch.
@@ -796,10 +807,10 @@ def make_timetable(datasets):
     '''
     # The task specifies to use datasets[13] for this experiment
     original_dataset = datasets[13]
-
+    assert datapoints < 10
     # Define the (A, B) pairs as specified in the prompt
     x_axis_configs = []
-    for A in Range(2, 11): # A ranges from 2 to 10
+    for A in Range(2, 2+datapoints): # A ranges from 2 to 10
         B = A * 100      # B ranges from 200 to 1000 (A*100)
         x_axis_configs.append((A, B))
 
@@ -816,7 +827,7 @@ def make_timetable(datasets):
 
         # Run all integration methods on the subsampled dataset
         # run_all expects a list of datasets, so we wrap sub_dataset in a list
-        _, fnames, runtimes_dict = run_all([sub_dataset], [.55])
+        _, fnames, runtimes_dict = run_all([sub_dataset], scalpvalues= [.55])
 
         config_label = f"{num_batches}x{cells_per_batch}"
 
@@ -837,23 +848,60 @@ def make_timetable(datasets):
 
     # Convert collected data to a DataFrame for easy plotting
     runtimes_df = pd.DataFrame(all_runtimes_data)
-    plotruntimes(runtimes_df)
-    return runtimes_df # Optionally return the dataframe
+    # print(runtimes_df)
+    return  runtimes_df #plotruntimes(runtimes_df)
+    # return runtimes_df # Optionally return the dataframe
 
-def plotruntimes(runtimes_df):
+def plotruntimes_(runtimes_df):
     palette = makepalette(runtimes_df.method)
 
     # Plot the results
     # plt.figure(figsize=(12, 7))
     g = sns.lineplot(data=runtimes_df, x='config_label', y='runtime',palette=palette, hue='method', marker='o')
+
     g.grid(True, linestyle='--', alpha=0.7)
-    plt.title('Integration Method Runtimes Across Dataset Sizes')
+    # plt.title('Integration Method Runtimes Across Dataset Sizes')
+    plt.xlabel('Number of Batches x Cells per Batch')
+    plt.ylabel('Runtime (seconds)')
+    plt.xticks(rotation=45, ha='right')
+
+    plt.tick_params(axis='both', which='both', direction='out', length=4, width=1, colors='black', bottom=True, top=False, left=True, right=False)
+    plt.tight_layout()
+
+    # plt.legend(bbox_to_anchor=(0.5, -.3), loc='upper center', ncol=3)
+    plt.legend(bbox_to_anchor=(0.5, -0.3), loc='upper center', ncol=3, frameon=False)
+    fig = plt.gcf()
+    plt.show()
+    return fig
+
+    # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    # fig = plt.gcf()
+    # plt.show()
+    # return fig
+
+
+def plotruntimes(runtimes_df):
+    palette = makepalette(runtimes_df.method.unique())
+
+    plt.figure(figsize=(12, 7)) # Create a figure explicitly for finer control
+
+    # Use 'g' for the Axes object returned by sns.lineplot
+    g = sns.lineplot(data=runtimes_df, x='config_label', y='runtime', hue='method',
+                     palette=palette, marker='o', linewidth=2.5) # Set consistent linewidth here
+
+    g.grid(True, linestyle='--', alpha=0.7)
     plt.xlabel('Number of Batches x Cells per Batch')
     plt.ylabel('Runtime (seconds)')
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    # Adjust legend position to avoid overlapping with plot elements
+    plt.legend(bbox_to_anchor=(0.5, -0.25), loc='upper center', ncol=3) # Moved down
+
+    fig = plt.gcf()
     plt.show()
+    return fig
+
 
 
 
