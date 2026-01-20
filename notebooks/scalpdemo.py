@@ -209,13 +209,19 @@ import time
 #def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
 # def run_all(datasets, scalpvalues = [.35,.55, .7,.75,.8, .9]):
 def run_all(datasets, scalpvalues = [.15,.2, .25, .3, .35, .45,  .55, .7, .9]):
+
+
+    # SETUP TASKS
     funcs = [scalp.mnn.harmony, scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat]
     for ot in scalpvalues:
         funcs.append( functools.partial(Scalp, ot=ot))
     fuid = Range(funcs)
     dataid = Range(datasets)
     tasks = [(f,d) for f in fuid for d in dataid]
+    fnames = 'Harmony Scanorama BBKNN ComBat'.split()
+    fnames+=[f'Scalp: {s}' for s in scalpvalues]
 
+    # RUN TASKS
     def run(fd):
         starttime = time.time()
         f,d = fd
@@ -223,16 +229,18 @@ def run_all(datasets, scalpvalues = [.15,.2, .25, .3, .35, .45,  .55, .7, .9]):
         dat = datasets[d]
         stack = fun(dat)
         return stack, time.time()-starttime
-
     mydata = ut.xxmap(run, tasks)
     mydata, runtimes = Transpose(mydata)
 
-    fnames = 'Harmony Scanorama BBKNN ComBat'.split()
-    fnames+=[f'Scalp: {s}' for s in scalpvalues]
 
-    times = defaultdict(int)
+    # times = defaultdict(int)
+    # for (fi, di), t in zip(tasks, runtimes):
+    #     times[fnames[fi]] += t
+
+    times = defaultdict(lambda: defaultdict(float))
     for (fi, di), t in zip(tasks, runtimes):
-        times[fnames[fi]] += t
+        times[di][fnames[fi]] = t
+
     # datasets_stack = Map(scalp.transform.stack, datasets)
     for (fu,da), result in zip(tasks, mydata):
         method = fnames[fu]
@@ -249,7 +257,6 @@ def run_all(datasets, scalpvalues = [.15,.2, .25, .3, .35, .45,  .55, .7, .9]):
         datasets[da].uns.setdefault('methods', []).append(method)
         datasets[da].uns.setdefault('integrated', []).append(method)
     return datasets, fnames, times
-
 
 
 
@@ -398,11 +405,12 @@ def mkscib_table(SCIB,datasets):
 
 
 fixed_color_methods = {
-    "Scanorama": "red",
+    "Scanorama": "blue",
     "BBKNN": "green",
     "ComBat": "purple",
-    "Harmony": "blue",
+    "Harmony": "black",
 }
+
 
 def makepalette(scalp_items:list):
     '''
@@ -419,7 +427,8 @@ def makepalette(scalp_items:list):
     old = fixed_color_methods.keys()
     ret = {}
     ret.update(pal(scalp_items,'Reds'))
-    ret.update(pal(old,'mako')) # doing this later so we can just pass all the methods i guess
+    # ret.update(pal(old,'mako')) # doing this later so we can just pass all the methods i guess
+    ret.update(fixed_color_methods)
     return ret
 
 def split_sc2(scores, datasets):
@@ -829,6 +838,7 @@ def make_timetable(datasets, datapoints = 9):
         # run_all expects a list of datasets, so we wrap sub_dataset in a list
         _, fnames, runtimes_dict = run_all([sub_dataset], scalpvalues= [.55])
 
+        runtimes_dict = runtimes_dict[0]  # Extract runtimes for the single dataset
         config_label = f"{num_batches}x{cells_per_batch}"
 
         # Collect runtimes for all methods for the current configuration
@@ -851,6 +861,69 @@ def make_timetable(datasets, datapoints = 9):
     # print(runtimes_df)
     return  runtimes_df #plotruntimes(runtimes_df)
     # return runtimes_df # Optionally return the dataframe
+
+
+
+
+# def score_time_front(scores, times):
+#     '''
+#     times is a dict of dataset -> method -> time
+#     scores is a dict of dataset -> method -> score dict which has attributes label_mean and batch_mean
+#     we need a scatter plot. each method gets a color, and we plot its results for each dataset, x: time, y: geomean of label and batch
+#     '''
+
+def score_time_front(scores, times):
+    data = []
+    for dataset_id, method_scores in scores.items():
+        for method_name, score_values in method_scores.items():
+            label_mean = score_values.get('label_mean', np.nan)
+            batch_mean = score_values.get('batch_mean', np.nan)
+
+            # Calculate geometric mean if both label_mean and batch_mean are available
+            geomean_score = gmean([label_mean, batch_mean]) if not np.isnan(label_mean) and not np.isnan(batch_mean) else np.nan
+
+            runtime = times.get(int(dataset_id), {}).get(method_name, np.nan)
+
+            data.append({
+                'dataset_id': dataset_id,
+                'method': method_name,
+                'geomean_score': geomean_score,
+                'runtime': runtime
+            })
+
+    df = pd.DataFrame(data)
+
+    # Filter out rows with NaN values in geomean_score or runtime
+    df = df.dropna(subset=['geomean_score', 'runtime'])
+
+    palette = makepalette(df.method.unique())
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+
+    sns.scatterplot(
+        data=df,
+        x='runtime',
+        y='geomean_score',
+        hue='method',
+        palette=palette,
+        s=100,  # Marker size
+        alpha=0.8,
+        ax=ax
+    )
+
+    ax.set_xlabel('Runtime (seconds)', fontsize=12)
+    ax.set_ylabel('Geometric Mean Score', fontsize=12)
+    ax.set_title('Integration Method Performance: Score vs. Runtime', fontsize=14)
+    ax.grid(True, linestyle='--', alpha=0.7)
+
+    # Place legend outside the plot area for better readability
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+
+    plt.tight_layout()
+    # plt.show()
+    return fig
+
+
 
 def plotruntimes_(runtimes_df):
     palette = makepalette(runtimes_df.method)
@@ -1074,3 +1147,78 @@ def kni(datasets):
 
 
 
+def variance_check123(datasets):
+    # find the largetst dataset
+    # then sample 5x 50% and score it via all the methods (i guess run_all)
+    # report a table with mean/var  per method for batch-score label-score and geomean
+    pass
+
+
+
+def variance_check(datasets):
+    # Find the largest dataset by number of observations
+    largest_dataset_idx = np.argmax([d.n_obs for d in datasets])
+    original_dataset = datasets[largest_dataset_idx]
+    print(f"Largest dataset found: {original_dataset.uns['name']} ({original_dataset.n_obs} cells)")
+
+    all_scores = defaultdict(lambda: defaultdict(list))
+    num_samples = 5
+    sample_fraction = 0.5
+
+    for i in range(num_samples):
+
+
+        ##############
+        #   SUBSAMPLE
+        ################
+        print(f"Sampling iteration {i+1}/{num_samples}...")
+        num_cells_to_sample = int(original_dataset.n_obs * sample_fraction)
+        if 'batch' in original_dataset.obs.columns:
+            # Stratified sampling by batch to maintain batch proportions
+            sampled_indices = []
+            for batch in original_dataset.obs['batch'].unique():
+                batch_cells = original_dataset.obs_names[original_dataset.obs['batch'] == batch]
+                num_to_sample_in_batch = int(len(batch_cells) * sample_fraction)
+                sampled_indices.extend(np.random.choice(batch_cells, num_to_sample_in_batch, replace=False))
+
+            if not sampled_indices: # Fallback if stratified sampling yields no cells
+                print("Warning: Stratified sampling yielded no cells, falling back to random sampling.")
+                assert False
+        else:
+            assert False
+        sub_adata = original_dataset[sampled_indices, :].copy()
+        sub_adata.uns = original_dataset.uns.copy()
+        # explicitly clean results... just in case
+        sub_adata.uns['integrated'] = []
+        sub_adata.uns['methods'] = []
+
+
+        integrated_datasets, fnames, _ = run_all([sub_adata], scalpvalues=[.65])
+        current_scores = scalp.score.scalp_scores(integrated_datasets[0], projection = 'methods', label_batch_split=False)
+
+        for method_name, scores_dict in current_scores.items():
+            all_scores[method_name]['label_mean'].append(scores_dict['label_mean'])
+            all_scores[method_name]['batch_mean'].append(scores_dict['batch_mean'])
+            all_scores[method_name]['geomean'].append(gmean([scores_dict['label_mean'], scores_dict['batch_mean']]))
+
+    # Prepare results table
+    results = []
+    for method, metrics in all_scores.items():
+        mean_label = np.mean(metrics['label_mean'])
+        std_label = np.std(metrics['label_mean'])
+        mean_batch = np.mean(metrics['batch_mean'])
+        std_batch = np.std(metrics['batch_mean'])
+        mean_geomean = np.mean(metrics['geomean'])
+        std_geomean = np.std(metrics['geomean'])
+
+        results.append({
+            'Method': method,
+            'Label Mean': f"{mean_label:.2f} ± {std_label:.2f}",
+            'Batch Mean': f"{mean_batch:.2f} ± {std_batch:.2f}",
+            'Geomean': f"{mean_geomean:.2f} ± {std_geomean:.2f}"
+        })
+
+    results_df = pd.DataFrame(results).set_index('Method')
+    print("\nVariance Check Results (Mean ± Std Dev):")
+    print(results_df.to_latex())
+    return results_df

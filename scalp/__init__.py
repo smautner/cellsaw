@@ -474,25 +474,20 @@ def plot4(adatas:list, label='label', embedding_key = 'scalp', headline = 'somep
 
 
 
-def plot4_2x2(adatas:list, label='label', embedding_key = 'scalp', headline = 'someplot', plotnames = 'ABCD', colors = 0):
+def plot4_2x2(adatas:list,   embedding_key = 'scalp', headline = 'someplot', plotnames = 'ABCD', mode = 'label', n = 10):
     '''
     same as plot4 but we want it as 2x2
     '''
 
-
-
-
+    # INPUT CHECK
     num_adatas = len(adatas)
     if num_adatas != 4:
         raise ValueError("This function is designed for exactly 4 AnnData objects.")
 
-    all_unique_labels = sorted(list(set(cat for adata in adatas for cat in adata.obs[label].astype(str).unique())))
+    # color setup
+    all_unique_labels = sorted(list(set(cat for adata in adatas for cat in adata.obs[mode].astype(str).unique())))
     n_labels = len(all_unique_labels)
-
-
-
-
-    if colors == 0: # Viridis for batches, Tab20/hls for labels
+    if mode == 'batch': # Viridis for batches, Tab20/hls for labels
         batch_palette_colors = sns.color_palette("viridis", n_labels) # Re-using viridis for general labels here
         label_to_color = {lbl: color for lbl, color in zip(all_unique_labels, batch_palette_colors)}
     else: # Tab20/hls for labels
@@ -500,8 +495,8 @@ def plot4_2x2(adatas:list, label='label', embedding_key = 'scalp', headline = 's
         label_to_color = {lbl: color for lbl, color in zip(all_unique_labels, label_palette_colors)}
 
 
-    fig = plt.figure(figsize=(6, 6)) # Adjusted for 2x2 plots + legend
-    gs = fig.add_gridspec(3, 2, height_ratios=[8, 8, 1]) # 2x2 plots, 1 row for legend
+    fig = plt.figure(figsize=(12, 12)) # Adjusted for 2x2 plots + legend
+    gs = fig.add_gridspec(3, 2, height_ratios=[8,8,1]) # 2x2 plots, 1 row for legend
 
     plot_indices = [(0, 0), (0, 1), (1, 0), (1, 1)] # Grid positions for 2x2
 
@@ -509,9 +504,13 @@ def plot4_2x2(adatas:list, label='label', embedding_key = 'scalp', headline = 's
 
     for i, adata in enumerate(adatas):
         X = adata.obsm[embedding_key]
-        X_2d = umap.UMAP(n_components=2, random_state=42).fit_transform(X) if X.shape[1] > 2 else X
-        current_labels = adata.obs[label].astype(str)
+        if n > 0:
+            X_2d = umap.UMAP(n_components=2, random_state=42, n_neighbors = n).fit_transform(X)#  if X.shape[1] > 2 else X
+            adata.obsm[f'X_umap_2d_{i}'] = X_2d
+        else:
+            X_2d = adata.obsm[f'X_umap_2d_{i}']
 
+        current_labels = adata.obs[mode].astype(str)
         ax = fig.add_subplot(gs[plot_indices[i]]) # Place plot in correct grid cell
         sns.scatterplot(x=X_2d[:, 0], y=X_2d[:, 1], hue=current_labels,
                         palette=label_to_color, ax=ax, s=16, legend=False)
@@ -533,10 +532,10 @@ def plot4_2x2(adatas:list, label='label', embedding_key = 'scalp', headline = 's
         handles.append(plt.Line2D([0], [0], marker='o', color='w',
                                   markerfacecolor=label_to_color[lbl],
                                   markersize=10))
-        labels.append(f"Cell Type {idx+1}")
+        labels.append(f"{'Cell Type' if mode == 'label' else 'Batch-ID'} {idx+1}")
 
     legend_ax.legend(handles=handles, labels=labels, loc='center',
-                     ncol=5, fontsize='small', frameon=False)
+                     ncol=4, fontsize='small', frameon=False)
 
     plt.suptitle(f"{headline}", y=0.98, fontsize=16)
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
