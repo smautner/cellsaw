@@ -28,6 +28,7 @@ import better_exceptions
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", module="anndata")
 
+from tablemaker import make_results_table , format_res_T
 
 
 '''
@@ -944,6 +945,7 @@ def plotruntimes_(runtimes_df):
     # plt.legend(bbox_to_anchor=(0.5, -.3), loc='upper center', ncol=3)
     plt.legend(bbox_to_anchor=(0.5, -0.3), loc='upper center', ncol=3, frameon=False)
     fig = plt.gcf()
+    fig.tight_layout()
     plt.show()
     return fig
 
@@ -976,163 +978,6 @@ def plotruntimes(runtimes_df):
     return fig
 
 
-
-
-from scipy.stats import gmean
-
-def test_make_results_table(check_normal=True):
-    '''
-    check_normal is introduced as a hack to be able to also check scib stuff..
-    '''
-    print("Starting test_make_results_table...")
-
-    # 1. Get data
-    datasets, _ = get_data()
-    print(f"Loaded {len(datasets)} datasets for testing.")
-
-    # the later should be ts datasets... so we have a mix. and dont get nans :)
-    if check_normal: datasets = datasets[:2] + datasets[-10:-8]
-    else: datasets = datasets[18:21]
-
-    # 2. Run all integration methods
-    # Using a small subset of scalpvalues to speed up the test
-    # And running on a single dataset for brevity
-    # datasets_after_run, fnames, times = run_all([datasets[0], datasets[1]], scalpvalues=[.55, .75])
-    datasets_after_run, fnames, times = run_all(datasets, scalpvalues=[.55, .75])
-
-
-    for ds in datasets_after_run:
-        print(scalp.score.scib_scores(ds,'Scalp: 0.55'))
-    if not check_normal:
-        return
-
-
-    print(f"Finished running {len(fnames)} methods on {len(datasets_after_run)} datasets.")
-    print("Methods run:", fnames)
-
-    # 3. Calculate scalp scores
-    scores = scalpscore(datasets_after_run)
-    print("Calculated scalp scores.")
-    # print("Raw scores:", scores) # for debugging
-
-    # 4. Define the chosen_scalp value for the test
-    # This should match one of the 'Scalp: X.XX' strings in fnames
-    chosen_scalp_option = '0.55' # Or '0.75' if you prefer
-
-    # Filter fnames to get the exact Scalp method name
-    full_scalp_method_name = [name for name in fnames if f'Scalp: {chosen_scalp_option}' in name][0]
-    print(f"Chosen Scalp method for table: {full_scalp_method_name}")
-
-
-    # 5. Call make_results_table
-    results_df, latex_table = make_results_table(scores, datasets_after_run, chosen_scalp_option)
-    print(latex_table)
-
-
-
-def make_results_table(scores, datasets, chosen_scalp, df=False):
-    """
-    scores: dict of dataset_id -> {method: {'label_mean':..., 'batch_mean':...}}
-    datasets: list of AnnData or similar objects with .uns['timeseries']
-    chosen_scalp: string, the exact scalp variant name to include
-    """
-    # -------- Step 1: Build dataframe ----------
-    def  makeResultsTableDF(scores):
-        rows = []
-        for ds, methods_dict in scores.items():
-            for meth, vals in methods_dict.items():
-                label = vals['label_mean']
-                batch = vals['batch_mean']
-                #geo = gmean([label, batch])
-                # rows.append({'dataset': ds, 'method': meth, 'label': label, 'batch': batch, 'geomean': geo})
-                rows.append({'dataset': ds, 'method': meth, 'label': label, 'batch': batch})
-        return pd.DataFrame(rows)
-
-
-
-    if type(df) == bool :
-        df = makeResultsTableDF(scores)
-    # add geomean
-    df['geomean'] = df[['label', 'batch']].apply(gmean, axis=1)
-    full_df = df
-
-    # check for nans
-    if full_df.isnull().any().any():
-        print("Warning: NaN values found in scores DataFrame. This might affect ranking.")
-        print(full_df[full_df.isnull().any(axis=1)])
-
-    ts_ids = [int(i) for i, e in enumerate(datasets) if datasets[i].uns.get('timeseries', False)]
-    batch_ids = [int(i) for i, e in enumerate(datasets) if not datasets[i].uns.get('timeseries', False)]
-
-    # -------- Step 2: Filter methods to include only chosen scalp + all non-scalp ----------
-    allowed_methods = set(m for m in full_df['method'] if not m.startswith('Scalp'))
-    scalp_methods = [m for m in full_df['method'].unique() if m.startswith('Scalp')]
-    # If chosen_scalp is provided, filter for it
-    selected_scalp_methods = [m for m in scalp_methods if str(chosen_scalp) in m]
-    allowed_methods.add(selected_scalp_methods[0])
-
-
-    df = full_df[full_df['method'].isin(allowed_methods)].copy()
-
-    # -------- Step 3: Compute ranks ----------
-    ranks = df.groupby('dataset')[['label', 'batch', 'geomean']].rank(ascending=False)
-    df[['label_rank', 'batch_rank', 'geo_rank']] = ranks
-
-    # check nans
-    if df.isnull().any().any():
-        print("Warning: NaN values found in ranks DataFrame. df is clean 1250")
-        print(ranks[ranks.isnull().any(axis=1)])
-
-    # -------- Step 4: Compute mean ranks ----------
-    def mean_ranks(ids):
-        sub = df[df['dataset'].isin(ids)]
-        return sub.groupby('method')[['label_rank', 'batch_rank', 'geo_rank']].mean()
-
-    ts_ranks = mean_ranks(ts_ids)
-    batch_ranks = mean_ranks(batch_ids)
-    total_ranks = df.groupby('method')[['label_rank', 'batch_rank', 'geo_rank']].mean()
-
-    result = pd.concat([
-        ts_ranks.add_prefix('TS_'),
-        batch_ranks.add_prefix('Batch_'),
-        total_ranks.add_prefix('Total_')
-    ], axis=1)
-
-
-    # check nan
-    if result.isnull().any().any():
-        print("Warning: NaN values found in ranks DataFrame. This might affect mean ranks.")
-        print(ranks[ranks.isnull().any(axis=1)])
-        breakpoint()
-
-
-
-
-    # -------- Step 5: Transpose ----------
-    result_t = result.T
-
-    # Reorder columns to place the chosen Scalp method first
-    cols = result_t.columns.tolist()
-    if selected_scalp_methods and selected_scalp_methods[0] in cols:
-        cols.remove(selected_scalp_methods[0])
-        cols.insert(0, selected_scalp_methods[0])
-        result_t = result_t[cols]
-
-    # -------- Step 6: Boldface best in each row ----------
-    latex_df = result_t.copy()
-    for row in latex_df.index:
-        vals = latex_df.loc[row]
-        minval = pd.to_numeric(vals, errors='coerce').min()
-        latex_df.loc[row] = [
-            f"\\textbf{{{float(v):.1f}}}" if np.isclose(float(v), minval) else f"{float(v):.1f}"
-            for v in vals
-        ]
-
-
-    latex_code = latex_df.to_latex(escape=False)
-    latex_code = latex_code.replace('_', ' ')
-
-    return result_t, latex_code
 
 
 

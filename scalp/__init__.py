@@ -474,6 +474,8 @@ def plot4(adatas:list, label='label', embedding_key = 'scalp', headline = 'somep
 
 
 
+
+
 def plot4_2x2(adatas:list,   embedding_key = 'scalp', headline = 'someplot', plotnames = 'ABCD', mode = 'label', n = 10):
     '''
     same as plot4 but we want it as 2x2
