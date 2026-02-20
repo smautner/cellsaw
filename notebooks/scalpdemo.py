@@ -209,7 +209,7 @@ import time
 
 #def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
 # def run_all(datasets, scalpvalues = [.35,.55, .7,.75,.8, .9]):
-def run_all(datasets, scalpvalues = [.15,.2, .25, .3, .35, .45,  .55, .7, .9]):
+def run_all(datasets, scalpvalues = [.1,.15,.2, .25, .3, .35,.4, .45,.5,  .55,.6,.65, .7,.75 ,.8,.85, .9, .95]):
 
 
     # SETUP TASKS
@@ -992,14 +992,9 @@ def kni(datasets):
 
 
 
-def variance_check123(datasets):
-    # find the largetst dataset
-    # then sample 5x 50% and score it via all the methods (i guess run_all)
-    # report a table with mean/var  per method for batch-score label-score and geomean
-    pass
 
 
-
+from scipy.stats import gmean
 def variance_check(datasets):
     # Find the largest dataset by number of observations
     largest_dataset_idx = np.argmax([d.n_obs for d in datasets])
