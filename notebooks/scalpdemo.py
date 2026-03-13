@@ -491,11 +491,14 @@ def barplot(geomean, datasets):
 
 
 
-def bluestar(scores2):
+import tablemaker as tbl
+def bluestar(scores2, chosen_scalp= ''):
 
     # --- 1. Data Preparation ---
     scores2_df = pd.DataFrame(scores2)
     z = scores2_df[scores2_df.method != 'scalp'].copy()
+
+
 
     z_stats = z.groupby("method").agg(
         label_mean=("label_mean", "mean"),
@@ -504,11 +507,23 @@ def bluestar(scores2):
         batch_std=("batch_mean", "std")
     ).reset_index()
 
+    # Alternative using gmean for mean calculation, not a big difference
+    # z_stats = z.groupby("method").apply(
+    #     lambda x: pd.Series({
+    #         "label_mean": gmean(x["label_mean"]),
+    #         "label_std": x["label_mean"].std(),
+    #         "batch_mean": gmean(x["batch_mean"]),
+    #         "batch_std": x["batch_mean"].std()
+    #     })
+    # ).reset_index()
+
+
     # --- 2. Ordering & Color Palette ---
     all_methods = sorted(z_stats['method'].unique())
     palette = makepalette(all_methods)
 
     scalp_methods = sorted([m for m in all_methods if "Scalp:" in m], key=lambda x: float(x.split(': ')[1]))
+    scalp_methods = tbl.subselect_scalp_methods(chosen_scalp, scalp_methods)
     other_methods = [m for m in all_methods if "Scalp:" not in m]
     legend_order = other_methods + scalp_methods
 
@@ -524,18 +539,41 @@ def bluestar(scores2):
             row = row.iloc[0]
             color = palette.get(method_name, 'gray')
 
+
+            ax.scatter(
+                row["label_mean"],
+                row["batch_mean"],
+                color=color,
+                label=method_name,
+                s=20,
+                zorder=3
+            )
+
+            # ax.text(
+            #     row["label_mean"],
+            #     row["batch_mean"],
+            #     f" {method_name}",
+            #     fontsize=9,
+            #     color=color,
+            #     va='center',
+            #     ha='left',
+            #     zorder=4
+            # )
+            epsix =  0.00012
+            epsiy =  0.00013
             ax.errorbar(
-                x=row["label_mean"],
-                y=row["batch_mean"],
+                x=row["label_mean"]+epsix,
+                y=row["batch_mean"]-epsiy,
                 xerr=row["label_std"],
                 yerr=row["batch_std"],
                 fmt='o',
-                label=method_name,
-                color=color,
+                # label=method_name,
+                color='gray',#color,
                 alpha=1,
                 capsize=0,
                 markersize=0
             )
+
     fontsize = 12
     sns.set(rc={ 'xtick.labelsize': fontsize, 'ytick.labelsize': fontsize})
     # --- 4. Styling ---
@@ -683,7 +721,7 @@ def bluestar(scores2):
 '''
 
 
-def barplot_v2(geomean, datasets):
+def barplot_v2(geomean, datasets, chosen_scalp= ''):
 
     # make data
     geomean.index.name = 'method'
@@ -696,10 +734,25 @@ def barplot_v2(geomean, datasets):
     palette = fixed_color_methods
     size = 12
     sns.set(rc={"font.size":size,"axes.titlesize":size,"axes.labelsize":size,   'xtick.labelsize': size, 'ytick.labelsize': size,},style="white")
+
+
+
+
+
+
+    if chosen_scalp:
+        scalp_methods = sorted([m for m in df_melted['method'].unique() if "Scalp:" in m], key=lambda x: float(x.split(': ')[1]))
+        keep_scalp = tbl.subselect_scalp_methods(chosen_scalp, scalp_methods)
+        df_melted = df_melted[~df_melted['method'].str.contains("Scalp:") | df_melted['method'].isin(keep_scalp)]
+
+
     order = sorted([m for m in df_melted['method'].unique() if 'Scalp' in m],
                    key=lambda x: float(x.split(': ')[1])) + sorted([m for m in
             df_melted['method'].unique() if 'Scalp' not in m])
     palette  = makepalette(order)
+
+
+
 
     # PAINTING
     g = sns.boxplot( data=df_melted, x="method", y="score", hue ="group", palette= "Blues", order = order)

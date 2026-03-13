@@ -151,7 +151,7 @@ def subselect_scalp_methods(chosen_scalp, all_scalp_methods):
     res = []
     for sel in chosen_scalp:
         for all_m in all_scalp_methods:
-            if f'Scalp: {sel}' in all_m:
+            if f'Scalp: {sel}' == all_m:
                 res.append(all_m)
     return res
 
