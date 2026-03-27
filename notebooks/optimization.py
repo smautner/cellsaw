@@ -103,7 +103,12 @@ def makespace():
 
 def getdata(cells = 750, data  = 8, src= 'batch'):
     if src == 'batch':
-        r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells,filter_clusters=15, slow=1))
+        r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells,filter_clusters=0, slow=0))
+        # r  =  list(scalp.data.scib(scalp.test_config.scib_datapath, maxdatasets=data, maxcells=cells,filter_clusters=15, slow=1))
+
+    elif src == 'scmark':
+        r = list(scalp.data.scmark(scalp.test_config.scmark_datapath, maxdatasets=data, maxcells=cells))
+
     else:
         r= list(scalp.data.timeseries(scalp.test_config.timeseries_datapath, maxdatasets=data, maxcells=cells))
     return [[rr] for rr in r]
@@ -140,8 +145,8 @@ def ho_eval(data, **kwargs):
         if k.endswith('k'):
             kwargs[k] = int(v)
     r = eval_fast(data,0,**kwargs)
-    #return 1.5 * r['label_mean'] + r['batch_mean']
-    return gmean([ r['label_mean'] , r['batch_mean']])
+    return 2 * r['label_mean'] # + r['batch_mean']
+    # return gmean([ r['label_mean'] , r['batch_mean']])
 
 
 
@@ -313,5 +318,41 @@ def test_ga():
     # o.print_more()
 
 
+
+
+#################
+# k dependant on dataset size?
+##########################
+
+
+def find_best_k():
+    datasets = getdata(cells=10000, data=10,src= 'sasd')
+    datasets += getdata(cells=10000, data=10,src= 'scmark')
+    k_range = Range(10, 50, 3)
+    tasks = [{'hub1_algo': 3, 'hub1_k': 12, 'hub2_algo': 3, 'hub2_k': 12,
+              'k': k, 'outlier_threshold': 0.25} for k in k_range]
+
+    out = []
+    for [ds] in datasets:
+        df = opti.gridsearch(ho_eval, data_list=[[ds]], tasks=copy.deepcopy(tasks), mp=True)
+
+        top_3 = df.nlargest(3, 'score')
+        best_ks = top_3['k'].tolist()
+        best_scores = top_3['score'].tolist()
+
+        res_str = (f"Cells: {ds.n_obs} | Batches: {len(ds.obs['batch'].unique())} | "+
+                    f"bsize: {ds.n_obs / len(ds.obs['batch'].unique())} | "+
+                   f"Top 3 k: {best_ks} | Scores: {[f'{s:.4f}' for s in best_scores]}")
+
+
+        worst_3 = df.nsmallest(3, 'score')
+        worst_ks = worst_3['k'].tolist()
+        worst_scores = worst_3['score'].tolist()
+        res_str += f" | Worst 3 k: {worst_ks} | Scores: {[f'{s:.4f}' for s in worst_scores]}"
+
+        out.append(res_str)
+
+    for e in out:
+        print(e)
 
 

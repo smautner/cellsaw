@@ -132,6 +132,29 @@ def scalp_scores(data, projection ='integrated', cv=5,label_batch_split= False):
         ret[projection2] = getscores(X,y,ybatch,cv, label_batch_split)
     return ret
 
+# def scalpscore(datasets):
+#     scr = lambda i: scalp_scores(datasets[i], projection = 'methods', label_batch_split=False)
+#     res  = ut.xxmap(scr, Range(datasets))
+#     return dict(zip(Range(datasets),res))
+
+# scalp_scores and scalpscore can be unified. write a new scalpscore function. it works the same as the old one but uses ut.xxmap on the gescores level. call xxmap only once!. returns the same as scalpscore.
+
+def scalpscores(datasets, projection='methods', cv=5, label_batch_split=False):
+    tasks = [(ds.obsm[p], ds.obs['label'], ds.obs['batch'], cv, label_batch_split, i, p)
+             for i, ds in enumerate(datasets)
+             for p in ds.uns.get(projection, [])]
+
+    def worker(task):
+        X, y, yb, cv, lbs, idx, proj = task
+        return idx, proj, getscores(X, y, yb, cv, lbs)
+
+    results = ut.xxmap(worker, tasks)
+
+    out = {i: {} for i in range(len(datasets))}
+    for idx, proj, scores in results:
+        out[idx][proj] = scores
+    return out
+
 def getscores(X,y,ybatch, cv, label_batch_split =False):
     r={}
     m,s = knn_cross_validation(X,y,cv, splitby = ybatch if label_batch_split else None)

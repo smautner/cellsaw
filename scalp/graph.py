@@ -736,8 +736,8 @@ def integrate(adata,*, base = 'pca40',
 
     Xlist =adata
 
-    if len(Xlist) ==1:
-        assert False, 'why do you only provide 1 dataset?'
+    assert len(Xlist) > 1, 'there should be at least 2 datasets..'
+    # if len(Xlist) ==1: assert False, 'why do you only provide 1 dataset?'
 
     def adjacent(i,j):
         if isinstance( dataset_adjacency, np.ndarray):

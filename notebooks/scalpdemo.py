@@ -122,9 +122,16 @@ def Scalp(dataset, dim = 2, ot= .97):
     # hub1_algo  hub1_k  hub2_algo  hub2_k   k  outlier_threshold  config_id     score       time
     #   0       9          3       9          19           0.970536    30  2.188789  15.822385
     # 0      10          3       6  15
-    # grap = scalp.graph.integrate(dataset,hub1_algo = 0, hub1_k = 10,  hub2_algo=3, hub2_k=6,  k=15,  dataset_adjacency=None, outlier_threshold=ot)
 
-    grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2, hub2_k=12,  k=12,  dataset_adjacency=False, outlier_threshold=ot)
+    # grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2, hub2_k=12,  k=12,  dataset_adjacency=False, outlier_threshold=ot)
+
+    num_batches = len(dataset.obs['batch'].unique())
+    num_cells = dataset.n_obs
+    # k_val = min(45, int(np.sqrt(num_cells / num_batches)))
+    k_val = min(40, 10 + int((num_cells / num_batches) / 100))
+
+    grap = scalp.graph.integrate(dataset,hub1_algo = 3, hub1_k = 12,  hub2_algo=3,
+                                 hub2_k=12,  k=k_val,  dataset_adjacency=False, outlier_threshold=ot)
     grap = grap != 0
 
 
@@ -260,11 +267,12 @@ def run_all(datasets, scalpvalues = [.1,.15,.2, .25, .3, .35,.4, .45,.5,  .55,.6
     return datasets, fnames, times
 
 
+from scalp.output.score import scalpscores
 
-def scalpscore(datasets):
-    scr = lambda i: scalp.score.scalp_scores(datasets[i],projection = 'methods', label_batch_split=False)
-    res  = ut.xxmap(scr, Range(datasets))
-    return dict(zip(Range(datasets),res))
+# def scalpscore(datasets):
+#     scr = lambda i: scalp.score.scalp_scores(datasets[i], projection = 'methods', label_batch_split=False)
+#     res  = ut.xxmap(scr, Range(datasets))
+#     return dict(zip(Range(datasets),res))
 
 
 
@@ -545,8 +553,9 @@ def bluestar(scores2, chosen_scalp= ''):
                 row["batch_mean"],
                 color=color,
                 label=method_name,
-                s=20,
-                zorder=3
+                s=40,
+                zorder=3,
+                edgecolor='black'
             )
 
             # ax.text(
@@ -569,10 +578,24 @@ def bluestar(scores2, chosen_scalp= ''):
                 fmt='o',
                 # label=method_name,
                 color='gray',#color,
-                alpha=1,
+                alpha=.4,
                 capsize=0,
                 markersize=0
             )
+
+    # find the scalp points (only the chosen ones), order them by y value, and connect them via an orange dashed line according to the ordering
+
+    scalp_points = z_stats[z_stats['method'].isin(scalp_methods)].sort_values("batch_mean")
+    if not scalp_points.empty:
+        ax.plot(
+            scalp_points["label_mean"],
+            scalp_points["batch_mean"],
+            color='orange',
+            linestyle='--',
+            linewidth=1.5,
+            zorder=2,
+            alpha=0.6
+        )
 
     fontsize = 12
     sns.set(rc={ 'xtick.labelsize': fontsize, 'ytick.labelsize': fontsize})
@@ -736,10 +759,6 @@ def barplot_v2(geomean, datasets, chosen_scalp= ''):
     sns.set(rc={"font.size":size,"axes.titlesize":size,"axes.labelsize":size,   'xtick.labelsize': size, 'ytick.labelsize': size,},style="white")
 
 
-
-
-
-
     if chosen_scalp:
         scalp_methods = sorted([m for m in df_melted['method'].unique() if "Scalp:" in m], key=lambda x: float(x.split(': ')[1]))
         keep_scalp = tbl.subselect_scalp_methods(chosen_scalp, scalp_methods)
@@ -767,19 +786,32 @@ def barplot_v2(geomean, datasets, chosen_scalp= ''):
         label.set_x(i+ 0.6)
     g.tick_params(axis='both', which='both', direction='out', length=4, width=1, colors='black', bottom=True, top=False, left=True, right=False)
     # Apply a translation to all x-tick labels
-    offset = mtrans.ScaledTranslation(.1, 1.2, g.figure.dpi_scale_trans)
+    # offset = mtrans.ScaledTranslation(.1, 1.2, g.figure.dpi_scale_trans)
+    offset = mtrans.ScaledTranslation(.1, 1.1, g.figure.dpi_scale_trans)
     for label in g.get_xticklabels():
         label.set_transform(g.transData + offset)
     # THIS WOULD BRING THE COLORS BACK:
     # [i.set_color( palette.get(i._text,'gray')) for  i in g.get_xticklabels()]
     plt.grid(True, axis="y", linestyle="--", alpha=0.7)
 
+
     # LEGEND + RETURN
+    handles, labels = g.get_legend_handles_labels()
+    new_labels = [l.capitalize() for l in labels]
+
     plt.gca().set_axisbelow(True)
-    plt.legend(bbox_to_anchor=(.2, .25), loc='upper left', borderaxespad=0)
+    plt.legend(handles, new_labels, bbox_to_anchor=(.2, .15), loc='upper left', borderaxespad=0)
     fig = plt.gcf()
     plt.show()
     return fig
+
+    # # LEGEND + RETURN
+    # handles, labels = plt.gca().get_legend
+    # plt.gca().set_axisbelow(True)
+    # plt.legend(bbox_to_anchor=(.2, .15), loc='upper left', borderaxespad=0)
+    # fig = plt.gcf()
+    # plt.show()
+    # return fig
 
 def barplot_backup_delMe(geomean, datasets):
 
@@ -996,7 +1028,8 @@ def plotruntimes_(runtimes_df):
     plt.tight_layout()
 
     # plt.legend(bbox_to_anchor=(0.5, -.3), loc='upper center', ncol=3)
-    plt.legend(bbox_to_anchor=(0.5, -0.3), loc='upper center', ncol=3, frameon=False)
+    # plt.legend(bbox_to_anchor=(0.5, -0.3), loc='upper center', ncol=3, frameon=False)
+    plt.legend(bbox_to_anchor=(0.5, -0.50), loc='upper center', ncol=3, frameon=False)
     fig = plt.gcf()
     fig.tight_layout()
     plt.show()
