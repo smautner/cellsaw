@@ -648,24 +648,36 @@ def aiSlopSolution(matrices, k, h):
 
 
 
-def mkblock(matrix, i,j):
+# def mkblock(matrix, i,j):
+#     '''
+#     we return a new array, the size of matrix
+#     row[i] of the new matrix, has the data of row[j] of the old matrix
+#     matrix and res should be lil_matrix
+#     '''
+#     # res = np.zeros((matrix.shape[0],matrix.shape[0]),dtype=np.float32)
+#     # print(f"{ res.shape=}")
+#     # print(f"{ matrix.shape=}")
+#     # print(f"{ i.shape=}")
+#     # print(f"{ j.shape=}")
+#     res = sparse.lil_matrix(matrix.shape)
+#     # matrix = matrix.T
+#     res[i] = matrix[j]
+#     return res
+
+
+def mkblock(matrix, i, j):
     '''
-    we return a new array, the size of matrix
-    row[i] of the new matrix, has the data of row[j] of the old matrix
-    matrix and res should be lil_matrix
+    reorders the rows just like the commented out version above, is uglier, but the speedup is worth it :)
     '''
+    if len(i) == 0:
+        return sparse.lil_matrix(matrix.shape)
+    submat = matrix.tocsr()[j, :].tocoo()
+    i_array = np.array(i)
+    mapped_rows = i_array[submat.row]
+    return sparse.coo_matrix((submat.data, (mapped_rows, submat.col)), shape=matrix.shape).tolil()
 
-    # res = np.zeros((matrix.shape[0],matrix.shape[0]),dtype=np.float32)
 
-    # print(f"{ res.shape=}")
-    # print(f"{ matrix.shape=}")
-    # print(f"{ i.shape=}")
-    # print(f"{ j.shape=}")
 
-    res = sparse.lil_matrix(matrix.shape)
-    # matrix = matrix.T
-    res[i] = matrix[j]
-    return res
 
 from scalp import transform
 import sklearn
@@ -686,8 +698,10 @@ def stack_blocks(n_datas, getpart):
                 distance_matrix = rows[j][i].T.copy()
             row.append(distance_matrix)
         rows.append(row)
-    rowss = [sparse.hstack(row) for row in rows]
-    return sparse.vstack(rowss)
+
+    return sparse.bmat(rows, format = 'csr')
+    # rowss = [sparse.hstack(row) for row in rows]
+    # return sparse.vstack(rowss)
 
 
 
@@ -760,11 +774,11 @@ def integrate(adata,*, base = 'pca40',
                 distances = sparse.lil_matrix(distances)
                 # if find_duplicate_rows(distances): breakpoint()# DEBUG, DELETE ME
                 return distances
+
+
             # this is a case for k-start :) from ug.hubness
             # distances = hubness(distances, hub2_k, hub2_algo)
             distances = uhub.transform_experiments(distances, hub2_k, hub2_algo, startfrom = 0) # changing k-start since i != j
-
-
 
             if not adjacent(i,j):
                 return [],[]# sparse.lil_matrix((Xlist[i].shape[0],Xlist[j].shape[0]), dtype=np.float32)

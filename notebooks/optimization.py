@@ -356,3 +356,25 @@ def find_best_k():
         print(e)
 
 
+
+
+import os
+import time
+def get_cached_data(cache_file='/home/ubuntu/data/d1_cache.delme'):
+    if os.path.exists(cache_file):
+        return ut.loadfile(cache_file)
+    d1 = getdata(cells=1000, data=4, src='ts')[:3] + \
+         getdata(cells=1000, data=4, src='batch')[:3]
+    ut.dumpfile(d1, cache_file)
+    return d1
+
+def quickeval():
+    d1 = get_cached_data()
+    def scr(d):
+        r = eval_fast(d[0], 0)
+        return gmean([r['label_mean'], r['batch_mean']])
+    start = time.time()
+    scores = Map(scr, d1)
+    mid = len(scores) // 2
+    print(np.mean(scores[:mid]), np.mean(scores[mid:]), time.time()-start)
+
