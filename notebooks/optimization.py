@@ -146,12 +146,6 @@ def ho_eval(data, **kwargs):
     return 2 * r['label_mean'] # + r['batch_mean']
     # return gmean([ r['label_mean'] , r['batch_mean']])
 
-def quickeval():
-    d1 = getdata(cells=1000, data=4,src= 'sasd')[:3] + getdata(cells=1000, data=4,src= 'batch')[:3]
-    def scr(d):
-        r = eval_fast(d[0],0)
-        return gmean([ r['label_mean'] , r['batch_mean']])
-    print( np.mean(Map(scr, d1)))
 
 # if __name__ == '__main__': main()
 space = '''
