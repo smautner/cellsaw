@@ -24,6 +24,7 @@ import functools
 import time
 import seaborn as sns # Added for plotting
 import better_exceptions
+from sklearn.neighbors import NearestNeighbors
 
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", module="anndata")
@@ -128,10 +129,10 @@ def Scalp(dataset, dim = 2, ot= .97):
     num_batches = len(dataset.obs['batch'].unique())
     num_cells = dataset.n_obs
     # k_val = min(45, int(np.sqrt(num_cells / num_batches)))
-    k_val = min(40, 10 + int((num_cells / num_batches) / 100))
+    # k_val = min(40, 10 + int((num_cells / num_batches) / 100))
 
     grap = scalp.graph.integrate(dataset,hub1_algo = 3, hub1_k = 12,  hub2_algo=3,
-                                 hub2_k=12,  k=k_val,  dataset_adjacency=False, outlier_threshold=ot)
+                                 hub2_k=12,  k=12,  dataset_adjacency=False, outlier_threshold=ot)
     grap = grap != 0
 
 
@@ -583,19 +584,29 @@ def bluestar(scores2, chosen_scalp= ''):
                 markersize=0
             )
 
-    # find the scalp points (only the chosen ones), order them by y value, and connect them via an orange dashed line according to the ordering
+    # # pareto front
 
-    scalp_points = z_stats[z_stats['method'].isin(scalp_methods)].sort_values("batch_mean")
-    if not scalp_points.empty:
-        ax.plot(
-            scalp_points["label_mean"],
-            scalp_points["batch_mean"],
-            color='orange',
-            linestyle='--',
-            linewidth=1.5,
-            zorder=2,
-            alpha=0.6
-        )
+
+    points = z_stats[z_stats['method'].isin(legend_order)][['label_mean', 'batch_mean']].values
+    pareto_mask = np.ones(points.shape[0], dtype=bool)
+    for i, p in enumerate(points):
+        is_dominated = np.any((points[:, 0] >= p[0]) & (points[:, 1] >= p[1]) &
+                             ((points[:, 0] > p[0]) | (points[:, 1] > p[1])))
+        if is_dominated:
+            pareto_mask[i] = False
+    pareto_points = points[pareto_mask]
+    pareto_points = pareto_points[pareto_points[:, 0].argsort()]
+    pareto_x, pareto_y = pareto_points[:, 0], pareto_points[:, 1]
+
+    if False:
+        ax.plot(pareto_x, pareto_y, color='orange', linestyle='--', linewidth=1.5, zorder=2, alpha=0.6)
+    else:
+        # draw the pareto not by connecting point but bu useing vertical and horizontal lines
+        # Create step points: (x0, y0), (x0, y1), (x1, y1), (x1, y2)...
+        step_x = np.repeat(pareto_x, 2)[:-1]
+        step_y = np.repeat(pareto_y, 2)[1:]
+        ax.plot(step_x, step_y, color='orange', linestyle='--', linewidth=1.5, zorder=2, alpha=0.6)
+
 
     fontsize = 12
     sns.set(rc={ 'xtick.labelsize': fontsize, 'ytick.labelsize': fontsize})
@@ -603,7 +614,6 @@ def bluestar(scores2, chosen_scalp= ''):
     # ax.tick_params(labelsize=12)
     ax.tick_params(axis='both', which='both', direction='out', length=4, width=1, colors='black', bottom=True, top=False, left=True, right=False)
     ax.grid(True, linestyle='--', alpha=0.7)
-
     ax.set_ylabel("Batch Mean Score", fontsize=fontsize)
     ax.set_xlabel("Label Mean Score", fontsize=fontsize)
     ax.tick_params(axis='both', labelsize=fontsize)
@@ -1068,8 +1078,12 @@ def plotruntimes(runtimes_df):
 
 
 def kni(datasets):
-    scores_kni = { str(i): scalp.score.kni_scores(datasets[i], projection='methods')
-        for i in lmz.Range(datasets) }
+
+    # scores_kni = { str(i): scalp.score.kni_scores(datasets[i], projection='methods') for i in lmz.Range(datasets) }
+
+    kni_func = functools.partial(scalp.score.kni_scores, projection='methods')
+    res = ut.xxmap(kni_func, datasets)
+    scores_kni = {str(i): r for i, r in enumerate(res)}
 
     dff = pd.DataFrame.from_dict(scores_kni, orient='index')
     average_scores = dff.mean()
@@ -1148,3 +1162,143 @@ def variance_check(datasets):
     print("\nVariance Check Results (Mean ± Std Dev):")
     print(results_df.to_latex())
     return results_df
+
+
+
+'''
+import scalpdemo as sd
+d,ds = sd.get_data(config = 0)# 0 is debug
+sd.Xembedding(ds)
+# we were about to test graph.py, changing the far neighbor setting ...
+'''
+from ubergauss import csrjax as asd
+from sklearn.manifold import SpectralEmbedding
+from sklearn.neighbors import kneighbors_graph
+def labToCol(labels):
+        # 2. Map unique labels to a Seaborn color palette
+    unique_labels = np.unique(labels)
+    palette = sns.color_palette("viridis", len(unique_labels))
+    lut = dict(zip(unique_labels, palette))
+
+    # Create a list of colors corresponding to each row/col
+    node_colors = [lut[label] for label in labels]
+    return node_colors
+
+def Xembedding(dataset):
+        # adj = sgraph.integrate(dataset,base = 'pca40', outlier_threshold= 1,k=10, pac=False) != 0
+        adj = sgraph.integrate(dataset, outlier_threshold= 1,k=10,hub2_algo=0, pac=True)
+
+        # sns.heatmap(adj.todense(), cmap='viridis'); plt.show()
+
+        # adj.setdiag(1)
+        z= reducetoones(adj)
+        # z +=z.T
+        # z = z!=0
+        sns.clustermap(z.todense(), method='ward', cmap='viridis',
+                        row_colors= labToCol(dataset.obs['label']),
+                        col_colors= labToCol(dataset.obs['label']),
+                       xticklabels=False, yticklabels=False);plt.show()
+        sns.heatmap(z.todense(), cmap='viridis'); plt.show()
+
+        # return
+        # adj =  kneighbors_graph(adj, n_neighbors= 50, metric='cosine',
+        #                        mode='connectivity', include_self=False)
+        # plt.show()
+
+        # adj[adj==2]=0
+        # adj = (adj+adj.T)!=1
+        # embedder = SpectralEmbedding(n_components=2, affinity='precomputed', n_jobs=-1)
+        # thing  = embedder.fit_transform(adj)
+        # thing = asd.embed_adjacency(adj)
+
+
+        embedding = embedd(adj)# np.array(asd.embed_adjacency(adj))
+        def plot(embedding):
+            dataset.obsm['scalp'] =  embedding #reducetoones(adj)
+            #dataset = dataset[dataset.obs['batch'] == dataset.obs['batch'].unique()[0]].copy()
+            scalp.plot(dataset, 'scalp', color=['batch','label'])
+            dataset.obsm.pop('scalp',0)
+            dataset.obsm.pop('newlayer',0)
+        plot(embedding)
+        # plot(z)
+
+
+
+
+        # stack = Scalp(dataset, ot= .75)
+        # scalp.plot(stack,'scalp', color=['batch','label'])
+
+def reducetoones(m, target = 1):
+    X_init = m.copy()
+    X_init.data[X_init.data != target] = 0
+    X_init.eliminate_zeros()
+    return X_init
+import pacmap
+from sklearn.decomposition import PCA
+
+def embedd(labels_matrix, n_components=2, random_state=42):
+    """
+    Runs LocalMAP using a custom labels matrix where 1=Near, 2=Mid, 3=Far.
+    """
+
+    z=  []
+    for tgt in [1, 2, 3]:
+        pen = reducetoones(labels_matrix, target=tgt)
+        pen += pen.T
+        z.append( np.argwhere(pen != 0 ).astype(np.int32))
+
+    # for tgt in [1, 2, 3]:
+    #     z.append( np.argwhere(labels_matrix == z).astype(np.int32))
+
+    pair_neighbors, pair_MN, pair_FP = z
+
+    # 2. Initialize PaCMAP
+    # We set apply_pca=False because our "features" are adjacency rows
+    model = pacmap.PaCMAP(
+        n_components=n_components,
+        pair_neighbors=pair_neighbors,
+        pair_MN=pair_MN,
+        # pair_MN=np.empty((0, 2), dtype=np.int32),
+        pair_FP=pair_FP,
+        # apply_pca=False,
+        # random_state=random_state
+    )
+
+    # 3. Fit the model
+    # We pass labels_matrix as X so LocalMAP can use the "connectivity profile"
+    # of each node to verify labels and refine boundaries in Phase 3.
+    # init="random" is required when bypassing internal neighbor search.
+    X_init =  reducetoones(labels_matrix)
+
+    # init = PCA(n_components, random_state=random_state).fit_transform(X_init)
+    # init = init / np.std(init[:, 0]) * 0.0001
+    # embedding = model.fit_transform(init, init=init)
+
+    embedding = model.fit_transform(X_init.todense())
+
+    return embedding
+
+
+
+
+def embedd_asd(labels_matrix, n_components=2, random_state=42):
+    """
+    just pcamap
+    """
+    # 2. Initialize PaCMAP
+    # We set apply_pca=False because our "features" are adjacency rows
+    model = pacmap.PaCMAP(
+        n_components=n_components,
+        # random_state=random_state
+    )
+    # 3. Fit the model
+    # We pass labels_matrix as X so LocalMAP can use the "connectivity profile"
+    # of each node to verify labels and refine boundaries in Phase 3.
+    # init="random" is required when bypassing internal neighbor search.
+    X_init =  reducetoones(labels_matrix)
+    embedding = model.fit_transform(X_init.toarray())
+    return embedding
+
+
+
+

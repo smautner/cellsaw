@@ -164,6 +164,8 @@ def plot(adata,embedding,**plotargs):
     # ax = sc.pl.embedding(adata, basis= 'newlayer' , show = False,**plotargs)
     plot_embedding_with_labels(adata, basis='newlayer', title=title)
 
+    del adata.obsm['newlayer']
+
 
 def plot_embedding_with_labels(adata, basis='', title = ''):
     X = adata.obsm[basis]

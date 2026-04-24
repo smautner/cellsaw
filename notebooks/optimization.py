@@ -85,12 +85,14 @@ def old():
 
 import pandas as pd
 
-
+from sklearn.metrics import pairwise_distances
+import ubergauss.hubness as hub
 def eval_fast(X,y, **kwargs):
     n_comp = kwargs.pop('n_comp', None)
     grap = scalp.graph.integrate(X,smartcut=False,**kwargs)
     grap = grap!=0 # way faster and better
-    # proj = umap.UMAP(n_neighbors=10, n_components=2).fit_transform(grap)
+    # grap = umap.UMAP(n_components=10).fit_transform(grap)
+    # grap = hub.transform(grap,None)
     return scalp.score.getscores(grap,X.obs['label'], X.obs['batch'], 5)
 
 import copy

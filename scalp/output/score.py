@@ -6,6 +6,13 @@ from ubergauss.optimization import pareto_scores
 import numpy as np
 from sklearn.metrics import  silhouette_score
 from scalp.data import transform
+import anndata
+from scipy.stats import mode
+from sklearn.neighbors import NearestNeighbors
+from typing import Dict, List, Optional
+import anndata
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import confusion_matrix
 
 def repeat_as_column(a,n):
     return np.tile(a,(n,1)).T
@@ -107,9 +114,14 @@ def split_scib_scores(d):
     return split(d)
 
 
+
 def scib_scores(ds, projection = 'umap'):
     try:
         ds.X = ut.zehidense(ds.X)
+        if 'Scalp' in projection:
+            ds.obsm['garbo'] = hub.transform(ds.obsm[projection], None)
+            projection = 'garbo'
+
         ds.obsm[projection] = ds.obsm[projection].astype(float)
         sc = score_scib_metrics(ds, projection)
         bio, batch = split_scib_scores(sc)
@@ -139,6 +151,10 @@ def scalp_scores(data, projection ='integrated', cv=5,label_batch_split= False):
 
 # scalp_scores and scalpscore can be unified. write a new scalpscore function. it works the same as the old one but uses ut.xxmap on the gescores level. call xxmap only once!. returns the same as scalpscore.
 
+import json
+from datetime import datetime
+import os
+
 def scalpscores(datasets, projection='methods', cv=5, label_batch_split=False):
     tasks = [(ds.obsm[p], ds.obs['label'], ds.obs['batch'], cv, label_batch_split, i, p)
              for i, ds in enumerate(datasets)
@@ -153,6 +169,12 @@ def scalpscores(datasets, projection='methods', cv=5, label_batch_split=False):
     out = {i: {} for i in range(len(datasets))}
     for idx, proj, scores in results:
         out[idx][proj] = scores
+
+    fname = f"./tableruns/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(datasets)}.json"
+    os.makedirs(os.path.dirname(fname), exist_ok=True)
+    with open(fname, 'w') as f:
+        json.dump(out, f)
+
     return out
 
 def getscores(X,y,ybatch, cv, label_batch_split =False):
@@ -261,126 +283,280 @@ def pareto_sample(datadict,scorenames=['label','batch']):
 
 
 
-import anndata
-from scipy.stats import mode
-from sklearn.neighbors import NearestNeighbors
-from typing import Dict, List, Optional
-
-
+import ubergauss.hubness as hub
 def kni_scores(data, projection ='integrated', cv=5,label_batch_split= False):
     dataset = data # if type(data)!= list else transform.stack(data)
     ret= {}
     for projection2 in dataset.uns[projection]:
-        ret[projection2] = kni_score(data,projection2)['kni_score']
+        if 'Scalp' not in projection2:
+            ret[projection2] = kni_score(data,projection2)['kni_score']
+        else:
+            projection3 = hub.transform(data.obsm[projection2], None)
+            data.obsm['garbo'] = projection3
+            ret[projection2] = kni_score(data,'garbo')['kni_score']
     return ret
 
+
+
+
+def scale_embeddings_numpy(X: np.ndarray) -> np.ndarray:
+    """Scales embeddings using quantile normalization natively in NumPy (much faster)"""
+    # Center by mean
+    X_mean = np.mean(X, axis=0)
+    X_centered = X - X_mean
+
+    # Calculate quantiles
+    q1 = np.percentile(X_centered, 25, axis=0)
+    q2 = np.percentile(X_centered, 75, axis=0)
+
+    iqr = q2 - q1
+    # Prevent division by zero
+    iqr[iqr == 0] = 1.0
+
+    return X_centered / iqr
+
 def kni_score(
-    adata: anndata.AnnData,
-    embedding_key: str,
-    label_key: str = 'label',
-    batch_key: str = 'batch',
-    n_neighbors: int = 10,
-    exclude_labels: Optional[List[str]] = None,
-) -> Dict[str, float]:
-    """
-    Calculates a k-nearest-neighbor based integration score (KNI).
+        adata: anndata.AnnData,
+        embedding_key: str,
+        label_key: str = 'label',
+        batch_key: str = 'batch',
+        n_neighbours: int = 10,
+        max_prop_same_batch: float = 0.8
+        ) -> dict:
+    """Calculates KNI score directly off NumPy embeddings for speed."""
 
-    The score measures how well cell types are mixed across batches. It is the
-    accuracy of a k-NN classifier where, for each cell, the label is predicted
-    using only neighbors from different batches. A high score indicates that
-    cells of the same type are close to each other, regardless of their batch.
+    # 1. Handle Obs data
+    obs_df = adata.obs[[label_key, batch_key]].copy()
 
-    Args:
-        adata:
-            AnnData object with embeddings, labels, and batches.
-        embedding_key:
-            Key in `adata.obsm` where the embedding is stored.
-        label_key:
-            Key in `adata.obs` for cell type labels.
-        batch_key:
-            Key in `adata.obs` for batch labels.
-        n_neighbors:
-            Number of neighbors to consider for each cell.
-        exclude_labels:
-            A list of labels to exclude from the calculation (e.g., ['Unknown']).
+    if obs_df[label_key].isna().sum() > 0:
+        obs_df[label_key] = obs_df[label_key].astype(str).fillna("Unknown")
 
-    Returns:
-        A dictionary with the following scores:
-        - 'kni_score': The primary integration score (0 to 1, higher is better).
-        - 'label_accuracy': k-NN classification accuracy using all neighbors.
-        - 'mean_proportion_same_batch': Average proportion of neighbors from the
-          same batch (0 to 1, lower is better).
-    """
-    # 1. Filter and extract data
-    adata_view = adata
-    if exclude_labels:
-        keep_mask = ~adata_view.obs[label_key].isin(exclude_labels)
-        # Use .copy() to avoid SettingWithCopyWarning on a view
-        adata_view = adata_view[keep_mask, :].copy()
+    valid_mask = np.ones(len(obs_df), dtype=bool)
 
-    if embedding_key not in adata_view.obsm:
-        raise KeyError(f"Embedding key '{embedding_key}' not found in adata.obsm.")
-    if not all(k in adata_view.obs for k in [label_key, batch_key]):
-        raise KeyError(f"Label or batch key not found in adata.obs.")
 
-    embeddings = adata_view.obsm[embedding_key]
-    # Use pd.Categorical to handle any data type and convert to integer codes
-    labels = pd.Categorical(adata_view.obs[label_key]).codes
-    batches = pd.Categorical(adata_view.obs[batch_key]).codes
-    n_cells = embeddings.shape[0]
+    # 2. Extract strictly valid data as Native NumPy Arrays
+    X = ut.zehidense(adata.obsm[embedding_key][valid_mask])
+    obs_df = obs_df.iloc[valid_mask].copy()
 
-    if n_cells < n_neighbors + 1:
-        return {
-            'kni_score': np.nan,
-            'label_accuracy': np.nan,
-            'mean_proportion_same_batch': np.nan
-        }
+    assert X.shape[0] == obs_df.shape[0], "Mismatch in number of cells after filtering."
 
-    # 2. Find nearest neighbors (excluding the cell itself)
-    X = embeddings.astype(np.float32)
-    nn = NearestNeighbors(n_neighbors=n_neighbors + 1, algorithm='auto')
-    nn.fit(X)
-    _, neighbor_indices = nn.kneighbors(X)
-    neighbor_indices = neighbor_indices[:, 1:]  # Exclude self (the first neighbor)
+    # Fast NumPy scaling
+    X_scaled = scale_embeddings_numpy(X)
 
-    # 3. Get labels and batches of neighbors using the indices
-    neighbor_labels = labels[neighbor_indices]
-    neighbor_batches = batches[neighbor_indices]
+    # Convert to categories to get integer codes
+    obs_df[label_key] = obs_df[label_key].astype('category')
+    obs_df[batch_key] = obs_df[batch_key].astype('category')
 
-    # 4. Calculate overall label accuracy using all neighbors
-    # scipy.stats.mode finds the most frequent label for each cell's neighborhood
-    predicted_labels = mode(neighbor_labels, axis=1, keepdims=False)[0]
-    label_accuracy = np.mean(predicted_labels == labels)
+    # Extract integer arrays for fast operations
+    y_true = obs_df[label_key].cat.codes.values
+    b_true = obs_df[batch_key].cat.codes.values
 
-    # 5. Calculate KNI score and batch mixing
-    # Reshape original cell's batch array for broadcasting against neighbor_batches
-    cell_batches = batches.reshape(-1, 1)
-    is_different_batch = neighbor_batches != cell_batches
+    assert -1 not in y_true, "N/A cell type found in label column"
 
-    # Calculate the average proportion of neighbors from the same batch
-    proportion_same_batch = (~is_different_batch).sum(axis=1) / n_neighbors
-    mean_proportion_same_batch = proportion_same_batch.mean()
+    # 3. Fit NearestNeighbors directly on the array
+    nn = NearestNeighbors(n_neighbors=n_neighbours, algorithm='auto')
+    nn.fit(X_scaled)
+    _, indices = nn.kneighbors(X_scaled)
 
-    # Calculate KNI score (accuracy using only different-batch neighbors)
-    kni_correct_predictions = 0
-    cells_with_foreign_neighbors = 0
+    # 4. Map neighbors to their cell types and batches
+    knn_ct = y_true[indices]           # shape (N, k)
+    knn_batch = b_true[indices]        # shape (N, k)
+    batch_mat = b_true[:, None]        # shape (N, 1)
 
-    for i in range(n_cells):
-        # Filter for neighbors from different batches
-        foreign_neighbor_labels = neighbor_labels[i, is_different_batch[i]]
+    # 5. Fast Mask Calculations
+    not_same_batch_mask = knn_batch != batch_mat
+    num_same_batch = np.sum(~not_same_batch_mask, axis=1)
+    diverse_neighbourhood_mask = num_same_batch < (max_prop_same_batch * n_neighbours)
 
-        if foreign_neighbor_labels.size > 0:
-            cells_with_foreign_neighbors += 1
-            # Predict label from these "foreign" neighbors
-            foreign_predicted_label = mode(foreign_neighbor_labels, keepdims=False)[0]
-            if foreign_predicted_label == labels[i]:
-                kni_correct_predictions += 1
+    # 6. Fast Loop over NumPy arrays (No Pandas .iloc!)
+    N = X_scaled.shape[0]
+    pred_all = np.zeros(N, dtype=int)
+    pred_kni = np.zeros(N, dtype=int) - 1 # -1 acts as null prediction
 
-    # Avoid division by zero if no cells have neighbors from other batches
-    kni_score = kni_correct_predictions / cells_with_foreign_neighbors if cells_with_foreign_neighbors > 0 else 0.0
+    for i in range(N):
+        # Predict using all neighbors
+        pred_all[i] = np.bincount(knn_ct[i]).argmax()
+
+        # Predict using only non-batch neighbors if neighborhood is diverse
+        if diverse_neighbourhood_mask[i]:
+            valid_ct = knn_ct[i][not_same_batch_mask[i]]
+            if len(valid_ct) > 0:
+                pred_kni[i] = np.bincount(valid_ct).argmax()
+
+    # 7. Calculate overall scores directly from boolean arrays
+    acc_correct = y_true == pred_all
+    kni_correct = (y_true == pred_kni) & diverse_neighbourhood_mask
+
+    acc_total = acc_correct.mean()
+    kni_total = kni_correct.mean()
+    diverse_pass_total = diverse_neighbourhood_mask.mean()
+
+    # 8. Grouped Stats using fast Pandas aggregation
+    res_df = pd.DataFrame({
+        'batch_name': obs_df[batch_key],
+        'acc_count_knn': acc_correct.astype(int),
+        'kni_count': kni_correct.astype(int),
+        'diverse_pass_count_knn': diverse_neighbourhood_mask.astype(int),
+        'batch_count_knn': 1
+    })
+
+    # Calculate batch-level metrics
+    results_by_batch = res_df.groupby('batch_name', observed=False).sum()
+    results_by_batch['batch_name'] = results_by_batch.index
+    results_by_batch['kni_batch'] = results_by_batch['kni_count'] / results_by_batch['batch_count_knn']
+    results_by_batch['acc_knn'] = results_by_batch['acc_count_knn'] / results_by_batch['batch_count_knn']
+    results_by_batch['diverse_pass_knn'] = results_by_batch['diverse_pass_count_knn'] / results_by_batch['batch_count_knn']
+
+    # 9. Fast Confusion Matrices using scikit-learn
+    labels_cats = obs_df[label_key].cat.categories
+
+    acc_conf_mat = confusion_matrix(y_true, pred_all, labels=range(len(labels_cats)))
+    acc_conf_df = pd.DataFrame(acc_conf_mat, index=labels_cats, columns=labels_cats)
+
+    kni_mask = pred_kni != -1
+    kni_conf_mat = confusion_matrix(y_true[kni_mask], pred_kni[kni_mask], labels=range(len(labels_cats)))
+    kni_conf_df = pd.DataFrame(kni_conf_mat, index=labels_cats, columns=labels_cats)
 
     return {
-        'kni_score': kni_score,
-        'label_accuracy': label_accuracy,
-        'mean_proportion_same_batch': mean_proportion_same_batch,
+        'acc_knn': acc_total,
+        'kni_score': kni_total,   # <-- This is the actual KNI score
+        'mean_pct_same_batch_in_knn': np.mean(num_same_batch) / n_neighbours,
+        'pct_cells_with_diverse_knn': diverse_pass_total,
+        'confusion_matrix': acc_conf_df,
+        'kni_confusion_matrix': kni_conf_df,
+        'results_by_batch': results_by_batch,
     }
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from sklearn.neighbors import NearestNeighbors
+import umap
+
+
+def plot_kni(
+    adata,
+    embedding_keys: list,
+    label_key: str = 'label',
+    batch_key: str = 'batch',
+    n_neigh: int = 50,
+    max_prop_same_batch: float = 0.8
+):
+    """
+    Plots a diagnostic scatter for KNI scores across different embeddings.
+
+    Colors:
+    - Gray: Fails diversity check (surrounded by too much of its own batch).
+    - Black: Passes diversity check, but predicts the WRONG cell type using non-batch neighbors.
+    - Tab20 Colors: Passes diversity check, and predicts the CORRECT cell type.
+    """
+
+    # 1. Labels and batches (No 'Unknown' filtering)
+    obs_df = adata.obs[[label_key, batch_key]].copy()
+    obs_df[label_key] = obs_df[label_key].astype('category')
+    obs_df[batch_key] = obs_df[batch_key].astype('category')
+
+    y_true = obs_df[label_key].cat.codes.values
+    b_true = obs_df[batch_key].cat.codes.values
+    N = len(y_true)
+
+    # Setup Colors
+    cmap = plt.get_cmap('tab20')
+    unique_labels = np.unique(y_true)
+    base_colors = {code: mcolors.to_hex(cmap(i % 20)) for i, code in enumerate(unique_labels)}
+
+    # Setup Plot Grid
+    fig, axes = plt.subplots(1, len(embedding_keys), figsize=(6 * len(embedding_keys), 6))
+    if len(embedding_keys) == 1:
+        axes = [axes]
+
+    # 2. Iterate over embedding keys
+    for ax, emb_key in zip(axes, embedding_keys):
+
+        # --- PLOTTING COORDINATES (2D Check) ---
+        X_orig = adata.obsm[emb_key]
+
+        # Convert sparse or numpy.matrix to standard numpy.ndarray to prevent math errors
+        if hasattr(X_orig, "toarray"):
+            X_orig = X_orig.toarray()
+        X_orig = np.asarray(X_orig)
+
+        if X_orig.shape[1] > 2:
+            # Create a 2D layer specifically for this embedding if it doesn't exist
+            layer_2d_name = f'{emb_key}_2d'
+            if layer_2d_name not in adata.obsm:
+                print(f"Calculating UMAP for {emb_key}...")
+                adata.obsm[layer_2d_name] = umap.UMAP(n_components=2).fit_transform(X_orig)
+
+            X_plot = adata.obsm[layer_2d_name]
+            if hasattr(X_plot, "toarray"):
+                X_plot = X_plot.toarray()
+            X_plot = np.asarray(X_plot)
+        else:
+            X_plot = X_orig
+
+        # --- KNI EVALUATION (High-D Space) ---
+        # Scale original embeddings for neighbor search (fast NumPy method)
+        X_mean = np.mean(X_orig, axis=0)
+        X_centered = X_orig - X_mean
+        q1 = np.percentile(X_centered, 25, axis=0)
+        q2 = np.percentile(X_centered, 75, axis=0)
+        iqr = q2 - q1
+        iqr[iqr == 0] = 1.0
+        X_scaled = X_centered / iqr
+
+        # Find neighbors
+        nn = NearestNeighbors(n_neighbors=n_neigh, algorithm='auto')
+        nn.fit(X_scaled)
+        _, indices = nn.kneighbors(X_scaled)
+
+        knn_ct = y_true[indices]
+        knn_batch = b_true[indices]
+        batch_mat = b_true[:, None]
+
+        # Calculate diversity masks
+        not_same_batch_mask = knn_batch != batch_mat
+        num_same_batch = np.sum(~not_same_batch_mask, axis=1)
+        diverse_mask = num_same_batch < (max_prop_same_batch * n_neigh)
+
+        # Categorize cells into the 3 plotting groups
+        correct_mask = np.zeros(N, dtype=bool)
+        wrong_mask = np.zeros(N, dtype=bool)
+
+        for i in range(N):
+            if diverse_mask[i]:
+                # Get cell types of neighbors from OTHER batches
+                valid_ct = knn_ct[i][not_same_batch_mask[i]]
+                if len(valid_ct) > 0:
+                    pred = np.bincount(valid_ct).argmax()
+                    if pred == y_true[i]:
+                        correct_mask[i] = True
+                    else:
+                        wrong_mask[i] = True
+                else:
+                    wrong_mask[i] = True
+
+        low_diversity_mask = ~diverse_mask
+
+        # --- DRAW PLOT ---
+        # Group 1: Low Diversity (Gray)
+        ax.scatter(X_plot[low_diversity_mask, 0], X_plot[low_diversity_mask, 1],
+                   c='#D3D3D3', s=4, edgecolors='none', alpha=1.0)
+
+        # Group 2: Wrong Prediction (Black)
+        ax.scatter(X_plot[wrong_mask, 0], X_plot[wrong_mask, 1],
+                   c='black', s=4, edgecolors='none', alpha=1.0)
+
+        # Group 3: Correct Prediction (Tab20 Colors)
+        colors_correct = [base_colors[y] for y in y_true[correct_mask]]
+        ax.scatter(X_plot[correct_mask, 0], X_plot[correct_mask, 1],
+                   c=colors_correct, s=4, edgecolors='none', alpha=1.0)
+
+        # Formatting
+        ax.set_title(f'{emb_key}', fontsize=14)
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
