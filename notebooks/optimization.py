@@ -87,10 +87,13 @@ import pandas as pd
 
 from sklearn.metrics import pairwise_distances
 import ubergauss.hubness as hub
+from clasp.embedding import embed_graph
 def eval_fast(X,y, **kwargs):
     n_comp = kwargs.pop('n_comp', None)
     grap = scalp.graph.integrate(X,smartcut=False,**kwargs)
-    grap = grap!=0 # way faster and better
+
+    # grap = grap!=0 # way faster and better
+    grap = embed_graph(grap, n_components=10)
     # grap = umap.UMAP(n_components=10).fit_transform(grap)
     # grap = hub.transform(grap,None)
     return scalp.score.getscores(grap,X.obs['label'], X.obs['batch'], 5)
@@ -116,22 +119,22 @@ def getdata(cells = 750, data  = 8, src= 'batch'):
     return [[rr] for rr in r]
 
 
-def main():
-    # load data.. first a little bit to check!
-    datasets  =  getdata()
-    # make my spaceship :
-    space3 = makespace()
-    tasks = [space3.sample() for i in range(500)]
-    # df = [opti.gridsearch(eval_fast, data= (ds,0),  tasks =copy.deepcopy( tasks) ,mp=True) for ds in datasets]
-    # df = pd.concat(df)
-    df = opti.gridsearch(ho_eval, data_list= [datasets],  tasks =copy.deepcopy( tasks) ,mp=True)
-    df.to_csv('out_small.csv', index=False)
+# def main():
+#     # load data.. first a little bit to check!
+#     datasets  =  getdata()
+#     # make my spaceship :
+#     space3 = makespace()
+#     tasks = [space3.sample() for i in range(500)]
+#     # df = [opti.gridsearch(eval_fast, data= (ds,0),  tasks =copy.deepcopy( tasks) ,mp=True) for ds in datasets]
+#     # df = pd.concat(df)
+#     df = opti.gridsearch(ho_eval, data_list= [datasets],  tasks =copy.deepcopy( tasks) ,mp=True)
+#     df.to_csv('out_small.csv', index=False)
 
-def hyp():
-    x = getdata()
-    s = makespace()
-    tr = ho.run(x,ho_eval,space = s, max_evals = 100)
-    breakpoint()
+# def hyp():
+#     x = getdata()
+#     s = makespace()
+#     tr = ho.run(x,ho_eval,space = s, max_evals = 100)
+#     breakpoint()
 
 
 from scipy.stats import gmean
@@ -145,8 +148,12 @@ def ho_eval(data, **kwargs):
         if k.endswith('k'):
             kwargs[k] = int(v)
     r = eval_fast(data,0,**kwargs)
-    return 2 * r['label_mean'] # + r['batch_mean']
+    return  r['label_mean']  *  r['batch_mean']
     # return gmean([ r['label_mean'] , r['batch_mean']])
+
+def ho_many(datas, **args):
+    # logger.warning(f"{datas=}")
+    return gmean(Map(lambda d: ho_eval(d[0], **args), datas))
 
 
 # if __name__ == '__main__': main()
@@ -155,17 +162,17 @@ hub1_algo [0,1,2,3,4]
 hub1_k 3 20 1
 hub2_algo [0,1,2,3,4]
 hub2_k 3 20 1
-k 10 30 1
+k 5 30 1
 outlier_threshold .2 1
 hub1_k -> hub1_algo
 hub2_k -> hub2_algo
 '''
 from ubergauss.optimization import nutype, gatype, grid1type
 import structout as so
-def arun(d,typ, T= True):
+def arun(d,typ= 'ga', T= 2):
     runs = 10
     if typ == 'ga':
-        o= gatype.nutype(space,ho_eval, d, numsample= 32, hyperband=[], T = T)
+        o= gatype.nutype(space,ho_many, d, numsample= 32, hyperband=[], T = T, mp=False)
     if typ == 'rd':
         o= nutype.nutype(space,ho_eval, d, numsample= 32*runs, hyperband=[])
         o.opti()
@@ -176,8 +183,8 @@ def arun(d,typ, T= True):
 
     [o.opti() for i in range(runs)]
 
-    z= pd.concat(o.runs)
-    so.lprint(z.score)
+    # z= pd.concat(o.runs)
+    # so.lprint(z.score)
     # o.opti()
     #for i in range(5):o.opti()
     o.print()
@@ -190,40 +197,6 @@ def arun(d,typ, T= True):
 # 4      20          4      11  20           0.999917           2.086836
 
 import copy
-def optimize_ga(d):
-    gaSpace= '''
-    numsample_factor 0.1 1
-    maxold .1 1
-    mutation_rate .02 .3
-    '''
-    def gaEval(o2,  **params):
-        o2.__dict__.update(params)
-        def get(o3):
-            # o= gatype.nutype(space, ho_eval, d, numsample= 10, **params)
-            o3.nuParams()
-            [o3.opti() for i in range(8)]
-            return o3.getmax()
-        return np.mean([get(copy.deepcopy(o2)) for e in range(3)])
-
-    o2= gatype.nutype(space, ho_eval, d, numsample= 20)
-    o2.opti()
-
-
-    o= gatype.nutype(gaSpace,gaEval, [[o2]], numsample= 50, mp = True)
-    o.opti()
-    print(o.runs[-1])
-
-    # o.opti()
-    # print(o.runs[-1])
-    # o.opti()
-    # print(o.runs[-1])
-    # o.print()
-    # print(o.runs[-1])
-    # o.print()
-
-    return o
-
-
 
 
 
@@ -291,34 +264,6 @@ time                              5.25035
 '''
 
 
-
-
-
-def test_ga():
-    ut.nuke()
-    def example_function(data, x=None, y=None, some_boolean=None,**kwargs):
-        score_from_x = - (x - 0.5)**2  # Max at x=0.5
-        score_from_y = - (y - 10)**2 / 100.0 # Max at y=10
-        score_from_bool = .1*some_boolean
-        score_noise = np.random.normal(0, .1)
-        return score_noise + score_from_x + score_from_y + score_from_bool
-
-    example_space = """
-    x 0.0 1.0
-    y 1 20 1
-    some_boolean [1, 0]
-    """
-    o = gatype.nutype(example_space,
-                      example_function,
-                      data=[[0]],
-                      numsample=16)
-    [o.opti() for _ in range(5)]
-    o.print()
-    # o.print_more()
-
-
-
-
 #################
 # k dependant on dataset size?
 ##########################
@@ -376,4 +321,138 @@ def quickeval():
     scores = Map(scr, d1)
     mid = len(scores) // 2
     print(np.mean(scores[:mid]), np.mean(scores[mid:]), time.time()-start)
+
+
+
+
+
+
+
+
+
+##########################################
+#      NONSENSE FROM HERE:
+##############################
+
+
+import logging
+logging.basicConfig(level=logging.WARNING)
+logger= logging.getLogger(__name__)
+def optimize_ga(d):
+
+    from rich.traceback import install
+    install(show_locals=True)
+    gaSpace= '''
+    top_factor 0.0 0.1
+    select_factor 0.1 0.6
+    mutation_factor 0.2 1
+    numsample  32 64 1
+    '''
+
+    BUDGET = 600
+    # run optimization...
+    def gaEval(o2,  **params):
+        # o2.__dict__.update(params)
+        def testonce():
+            # logger.warning(f"{o2=}{params=}")
+            repeats = max(1,int(BUDGET/params['numsample']))
+            o= gatype.nutype(space, ho_many, o2, mp=True,  **params)
+            # breakpoint()
+            [o.opti() for i in range(repeats)]
+            return o.getmax()
+        # return np.mean([get(copy.deepcopy(o2)) for e in range(3)])
+        return np.mean([testonce() for e in range(1)])
+
+    # gaEval()
+    # o2= gatype.nutype(space, ho_eval, d, numsample= 20)
+    # o2.opti()
+    o= gatype.nutype(gaSpace,gaEval,d, numsample= 200, mp = True)
+    o.opti()
+    show(o.runs[-1])
+    return o
+
+def show(df):
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.expand_frame_repr', False):
+            print(df)
+import seaborn as sns
+import matplotlib.pyplot as plt
+def pp(df):
+    sns.pairplot(df, y_vars=['score'], x_vars=[c for c in df.columns if c not in ['score', 'config_id', 'time']])
+    plt.show()
+    # we need to plot: numsample vs select_factor/top factor and make the score into a color. go that is 2 plots
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+    sns.scatterplot(data=df, x='numsample', y='select_factor', hue='score', palette='viridis', ax=axes[0])
+    axes[0].set_title('numsample vs select_factor')
+    sns.scatterplot(data=df, x='numsample', y='top_factor', hue='score', palette='viridis', ax=axes[1])
+    axes[1].set_title('numsample vs top_factor')
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+def optimize_meta_ga():
+    d = get_cached_data()
+
+    meta_space = '''
+    top_factor 0.0 0.25
+    select_factor 0.25 0.7
+    mutation_factor 0.01 2.0
+    numsample 16 96 1
+    '''
+    BUDGET = 600
+    def meta_eval(data_context, **params):
+        def run_inner():
+            # Convert float params from space to ints if necessary
+            if 'numsample' in params: params['numsample'] = int(params['numsample'])
+            repeats = max(1, int(BUDGET / params['numsample']))
+            o_inner = gatype.nutype(example_space, example_function, 0, mp=True, **params)
+            for _ in range(repeats):
+                o_inner.opti()
+
+            best_df = pd.concat(o_inner.runs)
+            best_df = best_df.sort_values('score', ascending=False).drop_duplicates(subset=[c for c in best_df.columns if c not in ['score', 'config_id', 'time']])
+            # calculate score without noise (true score)
+            top_params = best_df.iloc[0].to_dict()
+            top_params.pop('score', None); top_params.pop('config_id', None); top_params.pop('time', None)
+            # simulate true score without noise component
+            score_from_x = - (top_params['x'] - 0.5)**2
+            score_from_y = - (top_params['y'] - 10)**2 / 100.0
+            score_from_bool = .05 * top_params['some_boolean']
+            return score_from_x + score_from_y + score_from_bool
+
+        # Multiple trials to reduce noise in meta-optimization
+        return np.mean([run_inner() for _ in range(5)])
+    o_meta = gatype.nutype(meta_space, meta_eval, 0, numsample=200, mp=True)
+    for i in range(5):
+        o_meta.opti()
+    show(o_meta.runs[-1])
+    return o_meta
+
+
+def example_function(data, x=None, y=None, some_boolean=None,**kwargs):
+    score_from_x = - (x - 0.5)**2  # Max at x=0.5
+    score_from_y = - (y - 10)**2 / 100.0 # Max at y=10
+    score_from_bool = .05*some_boolean
+    score_noise = np.random.normal(0, .04)
+    return score_noise + score_from_x + score_from_y + score_from_bool
+
+example_space = """
+x 0.0 1.0
+y 1 20 1
+some_boolean [1, 0]
+"""
+def test_ga():
+    ut.nuke()
+    o = gatype.nutype(example_space,
+                      example_function,
+                      data=[[0]],
+                      numsample=16)
+    [o.opti() for _ in range(5)]
+    show(o.runs[-1])
+    # o.print()
+    # o.print_more()
+
+
 

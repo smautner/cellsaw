@@ -4,13 +4,6 @@ so we exported scalp demo to a script... lets see what we can do
 '''
 
 
-import matplotlib as mpl
-
-
-if __name__ == "__main__":
-    # mpl.use('Agg')  # Use a non-interactive backend for script execution
-    mpl.use('module://matplotlib-backend-sixel')
-
 from matplotlib import pyplot as plt
 import warnings
 from collections import defaultdict
@@ -25,10 +18,8 @@ import time
 import seaborn as sns # Added for plotting
 import better_exceptions
 from sklearn.neighbors import NearestNeighbors
-
 warnings.filterwarnings("ignore")
 warnings.filterwarnings("ignore", module="anndata")
-
 from tablemaker import make_results_table , format_res_T
 
 
@@ -88,6 +79,7 @@ def setup_grid(ax, dataset):
     ax.set_yticks(ticks)
     ax.grid(True, color='white', linestyle='--', linewidth=0.5)
 
+from scalp.mnn import clasp_embedder
 def Scalp(dataset, dim = 2, ot= .97):
     # if find_duplicate_rows(dataset.X): print("duplicates!"); return
     parm = {'neighbors_total': 60, 'intra_neighbors_mutual': False,
@@ -133,6 +125,7 @@ def Scalp(dataset, dim = 2, ot= .97):
 
     grap = scalp.graph.integrate(dataset,hub1_algo = 3, hub1_k = 12,  hub2_algo=3,
                                  hub2_k=12,  k=12,  dataset_adjacency=False, outlier_threshold=ot)
+    # grap += grap.T
     grap = grap != 0
 
 
@@ -146,7 +139,7 @@ def Scalp(dataset, dim = 2, ot= .97):
     if  False:
         dataset.obsp['connectivities'] = grap
         dataset.obsp['distances'] = grap
-        dataset.uns['neighbors'] =  {'params': {'n_neighbors': 15,
+        dataset.uns['neighbors'] =  {'params': {'n_neighbors': 10,
       'method': 'umap',
       'metric': 'euclidean',
       'n_pcs': 40,
@@ -158,10 +151,11 @@ def Scalp(dataset, dim = 2, ot= .97):
         grap = dataset.obsm.pop('X_umap')
 
     if False:
-        grap = (grap.T+grap) != 0 # mk symmetric
-        if find_duplicate_rows(grap): breakpoint()
-        mapr = umap.UMAP()
-        mapr.graph_ = grap
+
+        # grap = (grap.T+grap) != 0 # mk symmetric
+        # if find_duplicate_rows(grap): breakpoint()
+        # mapr = umap.UMAP()
+        # mapr.graph_ = grap
         grap = mapr.fit_transform(grap)
 
     # plt.matshow(grap.todense())
@@ -173,11 +167,18 @@ def Scalp(dataset, dim = 2, ot= .97):
     # projection = scalp.umapwrap.graph_pacmap2(False,csr_matrix(grap),label = 'umap', n_components = dim)
     # projection = scalp.umapwrap.graph_umap(False,grap,label = 'umap', n_components = dim) # THIS IS WHAT WE WANT TO USE I GUESS
     # print("umap done")
+
+
+
     dataset.obsm['scalp']= grap
     # dataset.uns.setdefault('integrated',[])
     # dataset.uns['integrated'].append('scalp')
     dataset.uns.setdefault('methods',[])
     dataset.uns['methods'].append('scalp')
+
+
+    # clasp_embedder(dataset, dim= 10)
+
     return dataset
 
 
@@ -211,9 +212,6 @@ def do_the_data(ds):
 ##   RUN EXPERIMENTS
 ###############
 import ubergauss.tools as ut
-import functools
-import time
-
 
 #def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
 # def run_all(datasets, scalpvalues = [.35,.55, .7,.75,.8, .9]):
@@ -221,13 +219,14 @@ def run_all(datasets, scalpvalues = [.1,.15,.2, .25, .3, .35,.4, .45,.5,  .55,.6
 
 
     # SETUP TASKS
-    funcs = [scalp.mnn.harmony, scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat]
+    eclasp = functools.partial(scalp.mnn.clasp, label = 'eClasp', embed = True)
+    funcs = [scalp.mnn.harmony, scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat, scalp.mnn.clasp, eclasp]
     for ot in scalpvalues:
         funcs.append( functools.partial(Scalp, ot=ot))
     fuid = Range(funcs)
     dataid = Range(datasets)
     tasks = [(f,d) for f in fuid for d in dataid]
-    fnames = 'Harmony Scanorama BBKNN ComBat'.split()
+    fnames = 'Harmony Scanorama BBKNN ComBat Clasp eClasp'.split()
     fnames+=[f'Scalp: {s}' for s in scalpvalues]
 
     # RUN TASKS
@@ -419,8 +418,9 @@ fixed_color_methods = {
     "BBKNN": "green",
     "ComBat": "purple",
     "Harmony": "black",
+    "Clasp": "magenta",
+    "eClasp": "cyan"
 }
-
 
 def makepalette(scalp_items:list):
     '''

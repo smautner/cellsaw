@@ -125,7 +125,12 @@ def repeated_subsample_linear_sum_assignment(distances, repeats, num_instances):
 def fast_neighborgraph(distancemat, neighbors):
     part = np.argpartition(distancemat, neighbors, axis = 1)[:,:neighbors]
     neighborsgraph = np.zeros_like(distancemat)
-    np.put_along_axis(neighborsgraph, part, np.take(distancemat,part), axis = 1)
+    if False:
+        np.put_along_axis(neighborsgraph, part, np.take(distancemat,part), axis = 1)
+    else:# ranked distances
+        ranks = rankdata(distancemat, axis=1)
+        np.put_along_axis(neighborsgraph, part, np.take(ranks, part), axis=1)
+
     return neighborsgraph
 
 
@@ -620,6 +625,8 @@ def integrate(adata,*, base = 'pca40',
         else:
             return True
 
+
+
     def make_distance_matrix(ij):
             i,j = ij
             if not adjacent(i,j):
@@ -631,11 +638,15 @@ def integrate(adata,*, base = 'pca40',
 
                 assert distances.shape[0] > 50, 'very few cells in dataset, you messed up!'
                 # distances = uhub.justtransform(distances, hub1_k, hub1_algo)
-                distances = uhub.transform_experiments(distances, hub1_k, hub1_algo)
+
+                # if i ==0: print(Xlist[0][0,:20])
+                # if i==0: print(distances[0,:20])
+
+
+                distances = uhub.transform_experiments(distances, hub1_k, hub1_algo, startfrom = 1)
 
                 f = fast_neighborgraph if not pac else pac_neighborgraph
                 distances = f(distances, k)
-
 
                 np.fill_diagonal(distances,1)
                 distances = sparse.lil_matrix(distances)
@@ -645,12 +656,16 @@ def integrate(adata,*, base = 'pca40',
 
             # this is a case for k-start :) from ug.hubness
             # distances = hubness(distances, hub2_k, hub2_algo)
+            debug2 = i == 0 and j == 1
+            if debug2: print(f"noco scalp: {distances[0,:20]= }")
             distances = uhub.transform_experiments(distances, hub2_k, hub2_algo, startfrom = 0) # changing k-start since i != j
+            if debug2: print(f"{distances[0,:20]= }")
 
             if not smartcut:
                 i_ids,j_ids, ij_lsa_distances = lin_asi_thresh(distances, 1,outlier_threshold, False)
             else:
                 i_ids,j_ids, ij_lsa_distances = iterated_linear_sum_assignment(distances,1)
+            if debug2: print(f"cols  {j_ids[:20]= }")
             return i_ids, j_ids
 
 
@@ -663,8 +678,6 @@ def integrate(adata,*, base = 'pca40',
 
     if smartcut:
         neighDepLinAsiCut(getpart, outlier_threshold,k)
-
-
     #
     blockdict = {(i,i): getpart[(i,i)] for i in range(n_datas)}
     tasks =  [(i,j) for i in range(n_datas) for j in range(i+1,n_datas)]

@@ -61,6 +61,69 @@ def combat(adata, base = 'pca40', batchindicator = 'batch', label =  'ComBat'):
     adata.uns['integrated'].append(label)
     return adata
 
+
+
+
+
+from clasp import (
+    ClaspEstimator,
+    score_embedding,
+)
+def clasp(adata, base = 'pca40', label = "Clasp", embed=False):
+
+    # params = { # this was optimized onthe first 2 datasets only... looked ok, but not better than mine..
+    # "assignment_quantile": 0.996974,
+    # "edge_weighting": "distance",
+    # "hubness_k": 9,
+    # "inter_edge_mode": "assignment",
+    # "intra_fraction": 0.564315,
+    # "mutual_neighbors": False,
+    # "n_inter_edges": 6,
+    # "n_neighbors": 6,
+    # "rank_correction": False
+    # }
+
+    # params = { # full opti no embedding
+    # "assignment_quantile": 0.995048,
+    # "edge_weighting": "binary",
+    # "hubness_k": 13,
+    # "inter_edge_mode": "assignment",
+    # "intra_fraction": 0.527628,
+    # "mutual_neighbors": True,
+    # "n_inter_edges": 3,
+    # "n_neighbors": 8,
+    # "rank_correction": True
+    # }
+
+    params = { # opti full dataset,  with embedding
+    "assignment_quantile": 0.995048,
+    "edge_weighting": "binary",
+    "hubness_k": 13,
+    "inter_edge_mode": "assignment",
+    "intra_fraction": 0.527628,
+    "mutual_neighbors": True,
+    "n_inter_edges": 3,
+    "n_neighbors": 8,
+    "rank_correction": True
+    }
+
+    estimator = ClaspEstimator(preset="balanced", batch_key="batch", label_key="label", **params)
+    graph = estimator.data_to_graph(adata, rep_key='pca40')
+    adata.obsm[label] = graph
+    if embed:
+        adata.obsm[label] = estimator.graph_to_embeddings(graph, n_components=10)
+    # estimator.plot(adata, embedding_key="X_clasp")
+    # scalp.plot(adata,'X_clasp', color=['batch','label'])
+    adata.uns.setdefault('integrated',[])
+    adata.uns['integrated'].append(label)
+    return adata
+
+from clasp.embedding import embed_graph
+def clasp_embedder(adata,emb= 'scalp', dim = 30):
+    adata.obsm[emb] = embed_graph(adata.obsm[emb], n_components=dim)
+    return adata
+
+
 import bbknn
 def _bbknnwrap(adatas, base = 'pca40', batchindicator = 'batch', dim = 2):
     adata = transform.stack(adatas)
