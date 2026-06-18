@@ -117,7 +117,7 @@ def integrate(
 
         if i == j:
             assert distances.shape[0] > 50, 'Insufficient cells in dataset!'
-            distances = uhub.transform_experiments(distances, hub1_k, hub1_algo, startfrom=1)
+            distances = uhub.transform(distances, k = hub1_k, algo = hub1_algo, skip_diag=True)
 
             f = fast_neighborgraph if not pac else pac_neighborgraph
             distances_graph = f(distances, k)
@@ -125,7 +125,7 @@ def integrate(
             np.fill_diagonal(distances_graph, 1)
             return sparse.lil_matrix(distances_graph)
 
-        distances = uhub.transform_experiments(distances, hub2_k, hub2_algo, startfrom=0)
+        distances = uhub.transform(distances, k=hub2_k, algo = hub2_algo, skip_diag=False)
         return iterated_linear_sum_assignment(distances, 1, outlier_threshold)
 
     # Generate pairwise matrices
