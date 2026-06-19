@@ -59,18 +59,12 @@ def get_is_ts(datasets):
 
 
 
-import scanpy as sc
 
 
 # # COMPARISON + SCORING
 
-import scanpy as sc
 from scalp import graph as sgraph
 from scipy.sparse import csr_matrix
-import scalp.data.similarity as sim
-import scalp.data.transform as trans
-import umap
-import pandas as pd
 
 def setup_grid(ax, dataset):
     counts = pd.Series(dataset.obs['batch']).value_counts()
@@ -79,26 +73,8 @@ def setup_grid(ax, dataset):
     ax.set_yticks(ticks)
     ax.grid(True, color='white', linestyle='--', linewidth=0.5)
 
-from scalp.mnn import clasp_embedder
 def Scalp(dataset, dim = 2, ot= .97):
     # if find_duplicate_rows(dataset.X): print("duplicates!"); return
-    parm = {'neighbors_total': 60, 'intra_neighbors_mutual': False,
-            'neighbors_intra_fraction': .33, 'add_tree': False, "epsilon":-1,
-                  'copy_lsa_neighbors': False, 'horizonCutoff':0, # this hz cutoff is what we look at
-            'inter_outlier_threshold': -1, 'distance_metric':'euclidean', 'standardize':0,
-            'inter_outlier_probabilistic_removal': False}
-
-
-    bestparm = {'neighbors_total': 27,
-         'neighbors_intra_fraction': 0.2204608669516461,
-         'inter_outlier_threshold': 0.7495085614413425,
-         'inter_outlier_probabilistic_removal': 0,
-         'intra_neighbors_mutual': 0,
-         'copy_lsa_neighbors': 1,
-         'add_tree': 0,
-         'horizonCutoff': 60,
-         'distance_metric': 'euclidean',
-         'standardize': 0}
 
     # parm = {'add_tree': True, 'copy_lsa_neighbors': False, 'inter_outlier_probabilistic_removal': False,  'inter_outlier_threshold': 0.72, 'intra_neighbors_mutual': False, 'neighbors_intra_fraction': 0, 'neighbors_total': 1}
     # grap = scalp.mkgraph(dataset,**bestparm)
@@ -112,14 +88,11 @@ def Scalp(dataset, dim = 2, ot= .97):
     # stair =  sim.dynamic_sim(asd, hvg='myvar')
     # print(stair)
 
-    # hub1_algo  hub1_k  hub2_algo  hub2_k   k  outlier_threshold  config_id     score       time
-    #   0       9          3       9          19           0.970536    30  2.188789  15.822385
-    # 0      10          3       6  15
 
     # grap = scalp.graph.integrate(dataset,hub1_algo = 2, hub1_k = 12,  hub2_algo=2, hub2_k=12,  k=12,  dataset_adjacency=False, outlier_threshold=ot)
 
-    num_batches = len(dataset.obs['batch'].unique())
-    num_cells = dataset.n_obs
+    # num_batches = len(dataset.obs['batch'].unique())
+    # num_cells = dataset.n_obs
     # k_val = min(45, int(np.sqrt(num_cells / num_batches)))
     # k_val = min(40, 10 + int((num_cells / num_batches) / 100))
 
@@ -151,11 +124,11 @@ def Scalp(dataset, dim = 2, ot= .97):
         grap = dataset.obsm.pop('X_umap')
 
     if False:
-
-        # grap = (grap.T+grap) != 0 # mk symmetric
-        # if find_duplicate_rows(grap): breakpoint()
-        # mapr = umap.UMAP()
-        # mapr.graph_ = grap
+        import umap
+        grap = (grap.T+grap) != 0 # mk symmetric
+        if find_duplicate_rows(grap): breakpoint()
+        mapr = umap.UMAP()
+        mapr.graph_ = grap
         grap = mapr.fit_transform(grap)
 
     # plt.matshow(grap.todense())
@@ -216,8 +189,6 @@ import ubergauss.tools as ut
 #def run_all(datasets, scalpvalues = [.15, .25, .35, .45, .55, .65, .75, .85, .95]):
 # def run_all(datasets, scalpvalues = [.35,.55, .7,.75,.8, .9]):
 def run_all(datasets, scalpvalues = [.1,.15,.2, .25, .3, .35,.4, .45,.5,  .55,.6,.65, .7,.75 ,.8,.85, .9, .95]):
-
-
     # SETUP TASKS
     eclasp = functools.partial(scalp.mnn.clasp, label = 'eClasp', embed = True)
     funcs = [scalp.mnn.harmony, scalp.mnn.scanorama, scalp.mnn.bbknnwrap, scalp.mnn.combat, scalp.mnn.clasp, eclasp]
@@ -268,7 +239,6 @@ def run_all(datasets, scalpvalues = [.1,.15,.2, .25, .3, .35,.4, .45,.5,  .55,.6
 
 
 from scalp.output.score import scalpscores
-
 # def scalpscore(datasets):
 #     scr = lambda i: scalp.score.scalp_scores(datasets[i], projection = 'methods', label_batch_split=False)
 #     res  = ut.xxmap(scr, Range(datasets))

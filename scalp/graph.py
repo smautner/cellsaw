@@ -82,7 +82,7 @@ def mkblock(matrix: lil_matrix, i: np.ndarray, j: np.ndarray) -> lil_matrix:
 def integrate(
     adata: AnnData,
     batch_key: str = "batch",
-    base: str = "X_pca",
+    base: str = "pca40",
     k: int = 12,
     metric: str = "cosine",
     dataset_adjacency: np.ndarray | bool = False,
